@@ -1,0 +1,299 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1350" viewBox="0 0 1440 1350" role="img" aria-labelledby="title desc">
+<title id="title">MeGit 品牌与产品色卡</title>
+<desc id="desc">从 Logo 提取的四种原色、三组色阶、中性色、明暗主题用例，以及警告和危险扩展。全部数值见 palette.json。</desc>
+<rect width="1440" height="1350" fill="#F5F6F8"/>
+<g font-family="Segoe UI, Microsoft YaHei, sans-serif">
+<svg x="56" y="24" xmlns="http://www.w3.org/2000/svg" width="190" height="91" viewBox="0 0 960 280" color="#01357c" role="img" aria-labelledby="megit-logo-title">
+  <title id="megit-logo-title">MeGit</title>
+  <desc>MeGit 完整标志。图形与名称等高、上下对齐；透明背景；文字为矢量轮廓；使用精简锚点与平滑贝塞尔曲线。</desc>
+  <defs>
+    <radialGradient id="megit-logo-blue" cx="62%" cy="40%" r="78%">
+      <stop offset="0" stop-color="#063c84"/>
+      <stop offset="1" stop-color="#003478"/>
+    </radialGradient>
+    <linearGradient id="megit-logo-green" x1="0%" y1="0%" x2="70%" y2="100%">
+      <stop offset="0" stop-color="#80cb19"/>
+      <stop offset="1" stop-color="#86d21f"/>
+    </linearGradient>
+    <linearGradient id="megit-logo-cyan" x1="0%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0" stop-color="#00a9f3"/>
+      <stop offset="1" stop-color="#00a1ee"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(28 28)">
+    <g id="megit-logo-symbol" transform="scale(0.464)">
+      <path fill="url(#megit-logo-blue)" d="M76.5 1 H121
+      C130.5 1 134.5 6 131.5 15 L113.5 67
+      C110.6 75.5 105.7 79 97 79 H49
+      C41.1 79 37.9 74.8 40.3 66.5 L52.6 21
+      C56.8 6.4 63.5 1 76.5 1 Z"/>
+      <path fill="url(#megit-logo-green)" d="M156 34 H195
+      C209 34 215.5 42 210.5 56 L171.5 167
+      C165 185.2 150.7 193 133.2 186.7 L62.1 161.3
+      C49.9 156.9 43.4 152 48 135.4 L55.7 108.6
+      C58.4 99.1 62.1 95 72.8 95 H98
+      C114 95 123 88.7 128.9 72 L137 49.3
+      C140.8 38.8 145 34 156 34 Z"/>
+      <path fill="url(#megit-logo-blue)" d="M263 31 H370
+      C388.7 31 399.6 45.1 392.9 64.7 L335.4 235.5
+      C330.1 251.2 322.2 256.2 307 250.9 L216 220.6
+      C185.4 210.4 160.5 225 149.5 256.5 L110 368.4
+      C106.2 379.2 97.2 381.1 86.1 373.4 L16 322.4
+      C1.1 311.6 -2.2 302.1 4.2 282.4 L31.9 195.5
+      C36.2 182.4 43.6 178.5 56.9 183 L129.2 207.4
+      C156.9 216.8 180.3 205 190.2 177 L231.3 60.6
+      C239 38.7 245.5 31 263 31 Z"/>
+      <path fill="url(#megit-logo-cyan)" d="M196 240.5
+      C189.5 240.5 174 242.9 169 256.5 L124.5 381.2
+      C119.5 395.3 121 401.8 133 410.6 L219.8 474.9
+      C236.1 487 251.8 480.9 258 462.6 L314.4 297.5
+      C319.1 283.7 314.2 275.3 301.8 271.5 L208 242.9
+      C203.6 241.6 200 240.5 196 240.5 Z"/>
+      <g fill="#fff">
+        <path d="M246.5 234.5 213.5 353.5" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round"/>
+        <circle cx="246.5" cy="234.5" r="34"/>
+        <circle cx="213.5" cy="353.5" r="32.5"/>
+      </g>
+      <ellipse cx="246.5" cy="234" rx="13.5" ry="14" fill="#01357c"/>
+      <ellipse cx="213.5" cy="353.5" rx="12.5" ry="13.5" fill="#0390e0"/>
+    </g>
+    <g id="megit-logo-wordmark" transform="translate(-142 -133)" fill="currentColor" fill-rule="evenodd">
+      <path d="M361.5 350.5 L409.5 138.5 H450.5 L476.5 240
+      L542.5 138.5 H585.5 L544 350.5 H501 L530 215
+      L479 295.5 H451 L433 214.5 L403.5 350.5 Z"/>
+      <path d="M626 354.5
+      C596.5 349.2 579 328 579 299
+      C579 269 590.5 224 620.5 203.5
+      C646.6 185.8 681.2 189.5 697 206
+      C712.5 222 713.6 243.6 702.5 285 H621.5
+      C619.8 302 622 311.7 630 316.5
+      C641.4 323.4 656.4 322 680.5 309 L694 335.7
+      C673.3 351.5 648.5 358.5 626 354.5 Z
+      M627 258 H669
+      C672.5 244.5 673.6 230 663 225.8
+      C647 219.5 634.8 232 627 258 Z"/>
+      <path d="M776 355
+      C745.5 350.5 724.3 332.8 721.7 306
+      C720 290 726 266 733 233
+      C739.9 199.8 743.5 188.5 751.9 175.8
+      C769.8 148.5 793.8 135.6 826 135.6
+      C849 135.6 864.3 142.2 881 159.5 L851.5 188
+      C842 178.5 836.5 174.5 822.5 174.5
+      C799.5 174.5 788.3 185.3 780.6 218.5 L767 284.5
+      C762.5 306.8 774.5 317.5 792 317.5
+      C800 317.5 805.6 315.6 811.3 312 L821.5 268
+      H798 L805 234.5 H868.5 L848.5 336
+      C824.8 350.5 799 358.5 776 355 Z"/>
+      <path d="M903.6 197.5 H943 L913.7 351 H873 Z"/>
+      <path d="M928.3 133.8
+      C943 130.7 953 138.7 953 151.9
+      C953 168.2 941.8 178 927.4 178
+      C913.4 178 906.8 170.3 908.4 158.2
+      C910 145 916.5 136.3 928.3 133.8 Z"/>
+      <path d="M990.2 157 H1029 L1022 197 H1049.5 L1043.9 229 H1015
+      L1001.7 294.7 C997.8 313.2 1000 318.5 1012.2 318
+      L1025.7 316.5 L1021.3 348.5
+      C1012.2 353.4 995.8 356.5 982.5 352.6
+      C962.1 346.6 952.2 332.6 957 309 L973.7 229
+      H954.3 L960.5 197 H981 Z"/>
+    </g>
+  </g>
+</svg>
+
+<text x="1384" y="75" font-size="14" fill="#616D7E" font-weight="500" text-anchor="end">品牌与产品配色  /  01</text>
+<text x="56" y="151" font-size="28" fill="#1D2024" font-weight="600" >由标志出发，让每个界面使用同一套颜色。</text>
+<text x="56" y="185" font-size="15" fill="#616D7E" font-weight="400" >LOGO 原色 · 语义色阶 · 明暗主题 · 对比度规范</text>
+<rect x="56" y="218" width="320" height="174" rx="12" fill="#01357C" stroke="none"/>
+<text x="78" y="253" font-size="13" fill="#FFFFFF" font-weight="400" >01</text>
+<text x="78" y="337" font-size="22" fill="#FFFFFF" font-weight="600" >MeGit 深蓝</text>
+<text x="78" y="370" font-size="20" fill="#FFFFFF" font-weight="500" >#01357C</text>
+<text x="57" y="420" font-size="14" fill="#495569" font-weight="400" >品牌主色 / 亮色主题主操作</text>
+<rect x="392" y="218" width="320" height="174" rx="12" fill="#86D21F" stroke="none"/>
+<text x="414" y="253" font-size="13" fill="#000D1F" font-weight="400" >02</text>
+<text x="414" y="337" font-size="22" fill="#000D1F" font-weight="600" >MeGit 绿</text>
+<text x="414" y="370" font-size="20" fill="#000D1F" font-weight="500" >#86D21F</text>
+<text x="393" y="420" font-size="14" fill="#495569" font-weight="400" >品牌辅助 / 成功与已包含</text>
+<rect x="728" y="218" width="320" height="174" rx="12" fill="#00A9F3" stroke="none"/>
+<text x="750" y="253" font-size="13" fill="#000D1F" font-weight="400" >03</text>
+<text x="750" y="337" font-size="22" fill="#000D1F" font-weight="600" >MeGit 亮青</text>
+<text x="750" y="370" font-size="20" fill="#000D1F" font-weight="500" >#00A9F3</text>
+<text x="729" y="420" font-size="14" fill="#495569" font-weight="400" >交互强调 / 暗色主题主操作</text>
+<rect x="1064" y="218" width="320" height="174" rx="12" fill="#FFFFFF" stroke="#D9E1EB"/>
+<text x="1086" y="253" font-size="13" fill="#000D1F" font-weight="400" >04</text>
+<text x="1086" y="337" font-size="22" fill="#000D1F" font-weight="600" >标志白</text>
+<text x="1086" y="370" font-size="20" fill="#000D1F" font-weight="500" >#FFFFFF</text>
+<text x="1065" y="420" font-size="14" fill="#495569" font-weight="400" >节点连线 / 留白 / 浅色表面</text>
+<text x="56" y="478" font-size="20" fill="#1D2024" font-weight="600" >同源色阶</text>
+<text x="1384" y="478" font-size="13" fill="#616D7E" font-weight="400" text-anchor="end">原色在色阶中标记 BASE</text>
+<text x="56" y="532" font-size="15" fill="#495569" font-weight="500" >深蓝</text>
+<rect x="160" y="503" width="106" height="50" rx="5" fill="#F7F9FB" stroke="none"/>
+<text x="170" y="533" font-size="11" fill="#000D1F" font-weight="400" >50</text>
+<text x="161" y="572" font-size="11" fill="#616D7E" font-weight="400" >#F7F9FB</text>
+<rect x="272" y="503" width="106" height="50" rx="5" fill="#F0F3F7" stroke="none"/>
+<text x="282" y="533" font-size="11" fill="#000D1F" font-weight="400" >100</text>
+<text x="273" y="572" font-size="11" fill="#616D7E" font-weight="400" >#F0F3F7</text>
+<rect x="384" y="503" width="106" height="50" rx="5" fill="#D9E1EB" stroke="none"/>
+<text x="394" y="533" font-size="11" fill="#000D1F" font-weight="400" >200</text>
+<text x="385" y="572" font-size="11" fill="#616D7E" font-weight="400" >#D9E1EB</text>
+<rect x="496" y="503" width="106" height="50" rx="5" fill="#B3C2D8" stroke="none"/>
+<text x="506" y="533" font-size="11" fill="#000D1F" font-weight="400" >300</text>
+<text x="497" y="572" font-size="11" fill="#616D7E" font-weight="400" >#B3C2D8</text>
+<rect x="608" y="503" width="106" height="50" rx="5" fill="#809ABE" stroke="none"/>
+<text x="618" y="533" font-size="11" fill="#000D1F" font-weight="400" >400</text>
+<text x="609" y="572" font-size="11" fill="#616D7E" font-weight="400" >#809ABE</text>
+<rect x="720" y="503" width="106" height="50" rx="5" fill="#4D72A3" stroke="none"/>
+<text x="730" y="533" font-size="11" fill="#FFFFFF" font-weight="400" >500</text>
+<text x="721" y="572" font-size="11" fill="#616D7E" font-weight="400" >#4D72A3</text>
+<rect x="832" y="503" width="106" height="50" rx="5" fill="#275390" stroke="none"/>
+<text x="842" y="533" font-size="11" fill="#FFFFFF" font-weight="400" >600</text>
+<text x="833" y="572" font-size="11" fill="#616D7E" font-weight="400" >#275390</text>
+<rect x="944" y="503" width="106" height="50" rx="5" fill="#01357C" stroke="none"/>
+<text x="954" y="533" font-size="11" fill="#FFFFFF" font-weight="700" >700 BASE</text>
+<text x="945" y="572" font-size="11" fill="#616D7E" font-weight="400" >#01357C</text>
+<rect x="1056" y="503" width="106" height="50" rx="5" fill="#012557" stroke="none"/>
+<text x="1066" y="533" font-size="11" fill="#FFFFFF" font-weight="400" >800</text>
+<text x="1057" y="572" font-size="11" fill="#616D7E" font-weight="400" >#012557</text>
+<rect x="1168" y="503" width="106" height="50" rx="5" fill="#001532" stroke="none"/>
+<text x="1178" y="533" font-size="11" fill="#FFFFFF" font-weight="400" >900</text>
+<text x="1169" y="572" font-size="11" fill="#616D7E" font-weight="400" >#001532</text>
+<rect x="1280" y="503" width="106" height="50" rx="5" fill="#000D1F" stroke="none"/>
+<text x="1290" y="533" font-size="11" fill="#FFFFFF" font-weight="400" >950</text>
+<text x="1281" y="572" font-size="11" fill="#616D7E" font-weight="400" >#000D1F</text>
+<text x="56" y="618" font-size="15" fill="#495569" font-weight="500" >亮青</text>
+<rect x="160" y="589" width="106" height="50" rx="5" fill="#F0FAFE" stroke="none"/>
+<text x="170" y="619" font-size="11" fill="#000D1F" font-weight="400" >50</text>
+<text x="161" y="658" font-size="11" fill="#616D7E" font-weight="400" >#F0FAFE</text>
+<rect x="272" y="589" width="106" height="50" rx="5" fill="#D9F2FD" stroke="none"/>
+<text x="282" y="619" font-size="11" fill="#000D1F" font-weight="400" >100</text>
+<text x="273" y="658" font-size="11" fill="#616D7E" font-weight="400" >#D9F2FD</text>
+<rect x="384" y="589" width="106" height="50" rx="5" fill="#B2E5FB" stroke="none"/>
+<text x="394" y="619" font-size="11" fill="#000D1F" font-weight="400" >200</text>
+<text x="385" y="658" font-size="11" fill="#616D7E" font-weight="400" >#B2E5FB</text>
+<rect x="496" y="589" width="106" height="50" rx="5" fill="#80D4F9" stroke="none"/>
+<text x="506" y="619" font-size="11" fill="#000D1F" font-weight="400" >300</text>
+<text x="497" y="658" font-size="11" fill="#616D7E" font-weight="400" >#80D4F9</text>
+<rect x="608" y="589" width="106" height="50" rx="5" fill="#4CC3F7" stroke="none"/>
+<text x="618" y="619" font-size="11" fill="#000D1F" font-weight="400" >400</text>
+<text x="609" y="658" font-size="11" fill="#616D7E" font-weight="400" >#4CC3F7</text>
+<rect x="720" y="589" width="106" height="50" rx="5" fill="#26B6F5" stroke="none"/>
+<text x="730" y="619" font-size="11" fill="#000D1F" font-weight="400" >500</text>
+<text x="721" y="658" font-size="11" fill="#616D7E" font-weight="400" >#26B6F5</text>
+<rect x="832" y="589" width="106" height="50" rx="5" fill="#00A9F3" stroke="none"/>
+<text x="842" y="619" font-size="11" fill="#000D1F" font-weight="700" >600 BASE</text>
+<text x="833" y="658" font-size="11" fill="#616D7E" font-weight="400" >#00A9F3</text>
+<rect x="944" y="589" width="106" height="50" rx="5" fill="#0076AA" stroke="none"/>
+<text x="954" y="619" font-size="11" fill="#FFFFFF" font-weight="400" >700</text>
+<text x="945" y="658" font-size="11" fill="#616D7E" font-weight="400" >#0076AA</text>
+<rect x="1056" y="589" width="106" height="50" rx="5" fill="#005D86" stroke="none"/>
+<text x="1066" y="619" font-size="11" fill="#FFFFFF" font-weight="400" >800</text>
+<text x="1057" y="658" font-size="11" fill="#616D7E" font-weight="400" >#005D86</text>
+<rect x="1168" y="589" width="106" height="50" rx="5" fill="#004461" stroke="none"/>
+<text x="1178" y="619" font-size="11" fill="#FFFFFF" font-weight="400" >900</text>
+<text x="1169" y="658" font-size="11" fill="#616D7E" font-weight="400" >#004461</text>
+<rect x="1280" y="589" width="106" height="50" rx="5" fill="#002A3D" stroke="none"/>
+<text x="1290" y="619" font-size="11" fill="#FFFFFF" font-weight="400" >950</text>
+<text x="1281" y="658" font-size="11" fill="#616D7E" font-weight="400" >#002A3D</text>
+<text x="56" y="704" font-size="15" fill="#495569" font-weight="500" >品牌绿</text>
+<rect x="160" y="675" width="106" height="50" rx="5" fill="#F8FCF2" stroke="none"/>
+<text x="170" y="705" font-size="11" fill="#000D1F" font-weight="400" >50</text>
+<text x="161" y="744" font-size="11" fill="#616D7E" font-weight="400" >#F8FCF2</text>
+<rect x="272" y="675" width="106" height="50" rx="5" fill="#EDF8DD" stroke="none"/>
+<text x="282" y="705" font-size="11" fill="#000D1F" font-weight="400" >100</text>
+<text x="273" y="744" font-size="11" fill="#616D7E" font-weight="400" >#EDF8DD</text>
+<rect x="384" y="675" width="106" height="50" rx="5" fill="#DBF2BC" stroke="none"/>
+<text x="394" y="705" font-size="11" fill="#000D1F" font-weight="400" >200</text>
+<text x="385" y="744" font-size="11" fill="#616D7E" font-weight="400" >#DBF2BC</text>
+<rect x="496" y="675" width="106" height="50" rx="5" fill="#C2E88F" stroke="none"/>
+<text x="506" y="705" font-size="11" fill="#000D1F" font-weight="400" >300</text>
+<text x="497" y="744" font-size="11" fill="#616D7E" font-weight="400" >#C2E88F</text>
+<rect x="608" y="675" width="106" height="50" rx="5" fill="#AAE062" stroke="none"/>
+<text x="618" y="705" font-size="11" fill="#000D1F" font-weight="400" >400</text>
+<text x="609" y="744" font-size="11" fill="#616D7E" font-weight="400" >#AAE062</text>
+<rect x="720" y="675" width="106" height="50" rx="5" fill="#98D941" stroke="none"/>
+<text x="730" y="705" font-size="11" fill="#000D1F" font-weight="400" >500</text>
+<text x="721" y="744" font-size="11" fill="#616D7E" font-weight="400" >#98D941</text>
+<rect x="832" y="675" width="106" height="50" rx="5" fill="#86D21F" stroke="none"/>
+<text x="842" y="705" font-size="11" fill="#000D1F" font-weight="700" >600 BASE</text>
+<text x="833" y="744" font-size="11" fill="#616D7E" font-weight="400" >#86D21F</text>
+<rect x="944" y="675" width="106" height="50" rx="5" fill="#5E9316" stroke="none"/>
+<text x="954" y="705" font-size="11" fill="#000D1F" font-weight="400" >700</text>
+<text x="945" y="744" font-size="11" fill="#616D7E" font-weight="400" >#5E9316</text>
+<rect x="1056" y="675" width="106" height="50" rx="5" fill="#4A7411" stroke="none"/>
+<text x="1066" y="705" font-size="11" fill="#FFFFFF" font-weight="400" >800</text>
+<text x="1057" y="744" font-size="11" fill="#616D7E" font-weight="400" >#4A7411</text>
+<rect x="1168" y="675" width="106" height="50" rx="5" fill="#36540C" stroke="none"/>
+<text x="1178" y="705" font-size="11" fill="#FFFFFF" font-weight="400" >900</text>
+<text x="1169" y="744" font-size="11" fill="#616D7E" font-weight="400" >#36540C</text>
+<rect x="1280" y="675" width="106" height="50" rx="5" fill="#223408" stroke="none"/>
+<text x="1290" y="705" font-size="11" fill="#FFFFFF" font-weight="400" >950</text>
+<text x="1281" y="744" font-size="11" fill="#616D7E" font-weight="400" >#223408</text>
+<text x="56" y="793" font-size="20" fill="#1D2024" font-weight="600" >中性色</text>
+<rect x="56" y="815" width="106" height="46" rx="5" fill="#FFFFFF" stroke="#D9E1EB"/>
+<text x="65" y="844" font-size="12" fill="#000D1F" font-weight="400" >0</text>
+<text x="56" y="880" font-size="11" fill="#616D7E" font-weight="400" >#FFFFFF</text>
+<rect x="168" y="815" width="106" height="46" rx="5" fill="#F5F6F8" stroke="none"/>
+<text x="177" y="844" font-size="12" fill="#000D1F" font-weight="400" >50</text>
+<text x="168" y="880" font-size="11" fill="#616D7E" font-weight="400" >#F5F6F8</text>
+<rect x="280" y="815" width="106" height="46" rx="5" fill="#E9EDF3" stroke="none"/>
+<text x="289" y="844" font-size="12" fill="#000D1F" font-weight="400" >100</text>
+<text x="280" y="880" font-size="11" fill="#616D7E" font-weight="400" >#E9EDF3</text>
+<rect x="392" y="815" width="106" height="46" rx="5" fill="#D7DCE5" stroke="none"/>
+<text x="401" y="844" font-size="12" fill="#000D1F" font-weight="400" >150</text>
+<text x="392" y="880" font-size="11" fill="#616D7E" font-weight="400" >#D7DCE5</text>
+<rect x="504" y="815" width="106" height="46" rx="5" fill="#B7BFCD" stroke="none"/>
+<text x="513" y="844" font-size="12" fill="#000D1F" font-weight="400" >200</text>
+<text x="504" y="880" font-size="11" fill="#616D7E" font-weight="400" >#B7BFCD</text>
+<rect x="616" y="815" width="106" height="46" rx="5" fill="#9AA4B4" stroke="none"/>
+<text x="625" y="844" font-size="12" fill="#000D1F" font-weight="400" >250</text>
+<text x="616" y="880" font-size="11" fill="#616D7E" font-weight="400" >#9AA4B4</text>
+<rect x="728" y="815" width="106" height="46" rx="5" fill="#616D7E" stroke="none"/>
+<text x="737" y="844" font-size="12" fill="#FFFFFF" font-weight="400" >400</text>
+<text x="728" y="880" font-size="11" fill="#616D7E" font-weight="400" >#616D7E</text>
+<rect x="840" y="815" width="106" height="46" rx="5" fill="#414953" stroke="none"/>
+<text x="849" y="844" font-size="12" fill="#FFFFFF" font-weight="400" >500</text>
+<text x="840" y="880" font-size="11" fill="#616D7E" font-weight="400" >#414953</text>
+<rect x="952" y="815" width="106" height="46" rx="5" fill="#30353C" stroke="none"/>
+<text x="961" y="844" font-size="12" fill="#FFFFFF" font-weight="400" >600</text>
+<text x="952" y="880" font-size="11" fill="#616D7E" font-weight="400" >#30353C</text>
+<rect x="1064" y="815" width="106" height="46" rx="5" fill="#24282E" stroke="none"/>
+<text x="1073" y="844" font-size="12" fill="#FFFFFF" font-weight="400" >700</text>
+<text x="1064" y="880" font-size="11" fill="#616D7E" font-weight="400" >#24282E</text>
+<rect x="1176" y="815" width="106" height="46" rx="5" fill="#1D2024" stroke="none"/>
+<text x="1185" y="844" font-size="12" fill="#FFFFFF" font-weight="400" >800</text>
+<text x="1176" y="880" font-size="11" fill="#616D7E" font-weight="400" >#1D2024</text>
+<rect x="1288" y="815" width="106" height="46" rx="5" fill="#16181B" stroke="none"/>
+<text x="1297" y="844" font-size="12" fill="#FFFFFF" font-weight="400" >900</text>
+<text x="1288" y="880" font-size="11" fill="#616D7E" font-weight="400" >#16181B</text>
+<rect x="56" y="919" width="654" height="212" rx="12" fill="#16181B" stroke="#30353C"/>
+<text x="80" y="954" font-size="16" fill="#D7DCE5" font-weight="600" >默认暗黑</text>
+<text x="80" y="983" font-size="13" fill="#9AA4B4" font-weight="400" >表面层级与文字保持克制，交互使用蓝 / 青。</text>
+<rect x="80" y="1007" width="292" height="92" rx="8" fill="#1D2024" stroke="#414953"/>
+<text x="96" y="1038" font-size="15" fill="#D7DCE5" font-weight="600" >MeGit 开发流程</text>
+<text x="96" y="1070" font-size="13" fill="#00A9F3" font-weight="400" >查看仓库与关系</text>
+<rect x="398" y="1007" width="138" height="38" rx="6" fill="#00A9F3" stroke="none"/>
+<text x="467" y="1031" font-size="14" fill="#000D1F" font-weight="600" text-anchor="middle">添加仓库</text>
+<rect x="554" y="1007" width="132" height="38" rx="6" fill="#223408" stroke="#4A7411"/>
+<text x="620" y="1031" font-size="14" fill="#86D21F" font-weight="500" text-anchor="middle">✓ 已包含</text>
+<text x="400" y="1082" font-size="12" fill="#9AA4B4" font-weight="400" >主要动作 / 成功状态</text>
+<rect x="730" y="919" width="654" height="212" rx="12" fill="#F5F6F8" stroke="#D9E1EB"/>
+<text x="754" y="954" font-size="16" fill="#24282E" font-weight="600" >明亮主题</text>
+<text x="754" y="983" font-size="13" fill="#616D7E" font-weight="400" >表面层级与文字保持克制，交互使用蓝 / 青。</text>
+<rect x="754" y="1007" width="292" height="92" rx="8" fill="#FFFFFF" stroke="#B3C2D8"/>
+<text x="770" y="1038" font-size="15" fill="#24282E" font-weight="600" >MeGit 开发流程</text>
+<text x="770" y="1070" font-size="13" fill="#01357C" font-weight="400" >查看仓库与关系</text>
+<rect x="1072" y="1007" width="138" height="38" rx="6" fill="#01357C" stroke="none"/>
+<text x="1141" y="1031" font-size="14" fill="#FFFFFF" font-weight="600" text-anchor="middle">添加仓库</text>
+<rect x="1228" y="1007" width="132" height="38" rx="6" fill="#EDF8DD" stroke="#AAE062"/>
+<text x="1294" y="1031" font-size="14" fill="#36540C" font-weight="500" text-anchor="middle">✓ 已包含</text>
+<text x="1074" y="1082" font-size="12" fill="#616D7E" font-weight="400" >主要动作 / 成功状态</text>
+<text x="56" y="1178" font-size="18" fill="#1D2024" font-weight="600" >功能扩展</text>
+<text x="171" y="1178" font-size="14" fill="#616D7E" font-weight="400" >警告与危险不来自 Logo，仅用于状态和操作风险。</text>
+<rect x="56" y="1198" width="320" height="44" rx="6" fill="#FFF4DD" stroke="#E7CF9C"/>
+<text x="72" y="1226" font-size="14" fill="#865710" font-weight="500" >警告 / 待整合  #865710</text>
+<rect x="392" y="1198" width="320" height="44" rx="6" fill="#FDECF0" stroke="#E8BBC5"/>
+<text x="408" y="1226" font-size="14" fill="#B6354B" font-weight="500" >错误 / 冲突  #B6354B</text>
+<text x="750" y="1219" font-size="15" fill="#495569" font-weight="500" >文字 ≥ 4.5:1  /  必要图形与焦点 ≥ 3:1</text>
+<text x="750" y="1244" font-size="13" fill="#616D7E" font-weight="400" >亮青 / 绿色原色不直接用作白底小字。</text>
+<text x="56" y="1314" font-size="13" fill="#616D7E" font-weight="400" >MeGit 配色规范 v1 · 2026-11-16</text>
+<text x="1384" y="1314" font-size="13" fill="#616D7E" font-weight="400" text-anchor="end">颜色数据 palette.json  /  运行时 themes.css</text>
+</g></svg>

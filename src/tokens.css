@@ -1,0 +1,63 @@
+/* Shared geometry and typography. Colors belong to themes.css. */
+:root {
+  --space-1: 4px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --motion-explain: 600ms;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --text-micro: 11px;
+  --text-caption: 12px;
+  --text-dense: 13px;
+  --text-body: 14px;
+  --text-heading: 16px;
+  --text-title: 20px;
+  --leading-compact: 1.4;
+  --leading-body: 1.6;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+  --radius-small: 4px;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --control-small: 28px;
+  --control-compact: 32px;
+  --control-default: 36px;
+  --control-touch: 44px;
+  --repository-avatar-small: 18px;
+  --repository-avatar-default: 28px;
+  --repository-avatar-large: 32px;
+  --repository-avatar-preview: 72px;
+  --repository-avatar-file-height: 220px;
+  --header-height: 44px;
+  --navigation-width: 212px;
+  --navigation-drawer-width: 256px;
+  --ribbon-width: 56px;
+  --inspector-width: 365px;
+  --inspector-card-min: 320px;
+  --branch-tree-menu-width: 240px;
+  --branch-tree-tip-width: 112px;
+  --branch-tree-detail-width: 420px;
+  --branch-tree-demo-height: 460px;
+  --branch-tree-map-inset: 64px;
+  --info-popover-width: 360px;
+  --info-popover-max-height: 560px;
+  --help-tooltip-width: 340px;
+  --learning-preview-width: 380px;
+  --learning-preview-height: 300px;
+  --navigation-logo-width: 84px;
+  /* Match the icon's scale inside the 960px full logo. */
+  --navigation-symbol-size: calc(var(--navigation-logo-width) * 0.464 * 512 / 960);
+  --canvas-control-size: var(--control-compact);
+  --canvas-control-extent: calc(var(--canvas-control-size) + var(--space-1) * 2 + 2px);
+}
+
+@media (pointer: coarse) {
+  :root {
+    --canvas-control-size: var(--control-touch);
+  }
+}

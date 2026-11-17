@@ -1,0 +1,249 @@
+.git-demo-tooltip > .tooltip-bubble {
+  width: var(--learning-preview-width);
+  max-width: calc(100vw - 16px);
+  padding: var(--space-3);
+}
+.git-demo-tooltip-content,
+.git-learning-preview {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.git-demo-tooltip-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.git-demo-tooltip-heading strong {
+  color: var(--text);
+  font-size: var(--text-dense);
+  font-weight: var(--weight-strong);
+}
+.git-demo-tooltip-heading small {
+  color: var(--muted);
+  font-size: var(--text-micro);
+}
+.git-learning-preview .git-learning-preview-scene {
+  height: var(--learning-preview-height);
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.git-learning-preview-scene .learning-diagram {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  height: 100%;
+}
+.git-learning-preview-caption {
+  min-height: 38px;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+}
+.git-learning-preview-scene .learning-mobile-file,
+.git-learning-preview-scene .learning-code-lines,
+.git-learning-preview-scene .learning-file > code {
+  display: none;
+}
+.git-learning-preview-scene .learning-file {
+  padding: var(--space-2);
+}
+.git-learning-preview-scene .learning-file-heading {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.git-learning-preview-scene .learning-file-heading span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.git-learning-preview-scene .learning-file-heading svg {
+  flex-shrink: 0;
+  width: 14px;
+}
+.git-learning-preview-scene .learning-areas,
+.git-learning-preview-scene .learning-conflict-files {
+  gap: var(--space-2);
+}
+.git-learning-preview-scene .learning-area {
+  min-height: 156px;
+  padding: var(--space-2);
+  gap: var(--space-2);
+  overflow: hidden;
+}
+.git-learning-preview-scene .learning-area h3 {
+  min-height: 34px;
+  font-size: var(--text-caption);
+  line-height: var(--leading-compact);
+}
+.git-learning-preview-scene .learning-area h3 svg,
+.git-learning-preview-scene .learning-areas .learning-file-heading span,
+.git-learning-preview-scene .learning-conflict-files .learning-file-heading span {
+  display: none;
+}
+.git-learning-preview-scene .learning-state {
+  min-height: 36px;
+  line-height: var(--leading-compact);
+  overflow-wrap: anywhere;
+}
+.git-learning-preview-scene .learning-recorded-copy {
+  gap: var(--space-2);
+}
+.git-learning-preview-scene
+  .learning-area:has(.learning-index-copy[aria-hidden='true'])
+  .learning-empty {
+  inset: 66px var(--space-2) auto;
+  font-size: var(--text-micro);
+}
+.git-learning-preview-scene .learning-empty {
+  font-size: var(--text-micro);
+}
+.git-learning-preview-scene .learning-graph > svg {
+  height: 188px;
+  width: 100%;
+}
+.git-learning-preview-scene .learning-diagram[data-view='areas'] .learning-graph > svg {
+  height: 108px;
+}
+.git-learning-preview-scene .learning-diagram[data-view='snapshots'] .learning-graph > svg {
+  height: 136px;
+}
+.git-learning-preview-scene .learning-diagram[data-view='conflict'] .learning-graph > svg {
+  height: 144px;
+}
+.git-learning-preview-scene .learning-graph-legend {
+  margin-top: -4px;
+  font-size: var(--text-micro);
+}
+.git-learning-preview-scene .learning-graph svg.is-small .learning-commit text {
+  font-size: 20px;
+}
+.git-learning-preview-scene
+  .learning-graph
+  svg.is-small
+  .learning-commit
+  text.learning-commit-version {
+  font-size: 17px;
+}
+.git-learning-preview-scene
+  .learning-graph
+  svg.is-small
+  .learning-commit
+  text.learning-commit-order {
+  font-size: 15px;
+}
+.git-learning-preview-scene .learning-graph svg.is-small .learning-reference text {
+  font-size: 17px;
+}
+.git-learning-preview-scene .learning-checkout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+.git-learning-preview-scene .learning-checkout > span {
+  grid-column: 1 / -1;
+}
+.git-learning-preview-scene .learning-checkout .learning-file {
+  max-width: none;
+}
+.git-learning-preview-scene .learning-snapshot {
+  padding: var(--space-2);
+}
+.git-learning-preview-scene .learning-snapshot h3 {
+  font-size: var(--text-caption);
+}
+.git-learning-preview-scene .learning-snapshot-files {
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.git-learning-preview-scene .learning-shared {
+  font-size: var(--text-micro);
+  line-height: var(--leading-compact);
+}
+.git-learning-preview-scene .learning-remote-scope {
+  display: none;
+}
+.git-learning-preview-scene .learning-remote-columns {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.git-learning-preview-scene .learning-remote-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  text-align: left;
+}
+.git-learning-preview-scene .learning-remote-column h3 {
+  min-height: 0;
+  font-size: var(--text-micro);
+  line-height: var(--leading-compact);
+}
+.git-learning-preview-scene .learning-remote-label code {
+  font-size: var(--text-caption);
+}
+.git-learning-preview-scene .learning-remote-history {
+  flex-direction: row;
+  min-height: 52px;
+  gap: 12px;
+  margin-top: 0;
+}
+.git-learning-preview-scene .learning-remote-commit > span {
+  width: 32px;
+  height: 32px;
+  font-size: var(--text-caption);
+}
+.git-learning-preview-scene .learning-remote-commit:not(:first-child)::before {
+  width: 12px;
+  height: 2px;
+  left: -12px;
+  top: 15px;
+}
+.git-learning-preview-scene .learning-remote-operations {
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.git-learning-preview-scene .learning-conflict-files h3 {
+  min-height: 34px;
+  font-size: var(--text-micro);
+  line-height: var(--leading-compact);
+}
+.git-learning-preview-scene .learning-conflict-markers {
+  height: 48px;
+  gap: 0;
+  padding: var(--space-1);
+}
+.git-learning-preview-scene .learning-conflict-markers svg {
+  width: 18px;
+  height: 18px;
+}
+.git-learning-preview-scene .learning-conflict-markers code {
+  display: none;
+}
+.git-learning-preview-scene .learning-conflict-status {
+  min-height: 34px;
+  margin-top: var(--space-2);
+  font-size: var(--text-micro);
+  line-height: var(--leading-compact);
+  text-align: center;
+}
+.git-learning-preview[data-mode='still'] *,
+.git-learning-preview[data-mode='still'] *::before,
+.git-learning-preview[data-mode='still'] *::after {
+  animation: none;
+  transition: none;
+}
+.design-learning-preview-example {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+.design-learning-preview-example [data-demo-poster] {
+  width: min(100%, var(--learning-preview-width));
+}

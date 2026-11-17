@@ -1,0 +1,10 @@
+---
+description: MeGit 界面简洁性、tooltip 与渐进式披露
+alwaysApply: true
+---
+
+- 遵循 `docs/UI_GUIDELINES.md`。
+- Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
+- 用分组、位置与控件状态解释关系，删除重复的副标题、装饰标签和常驻教学。
+- 简短说明优先使用支持悬停和键盘的 tooltip；图标按钮必须有本地化的无障碍名称。
+- 详细依据按需展开，复杂说明进入详情或帮助；关键错误与限制保持可见。

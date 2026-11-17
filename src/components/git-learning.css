@@ -1,0 +1,880 @@
+.dialog-header {
+  gap: var(--space-2);
+}
+.dialog-header h2 {
+  flex: 1;
+  min-width: 0;
+}
+.dialog-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.is-draggable > .dialog-header {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.dialog-move {
+  cursor: grab;
+  touch-action: none;
+}
+.is-draggable > .dialog-header:active {
+  cursor: grabbing;
+}
+.dialog.git-learning-dialog {
+  width: min(1120px, calc(100vw - 32px));
+  max-width: calc(100vw - 16px);
+  height: min(780px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 16px);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+.git-learning-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.git-learning-dialog > .dialog-header {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-4);
+}
+.learning-simulation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.learning-layout {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.learning-courses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-2);
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  overflow: auto;
+}
+.learning-course {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  min-height: var(--control-touch);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  text-align: left;
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-dense);
+}
+.learning-course-number {
+  font-size: var(--text-micro);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.learning-course svg {
+  color: var(--muted);
+}
+.learning-course.is-active {
+  color: var(--accent);
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+  font-weight: var(--weight-strong);
+}
+.learning-course.is-active svg {
+  color: var(--accent);
+}
+.learning-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.learning-lesson-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+}
+.learning-lesson-header h3 {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-strong);
+}
+.learning-lesson-header p {
+  color: var(--muted);
+  font-size: var(--text-caption);
+  margin-top: var(--space-1);
+}
+.learning-step-count {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.learning-mobile-simulation {
+  display: none;
+}
+.learning-command {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-6);
+  background: var(--surface-raised);
+  border-block: 1px solid var(--border);
+}
+.learning-command code {
+  overflow-x: auto;
+  color: var(--accent);
+  font-size: var(--text-caption);
+  white-space: pre;
+}
+.learning-command .icon-button {
+  color: var(--muted);
+}
+.learning-diagram-scroll {
+  flex: 1;
+  min-height: 238px;
+  overflow: auto;
+  padding: var(--space-6);
+  background: var(--canvas);
+  overscroll-behavior: contain;
+}
+.learning-diagram-scroll:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -3px;
+}
+.learning-diagram {
+  min-width: 620px;
+}
+.learning-mobile-file {
+  display: none;
+}
+.learning-areas,
+.learning-conflict-files {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.learning-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 216px;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+.learning-area h3,
+.learning-snapshot h3,
+.learning-conflict-files h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-dense);
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+.learning-area h3 svg {
+  color: var(--accent);
+}
+.learning-file {
+  position: relative;
+  padding: var(--space-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  min-width: 0;
+}
+.learning-file-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+}
+.learning-file-heading svg {
+  color: var(--muted);
+}
+.learning-file-heading span {
+  flex: 1;
+}
+.learning-file-heading b {
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-small);
+  font-size: var(--text-caption);
+}
+.learning-file > code {
+  display: block;
+  margin-top: var(--space-3);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.learning-code-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: var(--space-2);
+}
+.learning-code-lines i {
+  display: block;
+  height: 3px;
+  width: 70%;
+  background: var(--border-strong);
+  border-radius: 2px;
+}
+.learning-code-lines i:last-child {
+  width: 46%;
+}
+.learning-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-micro);
+  color: var(--muted);
+  margin-top: auto;
+}
+.learning-state.changed {
+  color: var(--orange);
+}
+.learning-state.staged {
+  color: var(--green);
+}
+.learning-index-copy {
+  transition:
+    transform var(--motion-explain) var(--ease-in-out),
+    opacity 200ms var(--ease-out);
+}
+.learning-recorded-copy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-4);
+  animation: learning-record var(--motion-explain) var(--ease-in-out);
+}
+.learning-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.learning-area:has(.learning-index-copy[aria-hidden='true']) .learning-empty {
+  position: absolute;
+  inset: 80px var(--space-4) auto;
+}
+.learning-graph {
+  position: relative;
+}
+.learning-graph > svg {
+  display: block;
+  width: 100%;
+}
+.learning-graph-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  margin-top: -12px;
+  color: var(--muted);
+  font-size: var(--text-micro);
+}
+.learning-parent {
+  stroke: var(--graph-0);
+  stroke-width: 2;
+  fill: none;
+  animation: learning-appear 250ms var(--ease-out);
+}
+.learning-parent.lane-1 {
+  stroke: var(--graph-1);
+}
+.learning-arrowhead {
+  fill: var(--muted);
+}
+.learning-commit circle {
+  stroke: var(--graph-0);
+  fill: var(--surface);
+  stroke-width: 2;
+}
+.learning-commit.lane-1 circle {
+  stroke: var(--graph-1);
+}
+.learning-commit.is-current circle {
+  fill: var(--accent-soft);
+  stroke-width: 3;
+}
+.learning-commit text {
+  fill: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: var(--weight-medium);
+}
+.learning-commit text.learning-commit-version {
+  fill: var(--text-secondary);
+  font-size: 15px;
+}
+.learning-commit text.learning-commit-order {
+  fill: var(--muted);
+  font-size: 12px;
+}
+.learning-commit-bubble {
+  animation: learning-appear 250ms var(--ease-out);
+}
+.learning-reference {
+  transition: transform var(--motion-explain) var(--ease-in-out);
+}
+.learning-reference rect {
+  fill: var(--surface-raised);
+  stroke: var(--border-strong);
+}
+.learning-reference text {
+  fill: var(--text-secondary);
+  font-size: 14px;
+  font-weight: var(--weight-medium);
+}
+.learning-reference.is-head rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+.learning-reference.is-head text {
+  fill: var(--accent);
+}
+.learning-snapshot {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+.learning-snapshot-files {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+.learning-shared {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--green);
+  font-size: var(--text-micro);
+  margin-top: var(--space-2);
+}
+.learning-checkout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+.learning-checkout > span {
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.learning-checkout .learning-file {
+  flex: 1;
+  max-width: 280px;
+}
+.learning-remote-scope {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-caption);
+  text-align: center;
+  margin-bottom: var(--space-2);
+}
+.learning-remote-scope span {
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: var(--space-2);
+}
+.learning-remote-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.learning-remote-column {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  text-align: center;
+}
+.learning-remote-column h3 {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--muted);
+  min-height: 22px;
+}
+.learning-remote-label code {
+  color: var(--accent);
+  font-size: var(--text-dense);
+}
+.learning-remote-history {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  min-height: 198px;
+  margin-top: var(--space-4);
+}
+.learning-remote-commit {
+  position: relative;
+  animation: learning-appear var(--motion-explain) var(--ease-out);
+}
+.learning-remote-commit > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: var(--surface-raised);
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text);
+  font-size: var(--text-body);
+}
+.learning-remote-commit.is-current > span {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.learning-remote-commit:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 24px;
+  left: 20px;
+  top: -24px;
+  background: var(--border-strong);
+}
+.learning-remote-column.is-receiving .learning-remote-commit:last-child {
+  animation: learning-receive var(--motion-explain) var(--ease-in-out);
+}
+.learning-remote-operations {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+.learning-remote-operations span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.learning-remote-operations span.is-active {
+  color: var(--accent);
+}
+.learning-conflict-files section h3 {
+  margin-bottom: var(--space-2);
+}
+.learning-conflict-markers {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-1);
+  height: 120px;
+  background: var(--orange-soft);
+  border: 1px solid var(--orange-border);
+  border-radius: var(--radius-control);
+  color: var(--orange);
+  font-size: var(--text-micro);
+}
+.learning-conflict-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--green);
+}
+.learning-conflict-status.is-pending {
+  color: var(--orange);
+}
+.learning-footer {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.learning-caption {
+  min-height: 38px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-size: var(--text-dense);
+  color: var(--text);
+  line-height: var(--leading-body);
+}
+.learning-caption.is-warning {
+  color: var(--orange);
+}
+.learning-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: var(--space-1) 0 var(--space-2);
+}
+.learning-progress button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 24px;
+  border: 0;
+  background: none;
+}
+.learning-progress span {
+  display: block;
+  width: 18px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--border-strong);
+}
+.learning-progress .is-complete span {
+  background: var(--muted);
+}
+.learning-progress .is-current span {
+  background: var(--accent);
+  height: 5px;
+}
+.learning-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.learning-controls .button {
+  white-space: normal;
+}
+.learning-next {
+  min-width: 144px;
+}
+@keyframes learning-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes learning-record {
+  from {
+    opacity: 0;
+    transform: translateX(-65%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes learning-receive {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .learning-course:hover {
+    background: var(--hover);
+  }
+}
+@media (min-width: 761px) and (max-height: 800px) {
+  .learning-lesson-header,
+  .learning-footer,
+  .learning-diagram-scroll {
+    padding: var(--space-3) var(--space-6);
+  }
+  .learning-area {
+    min-height: 172px;
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+  .learning-file {
+    padding: var(--space-2);
+  }
+  .learning-file > code {
+    margin-top: var(--space-2);
+  }
+  .learning-code-lines {
+    display: none;
+  }
+  .learning-graph > svg {
+    height: 210px;
+  }
+  .learning-diagram[data-view='areas'] .learning-graph > svg {
+    height: 160px;
+  }
+  .learning-diagram[data-view='snapshots'] .learning-graph > svg {
+    height: 150px;
+  }
+  .learning-checkout,
+  .learning-snapshot {
+    padding: var(--space-3);
+  }
+  .learning-remote-history {
+    min-height: 148px;
+    gap: var(--space-4);
+    margin-top: var(--space-3);
+  }
+  .learning-remote-commit > span {
+    width: 36px;
+    height: 36px;
+  }
+  .learning-remote-commit:not(:first-child)::before {
+    height: 16px;
+    left: 17px;
+    top: -16px;
+  }
+  .learning-conflict-markers {
+    height: 80px;
+  }
+}
+@media (max-width: 760px) {
+  .dialog.git-learning-dialog {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 16px);
+  }
+  .git-learning-dialog > .dialog-header {
+    padding: var(--space-2);
+  }
+  .learning-simulation {
+    display: none;
+  }
+  .learning-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .learning-courses {
+    flex-direction: row;
+    padding: var(--space-2);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .learning-course {
+    flex-shrink: 0;
+    padding: var(--space-2) var(--space-3);
+  }
+  .learning-course-number {
+    display: none;
+  }
+  .learning-lesson-header {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+  .learning-lesson-header p {
+    display: none;
+  }
+  .learning-lesson-header h3 {
+    font-size: var(--text-dense);
+  }
+  .learning-mobile-simulation {
+    display: block;
+    font-size: var(--text-micro);
+    color: var(--muted);
+    margin-top: var(--space-1);
+  }
+  .learning-command {
+    padding-inline: var(--space-3);
+  }
+  .learning-diagram-scroll {
+    padding: var(--space-4);
+  }
+  .learning-diagram {
+    min-width: 0;
+  }
+  .learning-mobile-file {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--muted);
+    font-size: var(--text-caption);
+    margin-bottom: var(--space-2);
+  }
+  .learning-areas,
+  .learning-conflict-files {
+    gap: var(--space-2);
+  }
+  .learning-area {
+    padding: var(--space-2);
+    gap: var(--space-2);
+    min-height: 156px;
+  }
+  .learning-area h3 {
+    min-height: 34px;
+    font-size: var(--text-caption);
+  }
+  .learning-area h3 svg {
+    display: none;
+  }
+  .learning-areas .learning-file,
+  .learning-conflict-files .learning-file {
+    padding: var(--space-2);
+  }
+  .learning-areas .learning-file-heading span,
+  .learning-conflict-files .learning-file-heading span,
+  .learning-areas .learning-file > code,
+  .learning-conflict-files .learning-file > code,
+  .learning-areas .learning-code-lines,
+  .learning-conflict-files .learning-code-lines {
+    display: none;
+  }
+  .learning-file > code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .learning-checkout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .learning-checkout > span {
+    grid-column: 1 / -1;
+  }
+  .learning-checkout .learning-file {
+    max-width: none;
+  }
+  .learning-checkout .learning-file-heading {
+    flex-wrap: wrap;
+  }
+  .learning-checkout .learning-file-heading span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .learning-state {
+    min-height: 36px;
+    overflow-wrap: anywhere;
+  }
+  .learning-area:has(.learning-index-copy[aria-hidden='true']) .learning-empty {
+    inset: 65px var(--space-2) auto;
+    font-size: var(--text-micro);
+  }
+  .learning-graph svg.is-small .learning-commit text {
+    font-size: 20px;
+  }
+  .learning-graph svg.is-small .learning-commit text.learning-commit-version {
+    font-size: 17px;
+  }
+  .learning-graph svg.is-small .learning-commit text.learning-commit-order {
+    font-size: 15px;
+  }
+  .learning-graph svg.is-small .learning-reference text {
+    font-size: 17px;
+  }
+  .learning-remote-scope {
+    display: none;
+  }
+  .learning-remote-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .learning-remote-column {
+    display: grid;
+    grid-template-columns: minmax(80px, 1fr) 120px;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+    padding: var(--space-2);
+  }
+  .learning-remote-column h3 {
+    min-height: 0;
+  }
+  .learning-remote-history {
+    flex-direction: row;
+    gap: 12px;
+    min-height: 60px;
+    margin-top: 0;
+  }
+  .learning-remote-commit > span {
+    width: 32px;
+    height: 32px;
+    font-size: var(--text-caption);
+  }
+  .learning-remote-commit:not(:first-child)::before {
+    width: 12px;
+    height: 2px;
+    left: -12px;
+    top: 15px;
+  }
+  .learning-remote-operations {
+    gap: var(--space-3);
+  }
+  .learning-conflict-files h3 {
+    min-height: 40px;
+    font-size: var(--text-caption);
+  }
+  .learning-conflict-markers {
+    height: 80px;
+    padding: var(--space-1);
+    overflow-wrap: anywhere;
+  }
+  .learning-conflict-markers code {
+    font-size: 9px;
+  }
+  .learning-snapshot {
+    padding: var(--space-3);
+  }
+  .learning-snapshot-files {
+    gap: var(--space-2);
+  }
+  .learning-footer {
+    padding: var(--space-3);
+  }
+  .learning-caption {
+    min-height: 44px;
+    font-size: var(--text-caption);
+  }
+  .learning-controls {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr;
+  }
+  .learning-next {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+}
+@media (pointer: coarse) {
+  .learning-course,
+  .learning-controls .button,
+  .learning-controls .icon-button,
+  .dialog-move {
+    min-height: var(--control-touch);
+  }
+  .learning-progress button {
+    height: var(--control-touch);
+    width: var(--control-touch);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .learning-index-copy {
+    transition: opacity 150ms ease;
+  }
+  .learning-reference {
+    transition: none;
+  }
+  .learning-recorded-copy,
+  .learning-remote-column.is-receiving .learning-remote-commit:last-child {
+    animation: learning-appear 150ms ease;
+  }
+}

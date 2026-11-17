@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="megit-icon-title">
+  <title id="megit-icon-title">MeGit 图形标志</title>
+  <desc>MeGit 不含文字的图形标志。透明方形画布；白色 Git 节点；使用精简锚点与平滑贝塞尔曲线。</desc>
+  <defs>
+    <radialGradient id="megit-icon-blue" cx="62%" cy="40%" r="78%">
+      <stop offset="0" stop-color="#063c84"/>
+      <stop offset="1" stop-color="#003478"/>
+    </radialGradient>
+    <linearGradient id="megit-icon-green" x1="0%" y1="0%" x2="70%" y2="100%">
+      <stop offset="0" stop-color="#80cb19"/>
+      <stop offset="1" stop-color="#86d21f"/>
+    </linearGradient>
+    <linearGradient id="megit-icon-cyan" x1="0%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0" stop-color="#00a9f3"/>
+      <stop offset="1" stop-color="#00a1ee"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(59 16)">
+    <g id="megit-icon-symbol">
+      <path fill="url(#megit-icon-blue)" d="M76.5 1 H121
+      C130.5 1 134.5 6 131.5 15 L113.5 67
+      C110.6 75.5 105.7 79 97 79 H49
+      C41.1 79 37.9 74.8 40.3 66.5 L52.6 21
+      C56.8 6.4 63.5 1 76.5 1 Z"/>
+      <path fill="url(#megit-icon-green)" d="M156 34 H195
+      C209 34 215.5 42 210.5 56 L171.5 167
+      C165 185.2 150.7 193 133.2 186.7 L62.1 161.3
+      C49.9 156.9 43.4 152 48 135.4 L55.7 108.6
+      C58.4 99.1 62.1 95 72.8 95 H98
+      C114 95 123 88.7 128.9 72 L137 49.3
+      C140.8 38.8 145 34 156 34 Z"/>
+      <path fill="url(#megit-icon-blue)" d="M263 31 H370
+      C388.7 31 399.6 45.1 392.9 64.7 L335.4 235.5
+      C330.1 251.2 322.2 256.2 307 250.9 L216 220.6
+      C185.4 210.4 160.5 225 149.5 256.5 L110 368.4
+      C106.2 379.2 97.2 381.1 86.1 373.4 L16 322.4
+      C1.1 311.6 -2.2 302.1 4.2 282.4 L31.9 195.5
+      C36.2 182.4 43.6 178.5 56.9 183 L129.2 207.4
+      C156.9 216.8 180.3 205 190.2 177 L231.3 60.6
+      C239 38.7 245.5 31 263 31 Z"/>
+      <path fill="url(#megit-icon-cyan)" d="M196 240.5
+      C189.5 240.5 174 242.9 169 256.5 L124.5 381.2
+      C119.5 395.3 121 401.8 133 410.6 L219.8 474.9
+      C236.1 487 251.8 480.9 258 462.6 L314.4 297.5
+      C319.1 283.7 314.2 275.3 301.8 271.5 L208 242.9
+      C203.6 241.6 200 240.5 196 240.5 Z"/>
+      <g fill="#fff">
+        <path d="M246.5 234.5 213.5 353.5" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round"/>
+        <circle cx="246.5" cy="234.5" r="34"/>
+        <circle cx="213.5" cy="353.5" r="32.5"/>
+      </g>
+      <ellipse cx="246.5" cy="234" rx="13.5" ry="14" fill="#01357c"/>
+      <ellipse cx="213.5" cy="353.5" rx="12.5" ry="13.5" fill="#0390e0"/>
+    </g>
+  </g>
+</svg>

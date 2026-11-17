@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-server/
+.megit/
+.worktrees/
+.archive/
+playwright-report/
+test-results/
+*.log
+.env
+.env.*
+!.env.example

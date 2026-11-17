@@ -1,0 +1,477 @@
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  Check,
+  CircleAlert,
+  FolderGit2,
+  Info,
+  MoreHorizontal,
+  Play,
+  Plus,
+  Settings2,
+  Trash2,
+} from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
+import { Button } from './Button';
+import { IconButton } from './IconButton';
+import { Field, focusFirstError } from './Field';
+import { PanelHeader } from './PanelHeader';
+import { PreferencesDialog } from './PreferencesDialog';
+import { InspectorDock } from './InspectorDock';
+import { emptyDock, openInspector, closeInspector } from '../lib/inspector-dock';
+import { RepositoryInfo } from './RepositoryInfo';
+import { HelpTip } from './GitHelp';
+import { GitLearningDialog } from './GitLearningDialog';
+import { GitLearningPreview } from './GitLearningPreview';
+import { gitLearningDemoIds, type GitLearningDemoId } from '../lib/git-learning-media';
+import { RepositoryAvatar } from './RepositoryAvatar';
+import { BranchTree } from './BranchTree';
+import { BranchTrunkDialog } from './BranchTrunkDialog';
+import { PopupMenu } from './PopupMenu';
+import type { BranchTreeData, Commit, TreeBranch } from '../../shared/types';
+
+const sampleRepository = 'MeGit / repository-with-a-long-name-and-a-feature-branch';
+
+function TreeExample() {
+  const { t } = useTranslation();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [base, setBase] = useState('refs/heads/main');
+  const [choosingTrunk, setChoosingTrunk] = useState(false);
+  const commit = (hash: string, parents: string[] = []): Commit => ({
+    hash,
+    parents,
+    shortHash: hash,
+    subject: hash,
+    author: 'MeGit',
+    date: '',
+    refs: '',
+  });
+  const branch = (name: string, hash: string): TreeBranch => ({
+    ref: `refs/heads/${name}`,
+    name,
+    hash,
+    current: name === 'feature/search',
+    remote: false,
+    parents: [],
+    subject: hash,
+    author: 'MeGit',
+    date: '',
+    upstream: null,
+    upstreamGone: false,
+    ahead: null,
+    behind: null,
+  });
+  const data: BranchTreeData = {
+    baseRef: base,
+    head: 'search',
+    currentRef: 'refs/heads/feature/search',
+    detached: false,
+    limit: 120,
+    hasMore: false,
+    shallow: false,
+    checkedAt: '',
+    branches: [
+      branch('main', 'merge'),
+      branch('feature/search', 'search'),
+      branch('feature/design', 'design'),
+    ],
+    commits: [
+      commit('merge', ['main-v2', 'design']),
+      commit('main-v2', ['root']),
+      commit('design', ['root']),
+      commit('search', ['main-v2']),
+      commit('root'),
+    ],
+  };
+  return (
+    <section className="design-card">
+      <h2>{t('branchTree.demo')}</h2>
+      <div className="design-tree-stage">
+        <BranchTree
+          data={data}
+          selectedRef={selected}
+          onSelect={setSelected}
+          onCommit={() => {}}
+          tools={
+            <>
+              <HelpTip topic="branchTree" related={['treeComparison']} />
+              <PopupMenu
+                label={t('branchTree.tools')}
+                icon={<MoreHorizontal size={18} />}
+                className="branch-tree-menu"
+                triggerClassName="icon-button small"
+                menuClassName="branch-tree-menu-items"
+              >
+                <button onClick={() => setChoosingTrunk(true)}>
+                  {t('branchTree.changeTrunk')}
+                </button>
+              </PopupMenu>
+            </>
+          }
+        />
+      </div>
+      {choosingTrunk && (
+        <BranchTrunkDialog
+          value={base}
+          options={data.branches}
+          onApply={(ref) => {
+            setBase(ref);
+            setChoosingTrunk(false);
+          }}
+          onClose={() => setChoosingTrunk(false)}
+        />
+      )}
+      {selected && (
+        <p className="design-caption" role="status">
+          {data.branches.find((item) => item.ref === selected)?.name}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function AvatarExample() {
+  const { t } = useTranslation();
+  const [custom, setCustom] = useState(true);
+  const example = { id: 'avatar-demo', name: 'MeGit', path: '' };
+  return (
+    <section className="design-card" aria-label={t('repositoryAvatar.example')}>
+      <PanelHeader
+        title={t('repositoryAvatar.example')}
+        icon={
+          <RepositoryAvatar
+            repo={example}
+            image={custom ? '/brand/megit-icon.svg' : undefined}
+            size="large"
+          />
+        }
+        iconAction={{
+          label: t('repositoryAvatar.configure'),
+          help: t('repositoryAvatar.configureHelp'),
+          onClick: () => setCustom((value) => !value),
+        }}
+        closeLabel={t('designSystem.closeExample')}
+        onClose={() => setCustom(false)}
+      />
+      <div className="design-demo-row">
+        <RepositoryAvatar repo={example} size="small" />
+        <RepositoryAvatar repo={example} image="/brand/megit-icon.svg" />
+        <RepositoryAvatar repo={example} image="data:image/png;base64,AA==" />
+      </div>
+      <p className="design-caption">{t('repositoryAvatar.exampleHelp')}</p>
+    </section>
+  );
+}
+
+function DockPanelExample({ title, onClose }: { title: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState('');
+  return (
+    <aside className="inspector" aria-label={title}>
+      <PanelHeader
+        title={title}
+        icon={<FolderGit2 size={20} />}
+        closeLabel={t('designSystem.closeExample')}
+        onClose={onClose}
+      />
+      <div className="context-panel-body">
+        <Field label={t('repository.message')}>
+          <textarea rows={8} value={draft} onChange={(event) => setDraft(event.target.value)} />
+        </Field>
+      </div>
+    </aside>
+  );
+}
+
+function DockExample() {
+  const { t } = useTranslation();
+  const samples = () =>
+    openInspector(openInspector(emptyDock, 'demo', { kind: 'repository', id: 'first' }), 'demo', {
+      kind: 'repository',
+      id: 'second',
+    });
+  const [state, setState] = useState(samples);
+  const [width, setWidth] = useState(760);
+  const title = (id: string) =>
+    t(id === 'first' ? 'designSystem.dockFirst' : 'designSystem.dockSecond');
+  return (
+    <section className="design-card design-dock-example">
+      <h2>{t('designSystem.dock')}</h2>
+      <p className="design-caption">{t('designSystem.dockRule')}</p>
+      <div className="design-demo-row">
+        <Button data-details-trigger onClick={() => setState(samples())}>
+          {t('designSystem.restoreExample')}
+        </Button>
+      </div>
+      <div className="design-dock-stage">
+        {!!state.items.length && (
+          <InspectorDock
+            state={state}
+            width={width}
+            onWidth={setWidth}
+            onActive={(active) =>
+              setState((previous) =>
+                previous.active === active ? previous : { ...previous, active },
+              )
+            }
+            onClose={(key) => setState((previous) => closeInspector(previous, key))}
+          >
+            {(item, close) => <DockPanelExample title={title(item.id)} onClose={close} />}
+          </InspectorDock>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function LearningPreviewExample() {
+  const { t, i18n } = useTranslation();
+  const [demo, setDemo] = useState<GitLearningDemoId>('stage');
+  const [activations, setActivations] = useState(0);
+  return (
+    <section
+      className="design-card design-learning-preview-example"
+      role="region"
+      aria-label={t('learning.preview.title')}
+    >
+      <h2>{t('learning.preview.title')}</h2>
+      <Field label={t('learning.preview.operation')}>
+        <select value={demo} onChange={(event) => setDemo(event.target.value as GitLearningDemoId)}>
+          {gitLearningDemoIds.map((id) => (
+            <option key={id} value={id}>
+              {t(`learning.preview.titles.${id}`)}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="design-demo-row">
+        <Button learningDemo={demo} onClick={() => setActivations((value) => value + 1)}>
+          {t(`learning.preview.titles.${demo}`)}
+        </Button>
+        <IconButton
+          label={t('learning.preview.iconAction')}
+          learningDemo={demo}
+          onClick={() => setActivations((value) => value + 1)}
+        >
+          <Play size={16} />
+        </IconButton>
+      </div>
+      <p className="design-caption" data-demo-activations role="status">
+        {t('learning.preview.activations', {
+          value: new Intl.NumberFormat(i18n.resolvedLanguage).format(activations),
+        })}
+      </p>
+      <h3>{t('learning.preview.poster')}</h3>
+      <div data-demo-poster>
+        <GitLearningPreview demo={demo} playback="still" />
+      </div>
+    </section>
+  );
+}
+
+export function DesignSystemPage() {
+  const { t } = useTranslation();
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [learningOpen, setLearningOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [invalid, setInvalid] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+  return (
+    <main className="design-system-page">
+      <div className="design-system-content">
+        <header className="design-system-header">
+          <BrandLogo variant="full" className="design-system-logo" />
+          <div className="design-system-links">
+            <a href="/brand/color-palette.html">{t('designSystem.palette')}</a>
+            <a href="/">{t('designSystem.openApp')}</a>
+            <IconButton label={t('preferences.title')} onClick={() => setPreferencesOpen(true)}>
+              <Settings2 size={18} />
+            </IconButton>
+          </div>
+        </header>
+        <div className="design-system-intro">
+          <h1>{t('designSystem.title')}</h1>
+          <p>{t('designSystem.intro')}</p>
+        </div>
+        <div className="design-system-grid">
+          <TreeExample />
+          <DockExample />
+          <section className="design-card">
+            <h2>{t('learning.title')}</h2>
+            <p className="design-caption">{t('learning.demoRule')}</p>
+            <Button onClick={() => setLearningOpen(true)}>{t('learning.demo')}</Button>
+          </section>
+          <LearningPreviewExample />
+          <section className="design-card">
+            <h2>{t('designSystem.foundations')}</h2>
+            <dl className="design-system-rules">
+              <div>
+                <dt>{t('designSystem.spacing')}</dt>
+                <dd>{t('designSystem.spacingValue')}</dd>
+              </div>
+              <div>
+                <dt>{t('designSystem.typography')}</dt>
+                <dd>{t('designSystem.typographyValue')}</dd>
+              </div>
+              <div>
+                <dt>{t('designSystem.controls')}</dt>
+                <dd>{t('designSystem.controlsValue')}</dd>
+              </div>
+              <div>
+                <dt>{t('designSystem.radius')}</dt>
+                <dd>{t('designSystem.radiusValue')}</dd>
+              </div>
+            </dl>
+            <p className="design-caption">{t('designSystem.colorRule')}</p>
+          </section>
+          <section className="design-card">
+            <h2>{t('designSystem.buttons')}</h2>
+            <div className="design-demo-row">
+              <Button variant="primary" icon={<Plus size={16} />} onClick={() => setVerified(true)}>
+                {t('board.add')}
+              </Button>
+              <Button onClick={() => setVerified(true)}>{t('common.save')}</Button>
+              <Button
+                variant="danger"
+                icon={<Trash2 size={16} />}
+                onClick={() => setVerified(false)}
+              >
+                {t('designSystem.removeExample')}
+              </Button>
+            </div>
+            <div className="design-demo-row">
+              <Button size="compact" onClick={() => setVerified(true)}>
+                {t('designSystem.compact')}
+              </Button>
+              <Button disabled>{t('designSystem.disabled')}</Button>
+              <Button variant="primary" busy>
+                {t('board.saving')}
+              </Button>
+              <IconButton label={t('designSystem.viewDetails')} onClick={() => setPanelOpen(true)}>
+                <Info size={17} />
+              </IconButton>
+              <IconButton
+                variant="danger"
+                label={t('designSystem.removeExample')}
+                onClick={() => setVerified(false)}
+              >
+                <Trash2 size={16} />
+              </IconButton>
+            </div>
+            <p className="design-caption">{t('designSystem.buttonRule')}</p>
+            <div className="design-tooltip-clip">
+              <IconButton label={t('designSystem.clippedTooltip')}>
+                <Info size={17} />
+              </IconButton>
+              <span>{t('designSystem.tooltipBoundary')}</span>
+            </div>
+          </section>
+          <section className="design-card">
+            <h2>{t('designSystem.forms')}</h2>
+            <form
+              className="inspector-fields"
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault();
+                setInvalid(!name.trim());
+                setVerified(!!name.trim());
+                if (!name.trim()) focusFirstError(event.currentTarget);
+              }}
+            >
+              <Field
+                label={t('designSystem.exampleName')}
+                hint={t('designSystem.fieldHint')}
+                error={invalid ? t('designSystem.nameRequired') : undefined}
+              >
+                <input
+                  required
+                  maxLength={100}
+                  value={name}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    setInvalid(false);
+                    setVerified(false);
+                  }}
+                />
+              </Field>
+              <div>
+                <Button type="submit" variant="primary">
+                  {t('designSystem.validate')}
+                </Button>
+              </div>
+            </form>
+            {verified && (
+              <p className="design-feedback success-text" role="status">
+                <Check size={16} />
+                {t('designSystem.verified')}
+              </p>
+            )}
+          </section>
+          <AvatarExample />
+          <section className="design-card design-panel-example">
+            {panelOpen ? (
+              <>
+                <PanelHeader
+                  title={sampleRepository}
+                  icon={<FolderGit2 size={20} />}
+                  closeLabel={t('designSystem.closeExample')}
+                  onClose={() => setPanelOpen(false)}
+                  actions={
+                    <RepositoryInfo
+                      repo={{
+                        id: 'design-example',
+                        name: sampleRepository,
+                        path: 'D:\\Projects\\MeGit\\example-repository',
+                      }}
+                    />
+                  }
+                />
+                <div className="design-panel-body">
+                  <h3>{t('designSystem.states')}</h3>
+                  <div className="design-demo-row">
+                    <HelpTip topic="staged" />
+                    <span className="design-state success-text">
+                      <Check size={14} />
+                      {t('relation.included')}
+                    </span>
+                    <span className="design-state warning-text">
+                      <CircleAlert size={14} />
+                      {t('relation.pending', { count: 3 })}
+                    </span>
+                    <span className="design-state danger-text">
+                      <CircleAlert size={14} />
+                      {t('board.failed')}
+                    </span>
+                  </div>
+                  <p className="design-caption">{t('designSystem.stateRule')}</p>
+                </div>
+              </>
+            ) : (
+              <div className="design-panel-body">
+                <Button onClick={() => setPanelOpen(true)}>
+                  {t('designSystem.restoreExample')}
+                </Button>
+              </div>
+            )}
+          </section>
+          <section className="design-card design-empty-example">
+            <FolderGit2 size={28} aria-hidden="true" />
+            <h2>{t('designSystem.empty')}</h2>
+            <p>{t('designSystem.emptyHelp')}</p>
+            <Button icon={<Plus size={16} />} onClick={() => setPanelOpen(true)}>
+              {t('designSystem.restoreExample')}
+            </Button>
+          </section>
+          <section className="design-card">
+            <h2>{t('designSystem.whiteboard')}</h2>
+            <p className="design-caption">{t('designSystem.whiteboardRule')}</p>
+            <p className="design-caption">{t('designSystem.acceptance')}</p>
+          </section>
+        </div>
+      </div>
+      {preferencesOpen && <PreferencesDialog onClose={() => setPreferencesOpen(false)} />}
+      {learningOpen && <GitLearningDialog onClose={() => setLearningOpen(false)} />}
+    </main>
+  );
+}

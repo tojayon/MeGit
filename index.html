@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#16181b" />
+    <meta name="description" content="MeGit — 看见代码之间的工作流" />
+    <title>MeGit · 开发流程</title>
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/brand/megit-icon.svg" />
+    <style>
+      html {
+        background: #16181b;
+        color-scheme: dark;
+      }
+      html[data-theme='light'] {
+        background: #f5f6f8;
+        color-scheme: light;
+      }
+    </style>
+    <script>
+      // Apply a validated preference before styles and the application are painted.
+      try {
+        const p = JSON.parse(localStorage.getItem('megit.preferences'));
+        if (
+          p?.version === 1 &&
+          ['dark', 'light'].includes(p.theme) &&
+          ['zh-CN', 'en'].includes(p.language) &&
+          (p.navigationCollapsed === undefined || typeof p.navigationCollapsed === 'boolean')
+        ) {
+          document.documentElement.dataset.theme = p.theme;
+          document.documentElement.lang = p.language;
+        }
+      } catch {
+        /* The app reports unavailable or invalid preference storage. */
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

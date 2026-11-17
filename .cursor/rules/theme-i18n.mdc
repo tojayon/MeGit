@@ -1,0 +1,11 @@
+---
+description: MeGit 全项目主题与国际化开发标准
+alwaysApply: true
+---
+
+- 遵循根目录 `AGENTS.md` 和 `docs/THEME_I18N.md`，它们是开发约定的单一来源。
+- 新界面必须同时支持暗黑／明亮，并在两套语言资源中补齐文案。
+- 颜色通过 `src/themes.css` 的语义 token 使用；文案通过类型化的 `t('语义键')` 使用。
+- 配色遵循 `docs/COLOR_GUIDELINES.md` 与 `public/brand/palette.json`，不自行引入未登记颜色；新增色同步两主题并验证对比度。
+- 应用错误传稳定代码；用户内容与 Git 原始诊断不翻译。
+- 验收执行 `npm run check` 与相关 Edge 场景，保留用户数据。
