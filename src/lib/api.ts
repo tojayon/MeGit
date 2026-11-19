@@ -53,15 +53,38 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
   return data as T;
 }
 export const api = {
-  branchTree: (repoId: string, options: { baseRef?: string; limit?: number; includeRemote?: boolean } = {}) => {
+  generateCommit: (repositoryId: string, signal: AbortSignal) =>
+    request<{ kind: 'commit'; text: string }>('/ai/assist', {
+      method: 'POST',
+      signal,
+      body: JSON.stringify({
+        kind: 'commit',
+        repositoryId,
+        language: i18n.resolvedLanguage === 'en' ? 'en' : 'zh-CN',
+      }),
+    }),
+  branchTree: (
+    repoId: string,
+    options: { baseRef?: string; limit?: number; includeRemote?: boolean } = {},
+  ) => {
     const query = new URLSearchParams();
     if (options.baseRef) query.set('base', options.baseRef);
     if (options.limit) query.set('limit', String(options.limit));
     if (options.includeRemote) query.set('remote', 'true');
-    return request<BranchTreeData>(`/repositories/${encodeURIComponent(repoId)}/branch-tree?${query}`);
+    return request<BranchTreeData>(
+      `/repositories/${encodeURIComponent(repoId)}/branch-tree?${query}`,
+    );
   },
-  branchComparison: (repoId: string, source: string, target: string, sourceHash: string, targetHash: string) =>
-    request<BranchComparison>(`/repositories/${encodeURIComponent(repoId)}/branch-comparison?${new URLSearchParams({ source, target, sourceHash, targetHash })}`),
+  branchComparison: (
+    repoId: string,
+    source: string,
+    target: string,
+    sourceHash: string,
+    targetHash: string,
+  ) =>
+    request<BranchComparison>(
+      `/repositories/${encodeURIComponent(repoId)}/branch-comparison?${new URLSearchParams({ source, target, sourceHash, targetHash })}`,
+    ),
   repositoryImages: (repoId: string, directory = '', offset = 0) =>
     request<RepositoryImages>(
       `/repositories/${encodeURIComponent(repoId)}/images?${new URLSearchParams({ directory, offset: String(offset) })}`,

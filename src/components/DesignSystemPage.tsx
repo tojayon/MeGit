@@ -9,6 +9,7 @@ import {
   Play,
   Plus,
   Settings2,
+  Palette,
   Trash2,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
@@ -17,6 +18,7 @@ import { IconButton } from './IconButton';
 import { Field, focusFirstError } from './Field';
 import { PanelHeader } from './PanelHeader';
 import { PreferencesDialog } from './PreferencesDialog';
+import { SettingsDialog } from './SettingsDialog';
 import { InspectorDock } from './InspectorDock';
 import { emptyDock, openInspector, closeInspector } from '../lib/inspector-dock';
 import { RepositoryInfo } from './RepositoryInfo';
@@ -35,6 +37,7 @@ import { WorkflowHeader } from './WorkflowHeader';
 import { FlowchartExample } from './FlowchartExample';
 import { RepositoryPortsExample } from './RepositoryPortsExample';
 import { CommitComposer } from './CommitComposer';
+import { RepositoryCardExample } from './RepositoryCardExample';
 import type { BranchTreeData, Commit, RepoState, TreeBranch } from '../../shared/types';
 
 const sampleRepository = 'MeGit / repository-with-a-long-name-and-a-feature-branch';
@@ -419,6 +422,7 @@ function LearningPreviewExample() {
 export function DesignSystemPage() {
   const { t } = useTranslation();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [learningOpen, setLearningOpen] = useState(false);
   const [name, setName] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -434,6 +438,9 @@ export function DesignSystemPage() {
             <a href="/brand/color-palette.html">{t('designSystem.palette')}</a>
             <a href="/">{t('designSystem.openApp')}</a>
             <IconButton label={t('preferences.title')} onClick={() => setPreferencesOpen(true)}>
+              <Palette size={18} />
+            </IconButton>
+            <IconButton label={t('settings.title')} onClick={() => setSettingsOpen(true)}>
               <Settings2 size={18} />
             </IconButton>
           </div>
@@ -445,6 +452,7 @@ export function DesignSystemPage() {
         <div className="design-system-grid">
           <TreeExample />
           <CommitComposerExample />
+          <RepositoryCardExample />
           <DockExample />
           <NavigationExample />
           <FlowchartExample />
@@ -641,6 +649,7 @@ export function DesignSystemPage() {
         </div>
       </div>
       {preferencesOpen && <PreferencesDialog onClose={() => setPreferencesOpen(false)} />}
+      {settingsOpen && <SettingsDialog example onClose={() => setSettingsOpen(false)} />}
       {learningOpen && <GitLearningDialog onClose={() => setLearningOpen(false)} />}
     </main>
   );

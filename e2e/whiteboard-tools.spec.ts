@@ -477,7 +477,10 @@ test('组与成员混合多选共同移动，上下游聚焦；撤销白板不�
     await page.getByRole('button', { name: '刷新本地状态', exact: true }).click();
     await openRepositoryTools(page, 'worktree');
     await page.getByRole('button', { name: '暂存 board-history.txt', exact: true }).click();
-    await page.getByLabel('提交说明').fill('白板历史不撤销这个提交');
+    await page
+      .getByRole('dialog')
+      .getByLabel('提交说明', { exact: true })
+      .fill('白板历史不撤销这个提交');
     await page.getByRole('button', { name: '提交 1 个文件', exact: true }).click();
     await expect(page.getByText('公共库：提交已保存到本地仓库', { exact: true })).toBeVisible();
     const head = await git(f.repo, 'rev-parse', 'HEAD');

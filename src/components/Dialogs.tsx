@@ -3,7 +3,7 @@ import { RepositoryAvatar } from './RepositoryAvatar';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, FolderGit2, GitMerge, GripHorizontal, Link2, X } from 'lucide-react';
 import type { Board, FlowEdge, Repository } from '../../shared/types';
-import { api } from '../lib/api';
+import { api, request } from '../lib/api';
 import { formatError } from '../lib/messages';
 import { isSafeRef } from '../../shared/refs';
 import { RelationAppearance } from './RelationAppearance';
@@ -134,18 +134,35 @@ export function AddRepositoryDialog({
   existing,
   onAdd,
   onClose,
+  mode = 'board',
+  repo,
+  onArchive,
+  onRemove,
 }: {
   existing: Repository[];
   onAdd: (repo: Repository) => void;
   onClose: () => void;
+  mode?: 'board' | 'register' | 'edit';
+  repo?: Repository;
+  onArchive?: () => void;
+  onRemove?: () => void;
 }) {
   const { t } = useTranslation();
-  const [path, setPath] = useState('');
-  const [name, setName] = useState('');
+  const [path, setPath] = useState(repo?.path ?? '');
+  const [name, setName] = useState(repo?.name ?? '');
+  const [logo, setLogo] = useState(repo?.logoPath);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   return (
-    <Dialog title={t('repository.addTitle')} onClose={onClose} busy={busy}>
+    <Dialog
+      title={
+        repo
+          ? t('repositoryIndex.edit', { name: repo.name })
+          : t(mode === 'register' ? 'repositoryIndex.register' : 'repository.addTitle')
+      }
+      onClose={onClose}
+      busy={busy}
+    >
       <form
         aria-busy={busy || undefined}
         onSubmit={async (event) => {
@@ -155,8 +172,17 @@ export function AddRepositoryDialog({
           setBusy(true);
           setError('');
           try {
+            if (repo) {
+              onAdd({ ...repo, name: name.trim(), logoPath: logo });
+              onClose();
+              return;
+            }
             const found = await api.inspect(path.trim());
             const known = existing.find((r) => r.path.toLowerCase() === found.path.toLowerCase());
+            if (known?.archived) {
+              setError({ code: 'repositoryArchived' });
+              return;
+            }
             onAdd(
               known || {
                 id: crypto.randomUUID(),
@@ -174,16 +200,50 @@ export function AddRepositoryDialog({
         }}
       >
         <div className="dialog-body">
-          <div className="dialog-symbol">
-            <FolderGit2 size={25} />
-          </div>
-          <p className="muted">{t('repository.addHelp')}</p>
+          {repo ? (
+            <div className="repository-index-identity">
+              <RepositoryAvatar repo={{ ...repo, logoPath: logo }} size="preview" />
+              <Button
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    const choice = await request<{ path: string | null }>(
+                      `/repositories/${encodeURIComponent(repo.id)}/pick-image`,
+                      { method: 'POST' },
+                    );
+                    if (choice.path) setLogo(choice.path);
+                  } catch (failure) {
+                    setError(failure);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {t('repositoryIndex.pickAvatar')}
+              </Button>
+              <Button disabled={busy || !logo} onClick={() => setLogo(undefined)}>
+                {t('repositoryAvatar.reset')}
+              </Button>
+            </div>
+          ) : (
+            <div className="dialog-symbol">
+              <FolderGit2 size={25} />
+            </div>
+          )}
+          {!repo && (
+            <p className="muted">
+              {t(mode === 'register' ? 'repositoryIndex.registerHelp' : 'repository.addHelp')}
+            </p>
+          )}
           <Field label={t('repository.path')} error={error ? formatError(error) : undefined}>
             <input
               autoFocus
               required
               value={path}
               disabled={busy}
+              readOnly={Boolean(repo)}
               onChange={(e) => {
                 setPath(e.target.value);
                 setError(null);
@@ -193,6 +253,27 @@ export function AddRepositoryDialog({
               spellCheck={false}
             />
           </Field>
+          {!repo && (
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  const choice = await request<{ path: string | null }>('/local-picker/folder', {
+                    method: 'POST',
+                  });
+                  if (choice.path) setPath(choice.path);
+                } catch (failure) {
+                  setError(failure);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {t('repositoryIndex.pickFolder')}
+            </Button>
+          )}
           <Field label={t('repository.name')}>
             <input
               value={name}
@@ -202,26 +283,38 @@ export function AddRepositoryDialog({
               maxLength={120}
             />
           </Field>
-          {existing.length > 0 && (
+          {mode === 'board' && existing.some((item) => !item.archived) && (
             <div className="registered-repos">
               <span className="field-caption">{t('repository.registered')}</span>
-              {existing.map((repo) => (
-                <button
-                  type="button"
-                  key={repo.id}
-                  className="repo-shortcut"
-                  disabled={busy}
-                  onClick={() => {
-                    setPath(repo.path);
-                    setName(repo.name);
-                    setError(null);
-                  }}
-                >
-                  <RepositoryAvatar repo={repo} size="small" />
-                  {repo.name}
-                  <ArrowRight size={14} />
-                </button>
-              ))}
+              {existing
+                .filter((item) => !item.archived)
+                .map((repo) => (
+                  <button
+                    type="button"
+                    key={repo.id}
+                    className="repo-shortcut"
+                    disabled={busy}
+                    onClick={() => {
+                      setPath(repo.path);
+                      setName(repo.name);
+                      setError(null);
+                    }}
+                  >
+                    <RepositoryAvatar repo={repo} size="small" />
+                    {repo.name}
+                    <ArrowRight size={14} />
+                  </button>
+                ))}
+            </div>
+          )}
+          {repo && (
+            <div className="repository-index-actions">
+              <Button disabled={busy} onClick={onArchive}>
+                {t(repo.archived ? 'repositoryIndex.restore' : 'repositoryIndex.archive')}
+              </Button>
+              <Button disabled={busy} variant="danger" onClick={onRemove}>
+                {t('repositoryIndex.remove')}
+              </Button>
             </div>
           )}
         </div>
@@ -233,10 +326,16 @@ export function AddRepositoryDialog({
             type="submit"
             variant="primary"
             busy={busy}
-            disabled={!path.trim()}
+            disabled={!path.trim() || (Boolean(repo) && !name.trim())}
             icon={<FolderGit2 size={16} />}
           >
-            {t('repository.addToBoard')}
+            {t(
+              repo
+                ? 'common.save'
+                : mode === 'register'
+                  ? 'repositoryIndex.register'
+                  : 'repository.addToBoard',
+            )}
           </Button>
         </footer>
       </form>
@@ -466,12 +565,14 @@ export function TextDialog({
   title,
   label,
   initial = '',
+  maxLength = 100,
   onSubmit,
   onClose,
 }: {
   title: string;
   label: string;
   initial?: string;
+  maxLength?: number;
   onSubmit: (text: string) => void;
   onClose: () => void;
 }) {
@@ -493,7 +594,7 @@ export function TextDialog({
               value={text}
               onChange={(e) => setText(e.target.value)}
               required
-              maxLength={100}
+              maxLength={maxLength}
             />
           </Field>
         </div>

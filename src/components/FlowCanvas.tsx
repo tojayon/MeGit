@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { RepositoryAvatar } from './RepositoryAvatar';
+import { RepositoryCard } from './RepositoryCard';
+import { useRepositoryActions } from '../lib/use-repository-actions';
+import type { NoticeMessage } from '../lib/messages';
 import { RepositoryPorts } from './RepositoryPorts';
 import { useSelectedConnectionPorts } from '../lib/use-selected-connection-ports';
 import { repositoryImage } from '../lib/repository-images';
@@ -32,8 +34,6 @@ import {
   SelectionMode,
 } from '@xyflow/react';
 import {
-  ArrowDown,
-  ArrowUp,
   ArrowUpRight,
   Check,
   ChevronDown,
@@ -43,8 +43,8 @@ import {
   Expand,
   FilePenLine,
   FolderGit2,
-  GitBranch,
   GitMerge,
+  GitBranch,
   Group,
   Link2,
   LoaderCircle,
@@ -105,6 +105,10 @@ type RepoNode = Node<
     repo: Repository;
     state?: RepoState;
     onOpen: (id: string) => void;
+    boardId: string;
+    onState: (id: string, state: RepoState) => void;
+    onRefresh: () => Promise<void>;
+    onNotice: (notice: NoticeMessage, error?: boolean) => void;
   },
   'repository'
 >;
@@ -145,88 +149,28 @@ function portStyle(side: PortSide, offset: number): CSSProperties {
 }
 
 const RepositoryNode = memo(function RepositoryNode({ data, selected }: NodeProps<RepoNode>) {
-  const { t } = useTranslation();
   const { repo, state, onOpen } = data;
-  const conflicts = state?.files.filter((f) => f.conflicted).length || 0;
+  const actions = useRepositoryActions({
+    repo,
+    viewKey: viewKey(data.boardId, repo.id, repo.path),
+    onState: (next) => data.onState(repo.id, next),
+    onRefresh: data.onRefresh,
+    onNotice: data.onNotice,
+  });
   return (
-    <article
-      className={`repository-node ${selected ? 'is-selected' : ''}`}
-      data-testid="repository-node"
+    <RepositoryCard
+      repo={repo}
+      state={state}
+      selected={selected}
+      message={actions.message}
+      onMessage={actions.setMessage}
+      busy={actions.busy}
+      onAction={actions.executeAction}
+      onGenerate={actions.generateCommit}
+      onOpen={() => onOpen(repo.id)}
     >
       <RepositoryPorts name={repo.name} />
-      <div className="node-heading">
-        <div className="repo-symbol">
-          <RepositoryAvatar repo={repo} />
-        </div>
-        <div className="node-name">
-          <h3 title={repo.name}>{repo.name}</h3>
-        </div>
-        <Tooltip content={t('repository.viewNamed', { name: repo.name })} placement="top">
-          <button
-            className="node-open icon-button nodrag nopan"
-            aria-label={t('repository.viewNamed', { name: repo.name })}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen(repo.id);
-            }}
-          >
-            <ArrowUpRight size={16} />
-          </button>
-        </Tooltip>
-      </div>
-      {state?.error ? (
-        <p className="node-error">
-          <CircleAlert size={15} />
-          {t('repository.unavailable')}
-        </p>
-      ) : state ? (
-        <>
-          <div className="node-branch">
-            <GitBranch size={14} />
-            <span title={state.branch}>
-              {state.detached
-                ? t('repository.detached')
-                : state.branch || t('repository.unknownBranch')}
-            </span>
-          </div>
-          <div className="node-stats">
-            <span className={conflicts ? 'conflicted' : state.changed ? 'modified' : ''}>
-              {conflicts ? (
-                <CircleAlert size={14} />
-              ) : state.changed ? (
-                <FilePenLine size={14} />
-              ) : (
-                <Check size={14} />
-              )}
-              {conflicts
-                ? t('repository.conflicts', { count: conflicts })
-                : state.changed
-                  ? t('repository.changes', { count: state.changed })
-                  : t('repository.clean')}
-            </span>
-            <div>
-              {!!state.ahead && (
-                <span aria-label={t('repository.aheadCount', { value: state.ahead })}>
-                  <ArrowUp size={13} />
-                  {state.ahead}
-                </span>
-              )}
-              {!!state.behind && (
-                <span aria-label={t('repository.behindCount', { value: state.behind })}>
-                  <ArrowDown size={13} />
-                  {state.behind}
-                </span>
-              )}
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="node-loading">
-          <LoaderCircle size={15} className="spin" />
-          {t('repository.reading')}
-        </div>
-      )}
-    </article>
+    </RepositoryCard>
   );
 });
 
@@ -469,6 +413,9 @@ function CanvasContents({
   selectedGroup,
   selectedIds,
   onSelectRepo,
+  onRepositoryState,
+  onRefresh,
+  onNotice,
   onSelectEdge,
   onSelectConnection,
   onEditConnection,
@@ -501,6 +448,9 @@ function CanvasContents({
   selectedGroup: string | null;
   selectedIds: string[];
   onSelectRepo: (id: string) => void;
+  onRepositoryState: (id: string, state: RepoState) => void;
+  onRefresh: () => Promise<void>;
+  onNotice: (notice: NoticeMessage, error?: boolean) => void;
   onSelectEdge: (id: string) => void;
   onSelectConnection: (id: string) => void;
   onEditConnection: (id: string) => void;
@@ -714,7 +664,15 @@ function CanvasContents({
           ariaLabel: t('repository.details', { name: repo.name }),
           selected: selectedIds.includes(node.id),
           className: seeds.length && context.nodeIds.has(node.id) ? 'context-related' : undefined,
-          data: { repo, state: snapshot?.repositories[node.repoId], onOpen: onSelectRepo },
+          data: {
+            repo,
+            state: snapshot?.repositories[node.repoId],
+            onOpen: onSelectRepo,
+            boardId: board.id,
+            onState: onRepositoryState,
+            onRefresh,
+            onNotice,
+          },
         };
       }),
     ...positionedNotes

@@ -199,7 +199,7 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
   await expect.poll(async () => (await navigation.boundingBox())?.x).toBe(0);
   await navigation.getByRole('link', { name: 'MeGit 首页' }).focus();
   await page.keyboard.press('Shift+Tab');
-  await expect(navigation.getByRole('button', { name: '偏好设置', exact: true })).toBeFocused();
+  await expect(navigation.getByRole('button', { name: '软件设置', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(navigation.getByRole('link', { name: 'MeGit 首页' })).toBeFocused();
   await page.keyboard.press('Tab');

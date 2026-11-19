@@ -7,6 +7,7 @@ export interface Repository {
   name: string;
   path: string;
   logoPath?: string;
+  archived?: boolean;
 }
 export interface RepositoryImage {
   path: string;

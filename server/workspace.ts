@@ -27,6 +27,7 @@ export const workspaceSchema = z.object({
         name: z.string().trim().min(1).max(120),
         path: z.string().min(1).max(4000),
         logoPath: z.string().refine(isRepositoryImagePath).optional(),
+        archived: z.boolean().optional(),
       }),
     )
     .max(200),

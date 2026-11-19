@@ -158,10 +158,13 @@ test('工作区草稿、历史位置和差异窗口刷新后恢复，关闭的�
     await page.goto('/');
     await page.getByRole('button', { name: '浏览甲', exact: true }).click();
     await openRepositoryTools(page, 'worktree');
-    await page.getByLabel('提交说明', { exact: true }).fill('继续开发分支功能\n保留这个草稿');
+    await page
+      .getByRole('dialog')
+      .getByLabel('提交说明', { exact: true })
+      .fill('继续开发分支功能\n保留这个草稿');
     await page.reload();
     await expect(page.getByRole('dialog', { name: '工作区', exact: true })).toBeVisible();
-    await expect(page.getByLabel('提交说明', { exact: true })).toHaveValue(
+    await expect(page.getByRole('dialog').getByLabel('提交说明', { exact: true })).toHaveValue(
       '继续开发分支功能\n保留这个草稿',
     );
     const history = await openRepositoryTools(page, 'history');

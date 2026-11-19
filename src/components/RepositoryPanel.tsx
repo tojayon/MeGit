@@ -47,6 +47,7 @@ import {
 import { CommitEvent } from './CommitEvent';
 import { useViewState, useScrollMemory, viewStorage } from '../lib/use-view-state';
 import { isText, isFiniteNumber } from '../lib/view-storage';
+import { useRepositoryActions } from '../lib/use-repository-actions';
 
 type DiffSelection = { title: string; query: DiffQuery };
 const isDiffSelection = (value: unknown): value is DiffSelection | null => {
@@ -706,9 +707,13 @@ export function RepositoryPanel({
   avatarDisabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const [message, setMessage] = useViewState(viewKey && `${viewKey}.draft`, '', isText);
-  const [busy, setBusy] = useState('');
-  const busyRef = useRef(false);
+  const { message, setMessage, busy, executeAction } = useRepositoryActions({
+    repo,
+    viewKey,
+    onState,
+    onRefresh,
+    onNotice,
+  });
   const [view, setView] = useViewState<'worktree' | 'history' | null>(
     viewKey && `${viewKey}.tools`,
     null,
@@ -729,23 +734,6 @@ export function RepositoryPanel({
     [setView],
   );
   const [diff, setDiff] = useViewState(viewKey && `${viewKey}.diff`, null, isDiffSelection);
-  async function executeAction(operation: GitAction): Promise<boolean> {
-    if (busyRef.current) return false;
-    busyRef.current = true;
-    setBusy(operation.type);
-    try {
-      const result = await api.action(repo.id, operation);
-      onState(result.state);
-      if (operation.type === 'commit') setMessage('');
-      await onRefresh();
-      onNotice({ key: `actions.${operation.type}`, values: { name: repo.name } });
-      return true;
-    } finally {
-      busyRef.current = false;
-      setBusy('');
-    }
-  }
-
   async function handleAction(operation: GitAction) {
     try {
       await executeAction(operation);

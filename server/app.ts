@@ -15,6 +15,10 @@ import {
 import type { GitAction, RepoState, Snapshot } from '../shared/types.js';
 import { listRepositoryImages, readRepositoryImage } from './repository-images.js';
 import { readBranchTree, compareBranches } from './branch-tree.js';
+import { pickLocal } from './local-picker.js';
+import { realpath } from 'node:fs/promises';
+import { aiRouter } from './ai.js';
+import { readCommitContext } from './ai-commit.js';
 
 const hashSchema = z.string().regex(/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
 const branchExpectationSchema = z.strictObject({
@@ -118,7 +122,25 @@ export function createApp(options: { dataDirectory: string }) {
     return repo;
   }
 
+  app.use(
+    '/api/ai',
+    aiRouter(
+      options.dataDirectory,
+      async (id) => readRepository((await repository(id)).path),
+      async (id) => readCommitContext((await repository(id)).path),
+    ),
+  );
   app.get('/api/workspace', async (_req, res) => res.json(await store.read()));
+  app.post('/api/local-picker/folder', async (_req, res) => res.json({ path: await pickLocal('folder') }));
+  app.post('/api/repositories/:id/pick-image', async (req, res) => {
+    const repo = await repository(req.params.id);
+    const selected = await pickLocal('image', repo.path);
+    if (!selected) return res.json({ path: null });
+    const resolved = await realpath(selected).catch(() => { throw new AppError('repositoryImageMissing', 404); });
+    const relative = path.relative(repo.path, resolved).replaceAll('\\', '/');
+    await readRepositoryImage(repo.path, relative);
+    return res.json({ path: relative });
+  });
   app.put('/api/workspace', async (req, res) => res.json(await store.save(req.body)));
   app.post('/api/repositories/inspect', async (req, res) => {
     const parsed = z.object({ path: z.string().min(1).max(4000) }).safeParse(req.body);
@@ -210,24 +232,41 @@ export function createApp(options: { dataDirectory: string }) {
   });
   app.get('/api/repositories/:id/branch-tree', async (req, res) => {
     const repo = await repository(req.params.id);
-    const query = z.strictObject({
-      base: z.string().min(1).max(512).optional(),
-      limit: z.coerce.number().int().min(1).max(600).default(120),
-      remote: z.enum(['true', 'false']).default('false'),
-    }).safeParse(req.query);
+    const query = z
+      .strictObject({
+        base: z.string().min(1).max(512).optional(),
+        limit: z.coerce.number().int().min(1).max(600).default(120),
+        remote: z.enum(['true', 'false']).default('false'),
+      })
+      .safeParse(req.query);
     if (!query.success) throw new AppError('invalidRef');
-    res.json(await readBranchTree(repo.path, { baseRef: query.data.base, limit: query.data.limit, includeRemote: query.data.remote === 'true' }));
+    res.json(
+      await readBranchTree(repo.path, {
+        baseRef: query.data.base,
+        limit: query.data.limit,
+        includeRemote: query.data.remote === 'true',
+      }),
+    );
   });
   app.get('/api/repositories/:id/branch-comparison', async (req, res) => {
     const repo = await repository(req.params.id);
-    const query = z.strictObject({
-      source: z.string().min(1).max(512),
-      target: z.string().min(1).max(512),
-      sourceHash: hashSchema.optional(),
-      targetHash: hashSchema.optional(),
-    }).safeParse(req.query);
+    const query = z
+      .strictObject({
+        source: z.string().min(1).max(512),
+        target: z.string().min(1).max(512),
+        sourceHash: hashSchema.optional(),
+        targetHash: hashSchema.optional(),
+      })
+      .safeParse(req.query);
     if (!query.success) throw new AppError('invalidRef');
-    res.json(await compareBranches(repo.path, { sourceRef: query.data.source, targetRef: query.data.target, sourceHash: query.data.sourceHash, targetHash: query.data.targetHash }));
+    res.json(
+      await compareBranches(repo.path, {
+        sourceRef: query.data.source,
+        targetRef: query.data.target,
+        sourceHash: query.data.sourceHash,
+        targetHash: query.data.targetHash,
+      }),
+    );
   });
   app.get('/api/repositories/:id/history', async (req, res) => {
     const repo = await repository(req.params.id);

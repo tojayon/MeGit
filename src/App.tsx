@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { editedRoute } from './lib/edge-route';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  ArrowUpRight,
   Check,
   CircleAlert,
   Group,
@@ -16,8 +15,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
-  Settings2,
+  Palette,
   SlidersHorizontal,
   Trash2,
   X,
@@ -40,6 +38,7 @@ import { AddRepositoryDialog, Dialog, RelationDialog, TextDialog } from './compo
 import { RepositoryPanel } from './components/RepositoryPanel';
 import { RelationPanel } from './components/RelationPanel';
 import { PreferencesDialog } from './components/PreferencesDialog';
+import { SettingsDialog } from './components/SettingsDialog';
 import { formatError, formatNotice, type NoticeMessage } from './lib/messages';
 import { updatePreferences, usePreferences } from './preferences/store';
 import { BrandLogo } from './components/BrandLogo';
@@ -66,7 +65,7 @@ import { PopupMenu } from './components/PopupMenu';
 import { RemoveBoardDialog } from './components/RemoveBoardDialog';
 import { focusWithoutTooltip } from './lib/overlays';
 import { GitLearningDialog } from './components/GitLearningDialog';
-import { RepositoryAvatar } from './components/RepositoryAvatar';
+import { RepositoryIndex } from './components/RepositoryIndex';
 import { RepositoryAvatarDialog } from './components/RepositoryAvatarDialog';
 import { WorkflowHeader } from './components/WorkflowHeader';
 import { useViewState, useViewIssue, viewStorage } from './lib/use-view-state';
@@ -81,6 +80,7 @@ type Modal =
   | 'help'
   | 'repositories'
   | 'preferences'
+  | 'settings'
   | 'group'
   | 'group-details'
   | 'note-details'
@@ -424,7 +424,7 @@ export default function App() {
           aria-label={t('preferences.title')}
           onClick={() => setModal('preferences')}
         >
-          <Settings2 size={20} />
+          <Palette size={20} />
         </button>
         {modal === 'preferences' && (
           <PreferencesDialog viewKey="app.preferences" onClose={() => setModal(null)} />
@@ -540,6 +540,7 @@ export default function App() {
         onRepositories={() => setModal('repositories')}
         onCreate={() => setModal('new-board')}
         onPreferences={() => setModal('preferences')}
+        onSettings={() => setModal('settings')}
         onHelp={() => setModal('help')}
       />
       <main
@@ -699,7 +700,7 @@ export default function App() {
                       aria-label={t('preferences.title')}
                       onClick={() => setModal('preferences')}
                     >
-                      <Settings2 size={19} />
+                      <Palette size={19} />
                     </button>
                   </Tooltip>
                 </span>
@@ -713,6 +714,21 @@ export default function App() {
                 selectedEdge={selectedEdge}
                 selectedGroup={selectedGroup}
                 selectedIds={selectedIds}
+                onRefresh={refresh}
+                onNotice={notify}
+                onRepositoryState={(id, state) => {
+                  if (boardIdRef.current !== board.id) return;
+                  snapshotVersion.current++;
+                  setSnapshot((previous) =>
+                    previous
+                      ? {
+                          ...previous,
+                          repositories: { ...previous.repositories, [id]: state },
+                          relations: {},
+                        }
+                      : previous,
+                  );
+                }}
                 onSelectRepo={openRepo}
                 onSelectEdge={openEdge}
                 onSelectConnection={(id) => {
@@ -975,6 +991,51 @@ export default function App() {
       {modal === 'preferences' && (
         <PreferencesDialog viewKey="app.preferences" onClose={() => setModal(null)} />
       )}
+      {modal === 'settings' && (
+        <SettingsDialog
+          key={board.id}
+          onClose={() => setModal(null)}
+          ai={{
+            repositories: boardClosed ? [] : boardRepos,
+            selectedRepo,
+            canApply: !boardClosed && !board.layoutLocked && saveStatus !== 'failed',
+            applyDiagram: (diagram) => {
+              if (
+                boardClosed ||
+                board.layoutLocked ||
+                saveStatus === 'failed' ||
+                (board.notes?.length ?? 0) + diagram.nodes.length > 200 ||
+                (board.connections?.length ?? 0) + diagram.edges.length > 600
+              )
+                return false;
+              const occupied = [...board.nodes, ...(board.notes ?? [])];
+              const bottom = Math.max(-220, ...occupied.map((node) => node.position.y));
+              const start = bottom + 300;
+              if (start + diagram.nodes.length * 160 > 100000) return false;
+              update((draft) => {
+                const target = draft.boards.find((item) => item.id === board.id);
+                if (!target || target.layoutLocked) return;
+                const notes = diagram.nodes.map((node, index) => ({
+                  ...node,
+                  id: crypto.randomUUID(),
+                  text: '',
+                  position: { x: 80, y: start + index * 160 },
+                }));
+                (target.notes ??= []).push(...notes);
+                (target.connections ??= []).push(
+                  ...diagram.edges.map((edge) => ({
+                    id: crypto.randomUUID(),
+                    source: notes[edge.source].id,
+                    target: notes[edge.target].id,
+                    label: edge.label,
+                  })),
+                );
+              });
+              return true;
+            },
+          }}
+        />
+      )}
       {modal === 'board-details' && (
         <BoardPanel
           key={board.id}
@@ -1180,47 +1241,43 @@ export default function App() {
         <GitLearningDialog viewKey="learning" onClose={() => setLearningOpen(false)} />
       )}
       {modal === 'repositories' && (
-        <Dialog
-          viewKey="app.repositories"
-          title={t('nav.repositories')}
+        <RepositoryIndex
+          repositories={workspace.repositories}
+          used={new Set(workspace.boards.flatMap((item) => item.nodes.map((node) => node.repoId)))}
+          readOnly={saveStatus === 'failed'}
+          canAddToBoard={!board.layoutLocked && board.nodes.length < 200}
           onClose={() => setModal(null)}
-        >
-          <div className="dialog-body">
-            <p className="muted">{t('board.indexHelp')}</p>
-            {workspace.repositories.length ? (
-              workspace.repositories.map((repo) => (
-                <button
-                  className="indexed-repo"
-                  key={repo.id}
-                  onClick={() => {
-                    const found = workspace.boards.find((b) =>
-                      b.nodes.some((n) => n.repoId === repo.id),
-                    );
-                    if (found) {
-                      update((draft) => {
-                        draft.activeBoardId = found.id;
-                      });
-                      openRepo(repo.id, found.id);
-                    } else addRepository(repo);
-                    setModal(null);
-                  }}
-                >
-                  <RepositoryAvatar repo={repo} />
-                  <span>
-                    <strong>{repo.name}</strong>
-                    <small>{repo.path}</small>
-                  </span>
-                  <ArrowUpRight size={16} />
-                </button>
-              ))
-            ) : (
-              <div className="panel-empty">
-                <Search size={25} />
-                <p>{t('board.indexEmpty')}</p>
-              </div>
-            )}
-          </div>
-        </Dialog>
+          onRegister={(repo) => update((draft) => {
+            if (!draft.repositories.some((item) => item.path.toLowerCase() === repo.path.toLowerCase())) draft.repositories.push(repo);
+          })}
+          onEdit={(changes) => update((draft) => {
+            const repo = draft.repositories.find((item) => item.id === changes.id);
+            if (!repo) return;
+            repo.name = changes.name;
+            if (changes.archived) repo.archived = true;
+            else delete repo.archived;
+            if (changes.logoPath) repo.logoPath = changes.logoPath;
+            else delete repo.logoPath;
+          })}
+          onRemove={(id) => update((draft) => {
+            for (const item of draft.boards) {
+              for (const node of item.nodes.filter((node) => node.repoId === id)) removeNode(item, node.id);
+            }
+            draft.repositories = draft.repositories.filter((item) => item.id !== id);
+          })}
+          onOpen={(repo) => {
+            const found = [board, ...workspace.boards].find((item) => item.nodes.some((node) => node.repoId === repo.id));
+            if (found) {
+              update((draft) => { draft.activeBoardId = found.id; });
+              openRepo(repo.id, found.id);
+            } else {
+              if (board.layoutLocked) return;
+              setClosedBoardId(null);
+              addRepository(repo);
+            }
+            setModal(null);
+          }}
+        />
       )}
       {avatarRepositoryId &&
         workspace.repositories.find((repo) => repo.id === avatarRepositoryId) && (

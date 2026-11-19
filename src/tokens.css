@@ -1,5 +1,12 @@
 /* Shared geometry and typography. Colors belong to themes.css. */
 :root {
+  --repository-index-card-width: 300px;
+  --settings-width: 760px;
+  --settings-min-height: 420px;
+  --settings-nav-width: 174px;
+  --repository-card-width: 276px;
+  --repository-card-avatar: 48px;
+  --repository-card-input: 28px;
   --commit-lens-width: 76px;
   --commit-lens-tail-gap: 12px;
   --commit-lens-tail-size: 12px;
@@ -30,6 +37,7 @@
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-strong: 600;
+  --weight-bold: 700;
   --radius-small: 4px;
   --radius-control: 6px;
   --radius-panel: 8px;

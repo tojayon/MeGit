@@ -9,6 +9,7 @@ import {
   Network,
   Plus,
   Settings2,
+  Palette,
   Workflow,
   X,
 } from 'lucide-react';
@@ -49,6 +50,7 @@ export function WorkspaceNavigation({
   onRepositories,
   onCreate,
   onPreferences,
+  onSettings,
   onHelp,
 }: {
   workspace: Workspace;
@@ -67,6 +69,7 @@ export function WorkspaceNavigation({
   onRepositories: () => void;
   onCreate: () => void;
   onPreferences: () => void;
+  onSettings: () => void;
   onHelp: () => void;
 }) {
   const { t } = useTranslation();
@@ -333,8 +336,9 @@ export function WorkspaceNavigation({
         </div>
         <div className="navigation-bottom">
           <div className="navigation-actions">
-            {action(t('preferences.title'), <Settings2 size={20} />, onPreferences)}
+            {action(t('preferences.title'), <Palette size={20} />, onPreferences)}
             {collapsed && action(t('nav.help'), <CircleHelp size={20} />, onHelp)}
+            {action(t('settings.title'), <Settings2 size={20} />, onSettings)}
           </div>
         </div>
       </aside>

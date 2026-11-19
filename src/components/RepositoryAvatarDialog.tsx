@@ -10,7 +10,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import type { Repository, RepositoryImage, RepositoryImages } from '../../shared/types';
-import { api } from '../lib/api';
+import { api, request } from '../lib/api';
 import { loadRepositoryImage } from '../lib/repository-images';
 import { formatError } from '../lib/messages';
 import { Dialog } from './Dialogs';
@@ -48,6 +48,8 @@ export function RepositoryAvatarDialog({
   }>();
   const [decoded, setDecoded] = useState<string>();
   const [decodeError, setDecodeError] = useState<string>();
+  const [picking, setPicking] = useState(false);
+  const [pickerError, setPickerError] = useState<unknown>();
   const listKey = JSON.stringify([repo.id, directory, offset]);
   const selectionKey = JSON.stringify([selected, selectionVersion]);
   const { id, path: root } = repo;
@@ -98,6 +100,7 @@ export function RepositoryAvatarDialog({
     <Dialog
       title={t('repositoryAvatar.title')}
       onClose={onClose}
+      busy={picking}
       className="repository-avatar-dialog"
     >
       <div className="dialog-body repository-avatar-body">
@@ -129,6 +132,32 @@ export function RepositoryAvatarDialog({
           </div>
         </div>
         <p className="muted repository-avatar-help">{t('repositoryAvatar.help')}</p>
+        <Button
+          busy={picking}
+          disabled={disabled}
+          onClick={async () => {
+            setPicking(true);
+            setPickerError(undefined);
+            try {
+              const result = await request<{ path: string | null }>(
+                `/repositories/${encodeURIComponent(id)}/pick-image`,
+                { method: 'POST' },
+              );
+              if (result.path) choose(result.path);
+            } catch (failure) {
+              setPickerError(failure);
+            } finally {
+              setPicking(false);
+            }
+          }}
+        >
+          {t('repositoryIndex.pickAvatar')}
+        </Button>
+        {Boolean(pickerError) && (
+          <p role="alert" className="field-error">
+            {formatError(pickerError)}
+          </p>
+        )}
         {(imageError || invalidImage) && (
           <p className="field-error" role="alert">
             {imageError ? formatError(imageError) : t('repositoryAvatar.decodeError')}
@@ -213,10 +242,10 @@ export function RepositoryAvatarDialog({
         )}
       </div>
       <footer className="dialog-footer">
-        <Button onClick={onClose}>{t('common.cancel')}</Button>
+        <Button disabled={picking} onClick={onClose}>{t('common.cancel')}</Button>
         <Button
           variant="primary"
-          disabled={disabled || !ready}
+          disabled={disabled || picking || !ready}
           onClick={() => {
             onSave(selected || undefined);
             onClose();

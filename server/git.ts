@@ -27,14 +27,20 @@ const execute = promisify(execFile);
 const MAX_DIFF = 240_000;
 const queues = new Map<string, Promise<unknown>>();
 
-async function run(repo: string, args: string[], network = false, allowExitOne = false) {
+async function run(
+  repo: string,
+  args: string[],
+  network = false,
+  allowExitOne = false,
+  outputLimit?: number,
+) {
   try {
-    return await execute('git', [...gitExecutionOptions, ...args], {
+    const result = await execute('git', [...gitExecutionOptions, ...args], {
       cwd: repo,
       encoding: 'utf8',
       windowsHide: true,
       timeout: network ? 120_000 : 20_000,
-      maxBuffer: 8 * 1024 * 1024,
+      maxBuffer: outputLimit ? outputLimit * 4 + 4096 : 8 * 1024 * 1024,
       env: {
         ...process.env,
         GIT_TERMINAL_PROMPT: '0',
@@ -44,6 +50,7 @@ async function run(repo: string, args: string[], network = false, allowExitOne =
         LANG: 'C',
       },
     });
+    return outputLimit ? { ...result, stdout: result.stdout.slice(0, outputLimit + 1) } : result;
   } catch (error) {
     const result = error as Error & {
       stdout?: string;
@@ -51,6 +58,13 @@ async function run(repo: string, args: string[], network = false, allowExitOne =
       killed?: boolean;
       code?: number | string;
     };
+    if (
+      outputLimit &&
+      result.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' &&
+      result.stdout &&
+      result.stdout.length > outputLimit
+    )
+      return { stdout: result.stdout.slice(0, outputLimit + 1), stderr: '' };
     if (allowExitOne && result.code === 1)
       return { stdout: result.stdout || '', stderr: result.stderr || '' };
     if (result.code === 'ENOENT') throw new AppError('gitMissing');
