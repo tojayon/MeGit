@@ -149,7 +149,7 @@ test('空仓库可按需开始首次提交；分支详情的帮助、资料与 E
     await page.goto('/');
     await page.getByRole('button', { name: '查看分支树演示', exact: true }).click();
     await expect(page.getByText('还没有提交，先记录第一个版本', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '新建分支', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '新建分支', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: '查看工作区改动', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '工作区', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '关闭工作区', exact: true }).click();
@@ -175,7 +175,9 @@ test('空仓库可按需开始首次提交；分支详情的帮助、资料与 E
     const offset = () =>
       page.locator('.branch-tree-viewport').evaluate((element) => {
         const dot = element
-          .querySelector('.tree-node.trunk > circle:last-child')!
+          .querySelector(
+            '.tree-node.trunk > .tree-head-marker, .tree-node.trunk > circle:last-child',
+          )!
           .getBoundingClientRect();
         const box = element.getBoundingClientRect();
         return Math.abs(dot.x + dot.width / 2 - box.x - element.clientWidth / 2);

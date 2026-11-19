@@ -28,7 +28,7 @@ export function Button({
       type={type}
       className={`button ${variant === 'default' ? '' : variant} ${size === 'compact' ? 'compact' : ''} ${className}`}
       disabled={disabled || busy}
-      aria-busy={busy || undefined}
+      aria-busy={busy || props['aria-busy'] || undefined}
     >
       {(icon || busy !== undefined) && (
         <span className="button-icon" aria-hidden="true">

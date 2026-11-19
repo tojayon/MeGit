@@ -2,16 +2,24 @@ import { CircleHelp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from './Tooltip';
 import type zhCN from '../i18n/locales/zh-CN';
+import { GitCommandPreview, type GitCommandPreviewData } from './GitCommandPreview';
 
 export type GitHelpTopic = keyof typeof zhCN.gitHelp.topics;
 
-export function GitHelp({ topic }: { topic: GitHelpTopic }) {
+export function GitHelp({
+  topic,
+  preview,
+}: {
+  topic: GitHelpTopic;
+  preview?: GitCommandPreviewData;
+}) {
   const { t } = useTranslation();
   return (
     <span className="git-help-content">
       <strong>{t(`gitHelp.topics.${topic}.title`)}</strong>
       <span>{t(`gitHelp.topics.${topic}.meaning`)}</span>
       <span>{t(`gitHelp.topics.${topic}.effect`)}</span>
+      {preview && <GitCommandPreview {...preview} />}
     </span>
   );
 }

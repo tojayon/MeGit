@@ -3,7 +3,7 @@ import {
   groupBounds,
   selectedNodeIds,
   selectionUnits,
-  NOTE_SIZE,
+  noteSize,
   REPOSITORY_SIZE,
   type Point,
   type Size,
@@ -66,7 +66,7 @@ export function createSnapScene(
         id: node.id,
         spacing: !fixedGroups.some((group) => group.nodeIds.includes(node.id)),
         ...node.position,
-        ...(dimensions[node.id] || ('repoId' in node ? REPOSITORY_SIZE : NOTE_SIZE)),
+        ...(dimensions[node.id] || ('repoId' in node ? REPOSITORY_SIZE : noteSize(node))),
       })),
   ].sort((a, b) => a.id.localeCompare(b.id));
   const members = [...board.nodes, ...(board.notes || [])].filter((node) => movingIds.has(node.id));

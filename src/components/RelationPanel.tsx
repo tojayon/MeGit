@@ -1,25 +1,33 @@
 import { useTranslation } from 'react-i18next';
+import { useRef } from 'react';
 import { ArrowRight, Check, CircleHelp, GitMerge, Link2 } from 'lucide-react';
 import type { FlowEdge, IntegrationState, Repository } from '../../shared/types';
 import { formatError } from '../lib/messages';
 import { PanelHeader } from './PanelHeader';
 import { HelpTip } from './GitHelp';
 import { RepositoryAvatar } from './RepositoryAvatar';
+import { useViewState, useScrollMemory } from '../lib/use-view-state';
+import { isBoolean } from '../lib/view-storage';
 
 export function RelationPanel({
   edge,
+  viewKey,
   source,
   target,
   result,
   onClose,
 }: {
   edge: FlowEdge;
+  viewKey?: string;
   source?: Repository;
   target?: Repository;
   result?: IntegrationState;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const scroll = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useViewState(viewKey && `${viewKey}.basis`, false, isBoolean);
+  useScrollMemory(scroll, viewKey && `${viewKey}.scroll`, edge.kind !== 'integration' || !!result);
   const uncertain = !result || result.state === 'unknown';
   const explanation = result?.errorInfo
     ? formatError(result.errorInfo)
@@ -35,7 +43,7 @@ export function RelationPanel({
         onClose={onClose}
         actions={<HelpTip topic={edge.kind} />}
       />
-      <div className="relation-panel-body">
+      <div ref={scroll} className="relation-panel-body">
         <div className="relation-endpoints">
           <div>
             <span>{t('relation.source')}</span>
@@ -76,7 +84,11 @@ export function RelationPanel({
             </div>
             {uncertain && <p>{explanation}</p>}
             {(!uncertain || result?.sourceHead) && (
-              <details className="result-details">
+              <details
+                className="result-details"
+                open={expanded}
+                onToggle={(event) => setExpanded(event.currentTarget.open)}
+              >
                 <summary>{t('relation.basis')}</summary>
                 {!uncertain && <p>{explanation}</p>}
                 {result?.sourceHead && (

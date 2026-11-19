@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useId, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState } from 'react';
+import { useScrollMemory } from '../lib/use-view-state';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft,
@@ -428,13 +429,17 @@ function ConflictScene({ frame }: { frame: LearningFrame }) {
 export function GitLearningScene({
   lesson,
   step,
+  viewKey,
   presentation = 'lesson',
 }: {
   lesson: LearningLesson;
   step: LearningStep;
+  viewKey?: string;
   presentation?: 'lesson' | 'preview';
 }) {
   const { t } = useTranslation();
+  const scroll = useRef<HTMLDivElement>(null);
+  useScrollMemory(scroll, viewKey);
   const frame = step.frame;
   const history = t('learning.graphState', {
     head: frame.head,
@@ -465,6 +470,7 @@ export function GitLearningScene({
   return (
     <PreviewPresentation value={presentation === 'preview'}>
       <div
+        ref={scroll}
         className={`learning-diagram-scroll ${presentation === 'preview' ? 'git-learning-preview-scene' : ''}`}
         tabIndex={presentation === 'lesson' ? 0 : undefined}
         role={presentation === 'lesson' ? 'region' : undefined}

@@ -11,6 +11,27 @@ const workspace = (): Workspace => ({
 });
 
 describe('白板历史', () => {
+  it('步骤与流程线共同撤销，清理新增字段并可以重做', () => {
+    const history = new BoardHistory();
+    const before = workspace();
+    const next = structuredClone(before);
+    next.boards[0].notes = [
+      {
+        id: 'step',
+        kind: 'decision',
+        title: '通过？',
+        summary: '判断',
+        text: '细节',
+        position: { x: 0, y: 0 },
+      },
+    ];
+    next.boards[0].connections = [{ id: 'flow', source: 'step', target: 'next', label: '通过' }];
+    history.record(before, next);
+    const undone = history.undo(next, 'a')!;
+    expect(undone.boards[0].notes).toBeUndefined();
+    expect(undone.boards[0].connections).toBeUndefined();
+    expect(history.redo(undone, 'a')!.boards[0].connections).toEqual(next.boards[0].connections);
+  });
   it('隔离各白板，保留最新 revision、视角、锁定与仓库登记，不重演 Git 操作', () => {
     const history = new BoardHistory();
     const before = workspace();

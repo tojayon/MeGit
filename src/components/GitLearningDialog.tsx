@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowLeft,
@@ -24,6 +24,8 @@ import { Tooltip } from './Tooltip';
 import { GitLearningScene } from './GitLearningScene';
 import { gitLessons, learningLessonIds, type LearningLessonId } from '../lib/git-learning';
 import './git-learning.css';
+import { useViewState, useScrollMemory } from '../lib/use-view-state';
+import { isFiniteNumber } from '../lib/view-storage';
 
 const courseIcons = {
   basics: Layers,
@@ -35,12 +37,25 @@ const courseIcons = {
   conflicts: CircleAlert,
 };
 
-export function GitLearningDialog({ onClose }: { onClose: () => void }) {
+export function GitLearningDialog({ onClose, viewKey }: { onClose: () => void; viewKey?: string }) {
   const { t, i18n } = useTranslation();
-  const [lessonId, setLessonId] = useState<LearningLessonId>('basics');
-  const [stepIndex, setStepIndex] = useState(0);
+  const [lessonId, setLessonId] = useViewState<LearningLessonId>(
+    viewKey && `${viewKey}.lesson`,
+    'basics',
+    (v): v is LearningLessonId => learningLessonIds.includes(v as LearningLessonId),
+  );
+  const [savedStep, setStepIndex] = useViewState(
+    viewKey && `${viewKey}.step`,
+    0,
+    (v): v is number => isFiniteNumber(v) && Number.isInteger(v) && v >= 0 && v < 100,
+  );
   const [playing, setPlaying] = useState(false);
+  const courses = useRef<HTMLElement>(null);
+  const main = useRef<HTMLDivElement>(null);
+  useScrollMemory(courses, viewKey && `${viewKey}.courses`);
+  useScrollMemory(main, viewKey && `${viewKey}.main.${lessonId}`);
   const lesson = gitLessons[lessonId];
+  const stepIndex = Math.min(savedStep, lesson.steps.length - 1);
   const step = lesson.steps[stepIndex];
   const lastStep = lesson.steps.length - 1;
   const number = new Intl.NumberFormat(i18n.resolvedLanguage);
@@ -58,7 +73,7 @@ export function GitLearningDialog({ onClose }: { onClose: () => void }) {
       if (next === lastStep) setPlaying(false);
     }, 2600);
     return () => window.clearTimeout(timer);
-  }, [playing, stepIndex, lastStep, lessonId]);
+  }, [playing, stepIndex, lastStep, lessonId, setStepIndex]);
   useEffect(() => {
     const pause = () => setPlaying(false);
     const hide = () => {
@@ -74,6 +89,7 @@ export function GitLearningDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog
+      viewKey={viewKey}
       title={t('learning.title')}
       closeLabel={t('learning.close')}
       className="git-learning-dialog"
@@ -93,7 +109,7 @@ export function GitLearningDialog({ onClose }: { onClose: () => void }) {
         data-step={stepIndex}
         data-playing={playing}
       >
-        <nav className="learning-courses" aria-label={t('learning.courses')}>
+        <nav ref={courses} className="learning-courses" aria-label={t('learning.courses')}>
           {learningLessonIds.map((id, index) => {
             const Icon = courseIcons[id];
             return (
@@ -118,7 +134,7 @@ export function GitLearningDialog({ onClose }: { onClose: () => void }) {
             );
           })}
         </nav>
-        <div className="learning-main">
+        <div ref={main} className="learning-main">
           <header className="learning-lesson-header">
             <div>
               <h3>{t(`learning.lessons.${lessonId}.title`)}</h3>
@@ -140,7 +156,12 @@ export function GitLearningDialog({ onClose }: { onClose: () => void }) {
               </button>
             </Tooltip>
           </div>
-          <GitLearningScene key={lessonId} lesson={lesson} step={step} />
+          <GitLearningScene
+            key={lessonId}
+            viewKey={viewKey && `${viewKey}.diagram.${lessonId}`}
+            lesson={lesson}
+            step={step}
+          />
           <footer className="learning-footer">
             <p
               className={`learning-caption ${step.caption === 'discard' ? 'is-warning' : ''}`}

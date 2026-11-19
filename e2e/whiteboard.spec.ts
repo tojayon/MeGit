@@ -1,5 +1,6 @@
 import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from './test';
+import { dragConnection } from './connection-helpers';
 import { fixture, commitFile, git } from '../tests/fixtures';
 import path from 'node:path';
 import type { Board, Workspace } from '../shared/types';
@@ -177,13 +178,14 @@ test('连线路由与四边端口持久化，上下游强调，双语主题与�
     await expect(page.locator('.react-flow__edge[data-id="ac"]')).toHaveClass(/context-related/);
     await expect(page.locator('.react-flow__node[data-id="d"]')).not.toHaveClass(/context-related/);
     await page.getByRole('button', { name: '关闭仓库详情' }).click();
-    await page
-      .locator('.react-flow__node[data-id="b"] .react-flow__handle[data-handleid="source-bottom"]')
-      .dragTo(
-        page.locator(
-          '.react-flow__node[data-id="d"] .react-flow__handle[data-handleid="target-top"]',
-        ),
-      );
+    await page.getByRole('button', { name: '适应白板', exact: true }).click();
+    await dragConnection(
+      page,
+      page.locator(
+        '.react-flow__node[data-id="b"] .react-flow__handle[data-handleid="source-bottom"]',
+      ),
+      page.locator('.react-flow__node[data-id="d"] .react-flow__handle[data-handleid="target-top"]'),
+    );
     await page.getByLabel('关系名称').fill('从下到上');
     await page.getByRole('button', { name: '保存关系', exact: true }).click();
     await page

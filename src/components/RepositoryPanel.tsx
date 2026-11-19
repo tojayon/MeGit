@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -29,16 +29,45 @@ import { api, timeAgo } from '../lib/api';
 import { Dialog } from './Dialogs';
 import { formatError, type NoticeMessage } from '../lib/messages';
 import { BranchTreePanel } from './BranchTreePanel';
+import { CommitComposer } from './CommitComposer';
 import { Button } from './Button';
-import { Field } from './Field';
 import { IconButton } from './IconButton';
 import { PanelHeader } from './PanelHeader';
 import { RepositoryInfo } from './RepositoryInfo';
 import { GitHelp, HelpTip } from './GitHelp';
 import { Tooltip } from './Tooltip';
 import { RepositoryAvatar } from './RepositoryAvatar';
+import {
+  actionArguments,
+  commitDiffArguments,
+  fileDiffArguments,
+  historyArguments,
+  statusArguments,
+} from '../../shared/git-commands';
+import { CommitEvent } from './CommitEvent';
+import { useViewState, useScrollMemory, viewStorage } from '../lib/use-view-state';
+import { isText, isFiniteNumber } from '../lib/view-storage';
 
 type DiffSelection = { title: string; query: DiffQuery };
+const isDiffSelection = (value: unknown): value is DiffSelection | null => {
+  if (value === null) return true;
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('title' in value) ||
+    !isText(value.title) ||
+    !('query' in value) ||
+    !value.query ||
+    typeof value.query !== 'object'
+  )
+    return false;
+  const q = value.query as DiffQuery;
+  return (
+    (q.path === undefined || isText(q.path)) &&
+    (q.staged === undefined || typeof q.staged === 'boolean') &&
+    (q.commit === undefined || (typeof q.commit === 'string' && /^[a-f\d]{40,64}$/i.test(q.commit)))
+  );
+};
 
 function CommitGraph({ commits }: { commits: Commit[] }) {
   const { t } = useTranslation();
@@ -96,16 +125,20 @@ function CommitGraph({ commits }: { commits: Commit[] }) {
 
 export function DiffDialog({
   repo,
+  viewKey,
   selection,
   onClose,
 }: {
   repo: Repository;
+  viewKey?: string;
   selection: DiffSelection;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const [result, setResult] = useState<DiffResult | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const scroll = useRef<HTMLDivElement>(null);
+  useScrollMemory(scroll, viewKey && `${viewKey}.content`, !!result);
   useEffect(() => {
     let active = true;
     api
@@ -122,6 +155,8 @@ export function DiffDialog({
   }, [repo.id, selection]);
   return (
     <Dialog
+      viewKey={viewKey}
+      restoreReady={!!result || !!error}
       title={t('diff.title')}
       onClose={onClose}
       wide
@@ -158,7 +193,7 @@ export function DiffDialog({
           {t('diff.reading')}
         </div>
       ) : (
-        <div className="diff-view" data-testid="diff-view">
+        <div className="diff-view" data-testid="diff-view" ref={scroll}>
           <pre>
             {(result.notice ? t(`diff.${result.notice}`) : result.text || t('diff.empty'))
               .split('\n')
@@ -193,12 +228,14 @@ export function DiffDialog({
 
 function FileGroup({
   files,
+  state,
   isStaged,
   busy,
   onAction,
   onDiff,
 }: {
   files: ChangedFile[];
+  state: RepoState;
   isStaged: boolean;
   busy: boolean;
   onAction: (action: GitAction) => Promise<void>;
@@ -216,7 +253,22 @@ function FileGroup({
             related={[isStaged ? 'unstage' : 'stage']}
           />
         </h3>
-        <Tooltip detailed content={<GitHelp topic={isStaged ? 'unstage' : 'stage'} />}>
+        <Tooltip
+          detailed
+          content={
+            <GitHelp
+              topic={isStaged ? 'unstage' : 'stage'}
+              preview={{
+                commands: [
+                  actionArguments(
+                    { type: isStaged ? 'unstage' : 'stage', paths: files.map((file) => file.path) },
+                    state,
+                  ),
+                ],
+              }}
+            />
+          }
+        >
           <button
             className="text-button"
             disabled={busy}
@@ -257,7 +309,14 @@ function FileGroup({
             content={
               <>
                 <strong>{file.path}</strong>
-                <GitHelp topic={isStaged ? 'stagedDiff' : 'workingDiff'} />
+                <GitHelp
+                  topic={isStaged ? 'stagedDiff' : 'workingDiff'}
+                  preview={{
+                    when: 'read',
+                    commands: [fileDiffArguments(file, isStaged)],
+                    empty: 'untracked',
+                  }}
+                />
               </>
             }
           >
@@ -273,7 +332,19 @@ function FileGroup({
           </Tooltip>
           <IconButton
             size="small"
-            help={<GitHelp topic={isStaged ? 'unstage' : 'stage'} />}
+            help={
+              <GitHelp
+                topic={isStaged ? 'unstage' : 'stage'}
+                preview={{
+                  commands: [
+                    actionArguments(
+                      { type: isStaged ? 'unstage' : 'stage', paths: [file.path] },
+                      state,
+                    ),
+                  ],
+                }}
+              />
+            }
             label={t('repository.fileAction', {
               action: isStaged ? t('repository.unstage') : t('repository.stage'),
               path: file.path,
@@ -293,27 +364,40 @@ function FileGroup({
 
 function RepositoryToolsPanel({
   repo,
+  viewKey,
+  onReady,
   state,
   tab,
   message,
   setMessage,
   busy,
   handleAction,
+  onCommitAction,
 }: {
   repo: Repository;
+  viewKey?: string;
+  onReady?: (tab: 'worktree' | 'history', ready: boolean) => void;
   state?: RepoState;
   tab: 'worktree' | 'history';
   message: string;
   setMessage: (message: string) => void;
   busy: string;
   handleAction: (action: GitAction) => Promise<void>;
+  onCommitAction: (action: GitAction) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
   const [commits, setCommits] = useState<Commit[]>([]);
   const [historyError, setHistoryError] = useState<unknown>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(tab === 'history');
   const [hasMore, setHasMore] = useState(false);
-  const [diff, setDiff] = useState<DiffSelection | null>(null);
+  const [diff, setDiff] = useViewState(viewKey && `${viewKey}.diff`, null, isDiffSelection);
+  const [historyCount] = useState(() => {
+    const count = viewKey ? viewStorage.read(`${viewKey}.count`) : undefined;
+    return isFiniteNumber(count) && count >= 40 && count <= 600 ? count : 40;
+  });
+  useEffect(() => {
+    onReady?.(tab, !historyLoading && !!state);
+  }, [onReady, historyLoading, tab, state]);
   const refFingerprint = state?.branches.map((branch) => `${branch.name}:${branch.hash}`).join('|');
 
   useEffect(() => {
@@ -325,12 +409,20 @@ function RepositoryToolsPanel({
         setHistoryError('');
       }
     });
-    api
-      .history(repo.id)
+    (async () => {
+      const data = await api.history(repo.id);
+      let last = data.length;
+      while (active && data.length < historyCount && last === 40) {
+        const more = await api.history(repo.id, data.length);
+        last = more.length;
+        data.push(...more);
+      }
+      return data;
+    })()
       .then((data) => {
         if (active) {
           setCommits(data);
-          setHasMore(data.length === 40);
+          setHasMore(data.length > 0 && data.length % 40 === 0);
         }
       })
       .catch((err) => {
@@ -342,7 +434,7 @@ function RepositoryToolsPanel({
     return () => {
       active = false;
     };
-  }, [repo.id, state?.head, refFingerprint, tab]);
+  }, [repo.id, state?.head, refFingerprint, tab, historyCount]);
 
   const staged = state?.files.filter((f) => !f.untracked && f.indexStatus !== '.') || [];
   const unstaged = state?.files.filter((f) => f.untracked || f.worktreeStatus !== '.') || [];
@@ -359,6 +451,15 @@ function RepositoryToolsPanel({
         </strong>
         <HelpTip topic="branch" />
       </div>
+      {tab === 'worktree' && (
+        <CommitComposer
+          state={state}
+          message={message}
+          onMessage={setMessage}
+          busy={busy}
+          onAction={onCommitAction}
+        />
+      )}
       <div className="remote-state">
         <span>
           <ArrowUp size={14} />
@@ -371,7 +472,15 @@ function RepositoryToolsPanel({
         <HelpTip topic="sync" related={['fetch', 'pull', 'push']} />
       </div>
       <div className="repo-actions">
-        <Tooltip detailed content={<GitHelp topic="fetch" />}>
+        <Tooltip
+          detailed
+          content={
+            <GitHelp
+              topic="fetch"
+              preview={{ commands: [actionArguments({ type: 'fetch' }, state)] }}
+            />
+          }
+        >
           <Button
             busy={busy === 'fetch'}
             icon={<RefreshCw size={15} />}
@@ -381,7 +490,15 @@ function RepositoryToolsPanel({
             {t('repository.fetch')}
           </Button>
         </Tooltip>
-        <Tooltip detailed content={<GitHelp topic="pull" />}>
+        <Tooltip
+          detailed
+          content={
+            <GitHelp
+              topic="pull"
+              preview={{ commands: [actionArguments({ type: 'pull' }, state)] }}
+            />
+          }
+        >
           <Button
             busy={busy === 'pull'}
             icon={<Download size={15} />}
@@ -391,7 +508,15 @@ function RepositoryToolsPanel({
             {t('repository.pull')}
           </Button>
         </Tooltip>
-        <Tooltip detailed content={<GitHelp topic="push" />}>
+        <Tooltip
+          detailed
+          content={
+            <GitHelp
+              topic="push"
+              preview={{ commands: [actionArguments({ type: 'push' }, state)] }}
+            />
+          }
+        >
           <Button
             busy={busy === 'push'}
             icon={<Upload size={15} />}
@@ -432,6 +557,7 @@ function RepositoryToolsPanel({
                 {unstaged.length > 0 && (
                   <FileGroup
                     files={unstaged}
+                    state={state!}
                     isStaged={false}
                     busy={!!busy}
                     onAction={handleAction}
@@ -441,6 +567,7 @@ function RepositoryToolsPanel({
                 {staged.length > 0 && (
                   <FileGroup
                     files={staged}
+                    state={state!}
                     isStaged
                     busy={!!busy}
                     onAction={handleAction}
@@ -448,39 +575,6 @@ function RepositoryToolsPanel({
                   />
                 )}
               </>
-            )}
-            {staged.length > 0 && (
-              <form
-                className="commit-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void handleAction({ type: 'commit', message });
-                }}
-              >
-                <div className="commit-help">
-                  <HelpTip topic="commit" />
-                </div>
-                <Field label={t('repository.message')}>
-                  <textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={t('repository.messagePlaceholder')}
-                    rows={3}
-                    maxLength={10000}
-                  />
-                </Field>
-                <Tooltip detailed content={<GitHelp topic="commit" />}>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    busy={busy === 'commit'}
-                    icon={<GitCommitHorizontal size={16} />}
-                    disabled={!!busy || !message.trim()}
-                  >
-                    {t('repository.commitFiles', { count: staged.length })}
-                  </Button>
-                </Tooltip>
-              </form>
             )}
           </>
         )}
@@ -502,39 +596,71 @@ function RepositoryToolsPanel({
                   <CommitGraph commits={commits} />
                   <div>
                     {commits.map((commit) => (
-                      <button
-                        className="commit-row"
+                      <Tooltip
                         key={commit.hash}
-                        onClick={() =>
-                          setDiff({ title: commit.subject, query: { commit: commit.hash } })
+                        detailed
+                        className="commit-row-tooltip"
+                        content={
+                          <>
+                            <CommitEvent commit={commit} />
+                            <GitHelp
+                              topic="commitDiff"
+                              preview={{
+                                when: 'read',
+                                commands: [commitDiffArguments(commit.hash)],
+                              }}
+                            />
+                          </>
                         }
                       >
-                        <strong>{commit.subject}</strong>
-                        <span>
-                          <code>{commit.shortHash}</code>
-                          <span>{commit.author}</span>
-                          <time>{timeAgo(commit.date)}</time>
-                        </span>
-                        {commit.refs && <small title={commit.refs}>{commit.refs}</small>}
-                      </button>
+                        <button
+                          className="commit-row"
+                          onClick={() =>
+                            setDiff({ title: commit.subject, query: { commit: commit.hash } })
+                          }
+                        >
+                          <strong>{commit.subject}</strong>
+                          <span>
+                            <code>{commit.shortHash}</code>
+                            <span>{commit.author}</span>
+                            <time>{timeAgo(commit.date)}</time>
+                          </span>
+                          {commit.refs && <small title={commit.refs}>{commit.refs}</small>}
+                        </button>
+                      </Tooltip>
                     ))}
                   </div>
                 </div>
                 {hasMore && (
-                  <button
-                    className="button load-more"
-                    onClick={async () => {
-                      try {
-                        const more = await api.history(repo.id, commits.length);
-                        setCommits([...commits, ...more]);
-                        setHasMore(more.length === 40);
-                      } catch (err) {
-                        setHistoryError(err);
-                      }
-                    }}
+                  <Tooltip
+                    detailed
+                    content={
+                      <GitHelp
+                        topic="history"
+                        preview={{ when: 'read', commands: [historyArguments(commits.length)] }}
+                      />
+                    }
                   >
-                    {t('repository.more')}
-                  </button>
+                    <button
+                      className="button load-more"
+                      onClick={async () => {
+                        try {
+                          const more = await api.history(repo.id, commits.length);
+                          setCommits([...commits, ...more]);
+                          if (viewKey)
+                            viewStorage.write(
+                              `${viewKey}.count`,
+                              Math.min(600, commits.length + more.length),
+                            );
+                          setHasMore(more.length === 40);
+                        } catch (err) {
+                          setHistoryError(err);
+                        }
+                      }}
+                    >
+                      {t('repository.more')}
+                    </button>
+                  </Tooltip>
                 )}
               </>
             ) : (
@@ -546,13 +672,21 @@ function RepositoryToolsPanel({
           </>
         )}
       </div>
-      {diff && <DiffDialog repo={repo} selection={diff} onClose={() => setDiff(null)} />}
+      {diff && (
+        <DiffDialog
+          repo={repo}
+          viewKey={viewKey && `${viewKey}.diff.${JSON.stringify(diff.query)}`}
+          selection={diff}
+          onClose={() => setDiff(null)}
+        />
+      )}
     </>
   );
 }
 
 export function RepositoryPanel({
   repo,
+  viewKey,
   state,
   onClose,
   onRefresh,
@@ -562,6 +696,7 @@ export function RepositoryPanel({
   avatarDisabled,
 }: {
   repo: Repository;
+  viewKey?: string;
   state?: RepoState;
   onClose: () => void;
   onRefresh: () => Promise<void>;
@@ -571,11 +706,29 @@ export function RepositoryPanel({
   avatarDisabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useViewState(viewKey && `${viewKey}.draft`, '', isText);
   const [busy, setBusy] = useState('');
   const busyRef = useRef(false);
-  const [view, setView] = useState<'worktree' | 'history' | null>(null);
-  const [diff, setDiff] = useState<DiffSelection | null>(null);
+  const [view, setView] = useViewState<'worktree' | 'history' | null>(
+    viewKey && `${viewKey}.tools`,
+    null,
+    (v): v is 'worktree' | 'history' | null => v === null || v === 'worktree' || v === 'history',
+  );
+  const [readyView, setReadyView] = useState<{
+    tab: 'worktree' | 'history';
+    ready: boolean;
+  } | null>(null);
+  const onViewReady = useCallback((tab: 'worktree' | 'history', ready: boolean) => {
+    setReadyView({ tab, ready });
+  }, []);
+  const openTools = useCallback(
+    (tab: 'worktree' | 'history') => {
+      setReadyView(null);
+      setView(tab);
+    },
+    [setView],
+  );
+  const [diff, setDiff] = useViewState(viewKey && `${viewKey}.diff`, null, isDiffSelection);
   async function executeAction(operation: GitAction): Promise<boolean> {
     if (busyRef.current) return false;
     busyRef.current = true;
@@ -627,21 +780,35 @@ export function RepositoryPanel({
         <div className="panel-error" role="alert">
           <CircleAlert size={19} />
           <p>{formatError(state.errorInfo || { code: 'unknown', details: state.error })}</p>
-          <Button onClick={() => void onRefresh()}>{t('repository.retry')}</Button>
+          <Tooltip
+            detailed
+            content={
+              <GitHelp topic="checked" preview={{ when: 'read', commands: [statusArguments] }} />
+            }
+          >
+            <Button onClick={() => void onRefresh()}>{t('repository.retry')}</Button>
+          </Tooltip>
         </div>
       ) : (
         <BranchTreePanel
+          viewKey={viewKey}
           repo={repo}
           state={state}
           busy={busy}
           onAction={executeAction}
+          commitMessage={message}
+          onCommitMessage={setMessage}
+          commitVisible={view !== 'worktree'}
           onRefresh={onRefresh}
-          onTools={setView}
+          onTools={openTools}
           onCommit={(commit) => setDiff({ title: commit.subject, query: { commit: commit.hash } })}
         />
       )}
       {view && (
         <Dialog
+          key={view}
+          viewKey={viewKey && `${viewKey}.${view}`}
+          restoreReady={readyView?.tab === view && readyView.ready}
           title={t(view === 'worktree' ? 'repository.worktree' : 'repository.history')}
           wide
           busy={!!busy}
@@ -651,6 +818,8 @@ export function RepositoryPanel({
         >
           <div className="dialog-body">
             <RepositoryToolsPanel
+              viewKey={viewKey && `${viewKey}.${view}`}
+              onReady={onViewReady}
               repo={repo}
               state={state}
               tab={view}
@@ -658,11 +827,19 @@ export function RepositoryPanel({
               setMessage={setMessage}
               busy={busy}
               handleAction={handleAction}
+              onCommitAction={executeAction}
             />
           </div>
         </Dialog>
       )}
-      {diff && <DiffDialog repo={repo} selection={diff} onClose={() => setDiff(null)} />}
+      {diff && (
+        <DiffDialog
+          repo={repo}
+          viewKey={viewKey && `${viewKey}.diff.${JSON.stringify(diff.query)}`}
+          selection={diff}
+          onClose={() => setDiff(null)}
+        />
+      )}
     </aside>
   );
 }

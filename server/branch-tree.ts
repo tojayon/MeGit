@@ -1,6 +1,7 @@
 import type { BranchComparison, BranchTreeData, Commit, TreeBranch } from '../shared/types.js';
 import { AppError } from './errors.js';
 import { runGit } from './git.js';
+import { comparisonArguments, treeHistoryArguments } from '../shared/git-commands.js';
 
 const logFormat = '--format=%H%x1f%P%x1f%h%x1f%an%x1f%aI%x1f%D%x1f%s';
 const refFormat =
@@ -134,18 +135,10 @@ export async function readBranchTree(
     data.head || branches.length
       ? parseLog(
           (
-            await runGit(repo, [
-              'log',
-              '--topo-order',
-              '--max-count=' + (limit + 1),
-              '-z',
-              logFormat,
-              '--branches',
-              ...(options.includeRemote ? ['--remotes'] : []),
-              ...(data.head ? ['HEAD'] : []),
-              ...(baseHash ? [baseHash] : []),
-              '--',
-            ])
+            await runGit(
+              repo,
+              treeHistoryArguments(limit, !!options.includeRemote, data.head, baseHash),
+            )
           ).stdout,
         )
       : [];
@@ -171,7 +164,9 @@ export async function readBranchTree(
   }
   return {
     branches,
-    commits: [...bounded.values()],
+    commits: [...bounded.values()].map((commit) =>
+      data.shallow && !commit.parents.length ? { ...commit, rootUnconfirmed: true } : commit,
+    ),
     baseRef,
     head: data.head,
     currentRef: data.currentRef,
@@ -195,11 +190,12 @@ export async function compareBranches(
     (options.targetHash && options.targetHash !== targetHash)
   )
     throw new AppError('branchTargetChanged', 409);
+  const commands = comparisonArguments(sourceHash, targetHash);
   const [counts, source, target, bases] = await Promise.all([
-    runGit(repo, ['rev-list', '--left-right', '--count', sourceHash + '...' + targetHash]),
-    runGit(repo, ['rev-list', '--topo-order', '--max-count=600', targetHash + '..' + sourceHash]),
-    runGit(repo, ['rev-list', '--topo-order', '--max-count=600', sourceHash + '..' + targetHash]),
-    runGit(repo, ['merge-base', '--all', sourceHash, targetHash], false, true),
+    runGit(repo, commands[0]),
+    runGit(repo, commands[1]),
+    runGit(repo, commands[2]),
+    runGit(repo, commands[3], false, true),
   ]);
   const [sourceOnly, targetOnly] = counts.stdout.trim().split(/\s+/).map(Number);
   const mergeBases = bases.stdout.trim().split(/\s+/).filter(Boolean);

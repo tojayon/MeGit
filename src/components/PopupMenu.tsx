@@ -142,6 +142,7 @@ export function PopupMenu({
           ref={menu}
           id={id}
           role="group"
+          data-keyboard-navigation="true"
           aria-label={label}
           onClick={(event) => {
             if (

@@ -19,7 +19,6 @@ export function GitDemoTooltip({
   return (
     <Tooltip
       detailed
-      openDelay={500}
       placement={placement}
       className="git-demo-tooltip"
       content={

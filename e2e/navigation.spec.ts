@@ -73,7 +73,9 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expect(rail).toBeVisible();
   const railBox = (await rail.boundingBox())!;
   const canvasBox = (await canvas.boundingBox())!;
-  expect(canvasBox.y).toBe(0);
+  expect(canvasBox.y).toBe(
+    (await page.locator('.workflow-panel > .inspector-heading').boundingBox())!.height,
+  );
   expect(railBox.height).toBeGreaterThan(railBox.width * 3);
   expect(railBox.width).toBeLessThanOrEqual(50);
   expect(canvasBox.x + canvasBox.width - railBox.x - railBox.width).toBeCloseTo(12, 0);
@@ -99,7 +101,7 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expectControlsAligned(page);
   const toggleBox = (await canvas.locator('.canvas-navigation-control').boundingBox())!;
   expect(toggleBox.x - (await canvas.boundingBox())!.x).toBeCloseTo(12, 0);
-  expect(toggleBox.y).toBeCloseTo(12, 0);
+  expect(toggleBox.y - canvasBox.y).toBeCloseTo(12, 0);
   await collapse.focus();
   await page.keyboard.press('Enter');
   await expect(navigation).toHaveAttribute('data-collapsed', 'true');
@@ -205,6 +207,7 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
     .locator('.navigation-brand')
     .getByRole('button', { name: '使用帮助', exact: true });
   await expect(help).toBeFocused();
+  await expect(page.getByRole('tooltip', { name: '使用帮助', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(navigation).not.toHaveAttribute('inert', '');
   await expect(page.getByRole('tooltip', { name: '使用帮助', exact: true })).toHaveCount(0);

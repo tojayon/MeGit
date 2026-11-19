@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRightLeft,
@@ -38,35 +38,74 @@ import { GitHelp, HelpTip } from './GitHelp';
 import { InfoPopover } from './InfoPopover';
 import { PopupMenu } from './PopupMenu';
 import { Tooltip } from './Tooltip';
+import { CommitComposer } from './CommitComposer';
+import { GitCommandPreview } from './GitCommandPreview';
+import { useViewState, useScrollMemory } from '../lib/use-view-state';
+import { isBoolean, isNullableText, isFiniteNumber } from '../lib/view-storage';
+import {
+  actionArguments,
+  commitDiffArguments,
+  comparisonArguments,
+  createBranchArguments,
+  historyArguments,
+  statusArguments,
+  treeHistoryArguments,
+} from '../../shared/git-commands';
 
 export function BranchTreePanel({
   repo,
+  viewKey,
   state,
   busy,
   onAction,
   onRefresh,
   onTools,
   onCommit,
+  commitMessage,
+  onCommitMessage,
+  commitVisible,
 }: {
   repo: Repository;
+  viewKey?: string;
   state?: RepoState;
   busy: string;
   onAction: (action: GitAction) => Promise<boolean>;
   onRefresh: () => Promise<void>;
   onTools: (view: 'worktree' | 'history') => void;
   onCommit: (commit: Commit) => void;
+  commitMessage: string;
+  onCommitMessage: (value: string) => void;
+  commitVisible: boolean;
 }) {
   const { t } = useTranslation();
-  const [baseRef, setBaseRef] = useState<string>();
-  const [remote, setRemote] = useState(false);
-  const [limit, setLimit] = useState(120);
-  const [expanded, setExpanded] = useState(false);
+  const [savedBaseRef, setSavedBaseRef] = useViewState(
+    viewKey && `${viewKey}.base`,
+    null,
+    isNullableText,
+  );
+  const baseRef = savedBaseRef ?? undefined;
+  const setBaseRef = useCallback((ref?: string) => setSavedBaseRef(ref ?? null), [setSavedBaseRef]);
+  const [remote, setRemote] = useViewState(viewKey && `${viewKey}.remote`, false, isBoolean);
+  const [limit, setLimit] = useViewState(
+    viewKey && `${viewKey}.limit`,
+    120,
+    (v): v is number => isFiniteNumber(v) && Number.isInteger(v) && v >= 1 && v <= 600,
+  );
+  const [expanded, setExpanded] = useViewState(viewKey && `${viewKey}.expanded`, false, isBoolean);
   const [data, setData] = useState<BranchTreeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
-  const [selectedRef, setSelectedRef] = useState<string | null>(null);
-  const [comparing, setComparing] = useState(false);
+  const [selectedRef, setSelectedRef] = useViewState(
+    viewKey && `${viewKey}.selected`,
+    null,
+    isNullableText,
+  );
+  const [comparing, setComparing] = useViewState(
+    viewKey && `${viewKey}.comparing`,
+    false,
+    isBoolean,
+  );
   const [comparison, setComparison] = useState<{ key: string; value: BranchComparison } | null>(
     null,
   );
@@ -80,6 +119,7 @@ export function BranchTreePanel({
   const [choosingTrunk, setChoosingTrunk] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const detail = useRef<HTMLElement>(null);
+  const detailScroll = useRef<HTMLDivElement>(null);
   const focusSelection = useRef(false);
   const focusAfterSearch = useRef(false);
   const fingerprint = state?.branches
@@ -112,6 +152,7 @@ export function BranchTreePanel({
   }, [
     repo.id,
     baseRef,
+    setBaseRef,
     remote,
     limit,
     reload,
@@ -123,6 +164,13 @@ export function BranchTreePanel({
     state?.fetchedAt,
   ]);
   const branch = data?.branches.find((item) => item.ref === selectedRef);
+  useEffect(() => {
+    if (!data || loading || !selectedRef || branch) return;
+    queueMicrotask(() => {
+      setSelectedRef(null);
+      setComparing(false);
+    });
+  }, [data, loading, selectedRef, branch, setSelectedRef, setComparing]);
   useLayoutEffect(() => {
     if (branch && focusSelection.current && !focusAfterSearch.current) {
       focusSelection.current = false;
@@ -138,6 +186,8 @@ export function BranchTreePanel({
     }
   }, [branch, searching]);
   const trunkHash = data ? treeRefHash(data, data.baseRef) : null;
+  const treeCommand = (nextRemote = remote, nextLimit = limit, hash = trunkHash) =>
+    treeHistoryArguments(nextLimit, nextRemote, data?.head ?? state?.head ?? null, hash);
   const comparisonKey =
     branch && data?.baseRef && trunkHash
       ? `${branch.ref}:${branch.hash}:${data.baseRef}:${trunkHash}`
@@ -164,6 +214,11 @@ export function BranchTreePanel({
     comparing && !loading && comparison?.key === comparisonKey ? comparison.value : null;
   const compareError =
     comparing && comparisonError?.key === comparisonKey ? comparisonError.error : null;
+  useScrollMemory(
+    detailScroll,
+    viewKey && `${viewKey}.detail-scroll.${selectedRef}`,
+    !!branch && !loading && (!comparing || !!result || !!compareError),
+  );
   const blocked = !!busy || !!state?.operation || !state?.head || loading;
   const isCurrent =
     !!branch?.current &&
@@ -204,16 +259,10 @@ export function BranchTreePanel({
   }
   const tools = (
     <>
-      <HelpTip topic="branchTree" related={['treeComparison']} />
-      <IconButton
-        size="small"
-        label={t('branches.new')}
-        help={<GitHelp topic="createBranch" />}
-        disabled={blocked}
-        onClick={() => state && setSelection({ type: 'createBranch', state, startPoint: 'HEAD' })}
-      >
-        <GitBranchPlus size={17} />
-      </IconButton>
+      <HelpTip
+        topic="branchTree"
+        related={['treeComparison', 'head', 'branchLabel', 'collapsedCommits', 'commitActions']}
+      />
       <PopupMenu
         label={t('branchTree.tools')}
         icon={<MoreHorizontal size={18} />}
@@ -221,41 +270,95 @@ export function BranchTreePanel({
         triggerClassName="icon-button small"
         menuClassName="branch-tree-menu-items"
       >
-        <button disabled={loading || !data?.commits.length} onClick={() => setChoosingTrunk(true)}>
-          {t('branchTree.changeTrunk')}
-        </button>
-        <button
-          onClick={() => {
-            setFilter('');
-            setSearching(true);
-          }}
+        <Tooltip detailed content={<GitHelp topic="treeComparison" preview={{ empty: 'view' }} />}>
+          <button
+            disabled={loading || !data?.commits.length}
+            onClick={() => setChoosingTrunk(true)}
+          >
+            {t('branchTree.changeTrunk')}
+          </button>
+        </Tooltip>
+        <Tooltip detailed content={<GitCommandPreview empty="view" />}>
+          <button
+            onClick={() => {
+              setFilter('');
+              setSearching(true);
+            }}
+          >
+            {t('branches.filter')}
+          </button>
+        </Tooltip>
+        <Tooltip detailed content={<GitHelp topic="worktree" preview={{ empty: 'view' }} />}>
+          <button onClick={() => onTools('worktree')}>
+            {t('branchTree.worktree')}
+            {state?.changed ? ` · ${state.changed}` : ''}
+          </button>
+        </Tooltip>
+        <Tooltip
+          detailed
+          content={
+            <GitHelp topic="history" preview={{ when: 'read', commands: [historyArguments()] }} />
+          }
         >
-          {t('branches.filter')}
-        </button>
-        <button onClick={() => onTools('worktree')}>
-          {t('branchTree.worktree')}
-          {state?.changed ? ` · ${state.changed}` : ''}
-        </button>
-        <button onClick={() => onTools('history')}>{t('branchTree.history')}</button>
-        <button onClick={() => setRemote((value) => !value)}>
-          {t(remote ? 'branchTree.hideRemote' : 'branchTree.showRemote')}
-        </button>
-        <button onClick={() => setExpanded((value) => !value)}>
-          {t(expanded ? 'branchTree.collapse' : 'branchTree.expand')}
-        </button>
-        <button
-          onClick={() => {
-            setReload((value) => value + 1);
-            void onRefresh().catch(setActionError);
-          }}
+          <button onClick={() => onTools('history')}>{t('branchTree.history')}</button>
+        </Tooltip>
+        <Tooltip
+          detailed
+          content={<GitCommandPreview when="read" commands={[treeCommand(!remote)]} />}
         >
-          {t('branches.refresh')}
-        </button>
+          <button onClick={() => setRemote((value) => !value)}>
+            {t(remote ? 'branchTree.hideRemote' : 'branchTree.showRemote')}
+          </button>
+        </Tooltip>
+        <Tooltip detailed content={<GitCommandPreview empty="view" />}>
+          <button onClick={() => setExpanded((value) => !value)}>
+            {t(expanded ? 'branchTree.collapse' : 'branchTree.expand')}
+          </button>
+        </Tooltip>
+        <Tooltip
+          detailed
+          content={
+            <GitHelp
+              topic="fetch"
+              preview={{ commands: [actionArguments({ type: 'fetch' }, state)] }}
+            />
+          }
+        >
+          <button
+            disabled={!!busy || loading || !state?.remotes.length}
+            onClick={() => void act({ type: 'fetch' })}
+          >
+            {t('repository.fetch')}
+          </button>
+        </Tooltip>
+        <Tooltip
+          detailed
+          content={
+            <GitHelp
+              topic="checked"
+              preview={{ when: 'read', commands: [statusArguments, treeCommand()] }}
+            />
+          }
+        >
+          <button
+            onClick={() => {
+              setReload((value) => value + 1);
+              void onRefresh().catch(setActionError);
+            }}
+          >
+            {t('branches.refresh')}
+          </button>
+        </Tooltip>
       </PopupMenu>
     </>
   );
   return (
     <div className="branch-tree-panel" ref={container}>
+      {!!actionError && (
+        <p className="error-message" role="alert">
+          {formatError(actionError)}
+        </p>
+      )}
       {state?.operation && (
         <p className="branch-tree-status warning-text" role="status">
           {t('branches.operation', { operation: t(`branches.operations.${state.operation}`) })} ·{' '}
@@ -287,7 +390,14 @@ export function BranchTreePanel({
         {error ? (
           <div className="panel-error" role="alert">
             <p>{formatError(error)}</p>
-            <Button onClick={() => setReload((value) => value + 1)}>{t('repository.retry')}</Button>
+            <Tooltip
+              detailed
+              content={<GitCommandPreview when="read" commands={[treeCommand()]} />}
+            >
+              <Button onClick={() => setReload((value) => value + 1)}>
+                {t('repository.retry')}
+              </Button>
+            </Tooltip>
           </div>
         ) : !data ? (
           <div className="loading-region" role="status">
@@ -303,12 +413,21 @@ export function BranchTreePanel({
         ) : (
           <>
             <BranchTree
+              viewKey={viewKey && `${viewKey}.map`}
               data={data}
               selectedRef={selectedRef}
               comparison={result}
               expanded={expanded}
               onSelect={select}
               onCommit={onCommit}
+              onCreateBranch={(commit) =>
+                state && setSelection({ type: 'createBranch', state, startPoint: 'COMMIT', commit })
+              }
+              createDisabled={
+                blocked
+                  ? t(state?.operation ? 'errors.branchOperation' : 'branchTree.refreshing')
+                  : undefined
+              }
               tools={tools}
             />
             {loading && (
@@ -382,7 +501,7 @@ export function BranchTreePanel({
                     <X size={15} />
                   </IconButton>
                 </header>
-                <div className="branch-tree-selection-body">
+                <div ref={detailScroll} className="branch-tree-selection-body">
                   {isCurrent && !loading ? (
                     <p className="branch-tree-checkout success-text">
                       {t('branchTree.current')}
@@ -397,6 +516,16 @@ export function BranchTreePanel({
                   ) : branch.remote ? (
                     <p>{t('branchTree.remote')}</p>
                   ) : null}
+                  {isCurrent && commitVisible && (
+                    <CommitComposer
+                      state={state}
+                      message={commitMessage}
+                      onMessage={onCommitMessage}
+                      busy={busy}
+                      disabled={loading}
+                      onAction={onAction}
+                    />
+                  )}
                   {!branch.remote && (branch.upstream || isCurrent || branch.upstreamGone) && (
                     <p className={branch.upstreamGone ? 'warning-text' : 'muted'}>
                       {branch.upstreamGone
@@ -427,15 +556,33 @@ export function BranchTreePanel({
                           <p className="error-message" role="alert">
                             {formatError(compareError)}
                           </p>
-                          <Button
-                            size="compact"
-                            onClick={() => {
-                              setComparisonError(null);
-                              setReload((value) => value + 1);
-                            }}
+                          <Tooltip
+                            detailed
+                            content={
+                              <GitHelp
+                                topic="treeComparison"
+                                preview={{
+                                  when: 'read',
+                                  commands: [
+                                    treeCommand(),
+                                    ...(trunkHash
+                                      ? comparisonArguments(branch.hash, trunkHash)
+                                      : []),
+                                  ],
+                                }}
+                              />
+                            }
                           >
-                            {t('branches.refresh')}
-                          </Button>
+                            <Button
+                              size="compact"
+                              onClick={() => {
+                                setComparisonError(null);
+                                setReload((value) => value + 1);
+                              }}
+                            >
+                              {t('branches.refresh')}
+                            </Button>
+                          </Tooltip>
                         </>
                       ) : result ? (
                         <>
@@ -452,13 +599,25 @@ export function BranchTreePanel({
                       )}
                     </div>
                   )}
-                  {!!actionError && (
-                    <p className="error-message" role="alert">
-                      {formatError(actionError)}
-                    </p>
-                  )}
                   <div className="branch-tree-actions">
-                    <Tooltip detailed content={<GitHelp topic="treeComparison" />}>
+                    <Tooltip
+                      detailed
+                      content={
+                        <GitHelp
+                          topic="treeComparison"
+                          preview={
+                            comparing
+                              ? { empty: 'view' }
+                              : {
+                                  when: 'read',
+                                  commands: trunkHash
+                                    ? comparisonArguments(branch.hash, trunkHash)
+                                    : [],
+                                }
+                          }
+                        />
+                      }
+                    >
                       <Button
                         size="compact"
                         icon={<GitCompareArrows size={15} />}
@@ -472,7 +631,23 @@ export function BranchTreePanel({
                     {branch.remote ? (
                       <IconButton
                         label={t('branches.fromRemote', { name: branch.name })}
-                        help={<GitHelp topic="tracking" />}
+                        help={
+                          <GitHelp
+                            topic="tracking"
+                            preview={{
+                              when: 'confirm',
+                              commands: [
+                                createBranchArguments({
+                                  name: branch.name.replace(/^[^/]+\//, ''),
+                                  startPoint: branch.ref,
+                                  startHash: branch.hash,
+                                  track: true,
+                                  checkout: false,
+                                }),
+                              ],
+                            }}
+                          />
+                        }
                         disabled={blocked}
                         onClick={() =>
                           state &&
@@ -486,7 +661,27 @@ export function BranchTreePanel({
                         <>
                           <IconButton
                             label={t('branches.switchTo', { name: branch.name })}
-                            help={<GitHelp topic="switchBranch" />}
+                            help={
+                              <GitHelp
+                                topic="switchBranch"
+                                preview={{
+                                  when: 'confirm',
+                                  commands: state
+                                    ? [
+                                        actionArguments(
+                                          {
+                                            type: 'switchBranch',
+                                            name: branch.name,
+                                            targetHash: branch.hash,
+                                            expected: state,
+                                          },
+                                          state,
+                                        ),
+                                      ]
+                                    : [],
+                                }}
+                              />
+                            }
                             disabled={blocked || !!state?.changed || !!branch.inWorktree}
                             onClick={() =>
                               state && setSelection({ type: 'switchBranch', state, branch })
@@ -497,7 +692,27 @@ export function BranchTreePanel({
                           <IconButton
                             variant="danger"
                             label={t('branches.deleteNamed', { name: branch.name })}
-                            help={<GitHelp topic="deleteBranch" />}
+                            help={
+                              <GitHelp
+                                topic="deleteBranch"
+                                preview={{
+                                  when: 'confirm',
+                                  commands: state
+                                    ? [
+                                        actionArguments(
+                                          {
+                                            type: 'deleteBranch',
+                                            name: branch.name,
+                                            targetHash: branch.hash,
+                                            expected: state,
+                                          },
+                                          state,
+                                        ),
+                                      ]
+                                    : [],
+                                }}
+                              />
+                            }
                             disabled={blocked || !!branch.inWorktree}
                             onClick={() =>
                               state && setSelection({ type: 'deleteBranch', state, branch })
@@ -513,7 +728,12 @@ export function BranchTreePanel({
                         hash: branch.hash.slice(0, 7),
                         subject: branch.subject,
                       })}
-                      help={<GitHelp topic="commitDiff" />}
+                      help={
+                        <GitHelp
+                          topic="commitDiff"
+                          preview={{ when: 'read', commands: [commitDiffArguments(branch.hash)] }}
+                        />
+                      }
                       onClick={() =>
                         onCommit({
                           hash: branch.hash,
@@ -534,7 +754,12 @@ export function BranchTreePanel({
                       <HelpTip topic="sync" related={['fetch', 'pull', 'push']} />
                       <IconButton
                         label={t('repository.fetch')}
-                        help={<GitHelp topic="fetch" />}
+                        help={
+                          <GitHelp
+                            topic="fetch"
+                            preview={{ commands: [actionArguments({ type: 'fetch' }, state)] }}
+                          />
+                        }
                         disabled={!!busy || loading || !state?.remotes.length}
                         onClick={() => void act({ type: 'fetch' })}
                       >
@@ -542,7 +767,12 @@ export function BranchTreePanel({
                       </IconButton>
                       <IconButton
                         label={t('repository.pull')}
-                        help={<GitHelp topic="pull" />}
+                        help={
+                          <GitHelp
+                            topic="pull"
+                            preview={{ commands: [actionArguments({ type: 'pull' }, state)] }}
+                          />
+                        }
                         disabled={!!busy || loading || !state?.upstream || state.detached}
                         onClick={() => void act({ type: 'pull' })}
                       >
@@ -550,7 +780,12 @@ export function BranchTreePanel({
                       </IconButton>
                       <IconButton
                         label={t('repository.push')}
-                        help={<GitHelp topic="push" />}
+                        help={
+                          <GitHelp
+                            topic="push"
+                            preview={{ commands: [actionArguments({ type: 'push' }, state)] }}
+                          />
+                        }
                         disabled={!!busy || loading || !state?.upstream || state.detached}
                         onClick={() => void act({ type: 'push' })}
                       >
@@ -559,11 +794,13 @@ export function BranchTreePanel({
                     </div>
                   )}
                   {isCurrent && !loading && (
-                    <Tooltip detailed content={<GitHelp topic="worktree" />}>
+                    <Tooltip
+                      detailed
+                      content={<GitHelp topic="worktree" preview={{ empty: 'view' }} />}
+                    >
                       <Button
                         className="branch-tree-worktree-button"
                         size="compact"
-                        variant="primary"
                         icon={<FileCode2 size={15} />}
                         onClick={() => onTools('worktree')}
                       >
@@ -585,12 +822,22 @@ export function BranchTreePanel({
           <span>{t(data.shallow ? 'branchTree.shallow' : 'branchTree.boundary')}</span>
           {data.hasMore &&
             (limit < 600 ? (
-              <button
-                className="text-button"
-                onClick={() => setLimit((value) => Math.min(600, value + 120))}
+              <Tooltip
+                detailed
+                content={
+                  <GitCommandPreview
+                    when="read"
+                    commands={[treeCommand(remote, Math.min(600, limit + 120))]}
+                  />
+                }
               >
-                {t('branchTree.more')}
-              </button>
+                <button
+                  className="text-button"
+                  onClick={() => setLimit((value) => Math.min(600, value + 120))}
+                >
+                  {t('branchTree.more')}
+                </button>
+              </Tooltip>
             ) : (
               <span>{t('branchTree.limit')}</span>
             ))}
@@ -613,6 +860,21 @@ export function BranchTreePanel({
       {choosingTrunk && data?.baseRef && (
         <BranchTrunkDialog
           value={data.baseRef}
+          previewForRef={(ref) => ({
+            when: 'read',
+            commands: [
+              treeCommand(
+                remote,
+                limit,
+                treeRefHash(data, ref) ??
+                  state?.branches.find(
+                    (item) =>
+                      `${item.remote ? 'refs/remotes/' : 'refs/heads/'}${item.name}` === ref,
+                  )?.hash ??
+                  null,
+              ),
+            ],
+          })}
           options={[
             ...(data.detached ? [{ ref: 'HEAD', name: t('branchTree.head') }] : []),
             ...(state?.branches || data.branches).map((item) => ({

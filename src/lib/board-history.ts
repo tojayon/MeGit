@@ -1,8 +1,11 @@
 import type { Board, Workspace } from '../../shared/types';
 
-type Content = Pick<Board, 'name' | 'description' | 'nodes' | 'edges' | 'groups' | 'notes'>;
-const content = ({ name, description, nodes, edges, groups, notes }: Board): Content =>
-  structuredClone({ name, description, nodes, edges, groups, notes });
+type Content = Pick<
+  Board,
+  'name' | 'description' | 'nodes' | 'edges' | 'groups' | 'notes' | 'connections'
+>;
+const content = ({ name, description, nodes, edges, groups, notes, connections }: Board): Content =>
+  structuredClone({ name, description, nodes, edges, groups, notes, connections });
 
 // Only board content is replayed. Revision, repository registrations and Git state stay live.
 export class BoardHistory {

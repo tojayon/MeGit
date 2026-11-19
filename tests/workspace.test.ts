@@ -10,6 +10,51 @@ afterEach(async () => {
 });
 
 describe('流程持久化', () => {
+  it('保存步骤形状、摘要与独立流程线，重读不丢失，也不允许悬空端点', async () => {
+    const f = await fixture();
+    cleanups.push(f.cleanup);
+    const directory = path.join(f.root, 'flowchart');
+    const store = new WorkspaceStore(directory);
+    const initial = await store.read();
+    const board = {
+      ...initial.boards[0],
+      notes: [
+        {
+          id: 'start',
+          title: '开始',
+          text: '完整操作',
+          summary: '选择变更',
+          kind: 'start',
+          position: { x: 0, y: 0 },
+        },
+        { id: 'gate', title: '通过？', text: '', kind: 'decision', position: { x: 300, y: 0 } },
+      ],
+      connections: [
+        {
+          id: 'flow',
+          source: 'start',
+          target: 'gate',
+          label: '下一步',
+          sourcePort: 'right',
+          targetPort: 'left',
+          waypoints: [{ x: 260, y: 32 }],
+        },
+      ],
+    };
+    const saved = await store.save({ ...initial, boards: [board] });
+    expect((await new WorkspaceStore(directory).read()).boards[0]).toEqual(board);
+    const invalid = structuredClone(saved);
+    invalid.boards[0].connections![0].target = 'missing';
+    await expect(store.save(invalid)).rejects.toMatchObject({ code: 'invalidEdge' });
+    invalid.boards[0].connections![0].target = 'start';
+    await expect(store.save(invalid)).rejects.toMatchObject({ code: 'invalidEdge' });
+    invalid.boards[0].connections![0].target = 'gate';
+    invalid.boards[0].connections![0].target = 'group';
+    await expect(store.save(invalid)).rejects.toMatchObject({ code: 'invalidEdge' });
+    invalid.boards[0].connections![0].target = 'gate';
+    invalid.boards[0].connections!.push(invalid.boards[0].connections![0]);
+    await expect(store.save(invalid)).rejects.toMatchObject({ code: 'duplicateRelation' });
+  });
   it('保存独立人工说明与布局锁定，说明不能充当仓库关系端点或重复标识', async () => {
     const f = await fixture();
     cleanups.push(f.cleanup);

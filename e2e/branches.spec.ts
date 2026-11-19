@@ -1,4 +1,4 @@
-import { openRepositoryTools, selectBranch } from './branch-tree-helpers';
+import { newBranchAtCommit, openRepositoryTools, selectBranch } from './branch-tree-helpers';
 import { test, expect } from './test';
 import type { APIRequestContext, Page } from '@playwright/test';
 import { fixture, commitFile, git } from '../tests/fixtures.js';
@@ -28,7 +28,7 @@ test('创建中文分支、切换、查找和安全删除后同步白板；撤�
     await commitFile(f.repo);
     await seed(request, f.repo);
     await open(page);
-    await page.getByRole('button', { name: '新建分支', exact: true }).click();
+    await newBranchAtCommit(page, await git(f.repo, 'rev-parse', 'HEAD'));
     await page.getByLabel('分支名称', { exact: true }).fill('功能/登录');
     await page.getByLabel('创建后切换', { exact: true }).check();
     await page.getByRole('button', { name: '创建分支', exact: true }).click();
@@ -93,7 +93,7 @@ test('远端跟踪分支只读本地缓存；两主题、英文和窄屏可用',
       page.getByRole('region', { name: 'Branch growth tree', exact: true }),
     ).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole('button', { name: 'New branch', exact: true }).click();
+    await newBranchAtCommit(page, head, true);
     await page.getByLabel('Branch name', { exact: true }).fill('bad name');
     await expect(page.getByRole('button', { name: 'Create branch', exact: true })).toBeDisabled();
     await expect(page.getByRole('alert')).toContainText('Invalid branch name');
@@ -159,7 +159,8 @@ test('未提交修改可仅创建分支，切换被禁用且状态说明可见',
       page.getByText('工作区还有未提交修改，请先提交或自行处理后再切换分支。', { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: '切换到 feature', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: '新建分支', exact: true }).click();
+    await page.getByRole('button', { name: '收起分支详情', exact: true }).click();
+    await newBranchAtCommit(page, await git(f.repo, 'rev-parse', 'HEAD'));
     await page.getByLabel('分支名称', { exact: true }).fill('draft-branch');
     await expect(page.getByLabel('创建后切换')).toBeDisabled();
     await page.getByRole('button', { name: '创建分支', exact: true }).click();

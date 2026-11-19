@@ -7,6 +7,7 @@ import { Button } from './Button';
 
 export function GroupPanel({
   group,
+  viewKey,
   board,
   repositories,
   snapshot,
@@ -16,6 +17,7 @@ export function GroupPanel({
   onRepo,
 }: {
   group: FlowGroup;
+  viewKey?: string;
   board: Board;
   repositories: Repository[];
   snapshot: Snapshot | null;
@@ -27,7 +29,7 @@ export function GroupPanel({
   const { t } = useTranslation();
   const toggleLabel = t(group.collapsed ? 'group.expand' : 'group.collapse', { name: group.name });
   return (
-    <Dialog title={group.name} closeLabel={t('group.close')} onClose={onClose}>
+    <Dialog viewKey={viewKey} title={group.name} closeLabel={t('group.close')} onClose={onClose}>
       <div className="dialog-body group-editor">
         <div className="group-panel-actions">
           <Button

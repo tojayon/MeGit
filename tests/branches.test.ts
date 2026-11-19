@@ -41,6 +41,91 @@ const target = (
 });
 
 describe('安全的本地分支管理（临时真实 Git 仓库）', () => {
+  it('从图上的历史提交精确创建分支，保留当前分支和草稿', async () => {
+    const { repo } = await setup();
+    const root = (await readRepository(repo)).head!;
+    await commitFile(repo, 'next.txt');
+    await writeFile(path.join(repo, 'draft.txt'), 'unfinished');
+    const s = await readRepository(repo);
+    await performAction(repo, {
+      ...create(s, 'feature/from-point'),
+      startPoint: 'COMMIT',
+      startHash: root,
+    });
+    expect(await git(repo, 'rev-parse', 'refs/heads/feature/from-point')).toBe(root);
+    expect(await readRepository(repo)).toMatchObject({ branch: 'main', head: s.head, changed: 1 });
+    expect(await readFile(path.join(repo, 'draft.txt'), 'utf8')).toBe('unfinished');
+  });
+
+  it('可以从其他本地或远端开发线的提交创建分支', async () => {
+    const { repo } = await setup();
+    await git(repo, 'switch', '-c', 'feature');
+    const feature = await commitFile(repo, 'feature.txt');
+    await git(repo, 'switch', 'main');
+    let s = await readRepository(repo);
+    await performAction(repo, {
+      ...create(s, 'from-local'),
+      startPoint: 'COMMIT',
+      startHash: feature,
+    });
+    await git(repo, 'update-ref', 'refs/remotes/origin/feature', feature);
+    await git(repo, 'branch', '-D', 'feature', 'from-local');
+    s = await readRepository(repo);
+    await performAction(repo, {
+      ...create(s, 'from-remote'),
+      startPoint: 'COMMIT',
+      startHash: feature,
+    });
+    expect(await git(repo, 'rev-parse', 'refs/heads/from-remote')).toBe(feature);
+  });
+
+  it('提交点模式拒绝缺失、非提交、已不可达对象与远端跟踪', async () => {
+    const { repo } = await setup();
+    const dangling = await git(
+      repo,
+      'commit-tree',
+      'HEAD^{tree}',
+      '-p',
+      'HEAD',
+      '-m',
+      'unreachable',
+    );
+    const blob = await git(repo, 'rev-parse', 'HEAD:笔记 example.txt');
+    await git(repo, 'tag', '-a', 'tag-object', '-m', 'fixture tag');
+    const tag = await git(repo, 'rev-parse', 'refs/tags/tag-object');
+    const s = await readRepository(repo);
+    for (const hash of ['f'.repeat(40), dangling, blob, tag, 'HEAD~1', '--help'])
+      await expect(
+        performAction(repo, { ...create(s, 'rejected'), startPoint: 'COMMIT', startHash: hash }),
+      ).rejects.toMatchObject({ code: 'commitMissing' });
+    await expect(
+      performAction(repo, { ...create(s, 'no-track'), startPoint: 'COMMIT', track: true }),
+    ).rejects.toMatchObject({ code: 'branchStartPoint' });
+    expect(await git(repo, 'branch', '--list', 'rejected', 'no-track')).toBe('');
+  });
+
+  it('提交点模式保持过期确认、进行中操作和脏工作区保护', async () => {
+    const { repo } = await setup();
+    const old = await readRepository(repo);
+    await commitFile(repo, 'new.txt');
+    await expect(
+      performAction(repo, { ...create(old, 'stale'), startPoint: 'COMMIT' }),
+    ).rejects.toMatchObject({ code: 'branchStateChanged' });
+    await writeFile(path.join(repo, 'draft.txt'), 'draft');
+    const dirty = await readRepository(repo);
+    await expect(
+      performAction(repo, {
+        ...create(dirty, 'dirty', true),
+        startPoint: 'COMMIT',
+        startHash: old.head!,
+      }),
+    ).rejects.toMatchObject({ code: 'dirtyBranch' });
+    await writeFile(path.join(repo, '.git', 'CHERRY_PICK_HEAD'), dirty.head!);
+    await expect(
+      performAction(repo, { ...create(dirty, 'busy'), startPoint: 'COMMIT' }),
+    ).rejects.toMatchObject({ code: 'branchOperation' });
+  });
+
   it('中文分支从当前提交创建、切换，再切回并安全删除', async () => {
     const { repo } = await setup();
     let s = await readRepository(repo);

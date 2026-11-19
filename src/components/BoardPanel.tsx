@@ -8,11 +8,13 @@ import { Button } from './Button';
 
 export function BoardPanel({
   board,
+  viewKey,
   onSave,
   onGroup,
   onClose,
 }: {
   board: Board;
+  viewKey?: string;
   onSave: (details: Pick<Board, 'name' | 'description'>) => void;
   onGroup: (id: string) => void;
   onClose: () => void;
@@ -30,12 +32,20 @@ export function BoardPanel({
   const description =
     descriptionDraft.base === board.description ? descriptionDraft.value : board.description;
   return (
-    <Dialog title={t('inspector.board')} closeLabel={t('inspector.closeBoard')} onClose={onClose}>
+    <Dialog
+      viewKey={viewKey}
+      title={t('inspector.board')}
+      closeLabel={t('inspector.closeBoard')}
+      onClose={onClose}
+    >
       <div className="dialog-body board-editor">
         <div className="board-summary">
           <span>{t('board.repositories', { count: board.nodes.length })}</span>
           <span>{t('board.relations', { count: board.edges.length })}</span>
           <span>{t('inspector.groups', { count: board.groups?.length || 0 })}</span>
+          {!!board.connections?.length && (
+            <span>{t('flowchart.connections', { count: board.connections.length })}</span>
+          )}
         </div>
         <form
           className="inspector-fields"

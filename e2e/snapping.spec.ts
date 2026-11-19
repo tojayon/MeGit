@@ -122,6 +122,8 @@ test('设计规范中的真实提示越过裁切容器，Escape 与滚动均可�
   await expect(tooltip).toHaveCount(0);
   await trigger.focus();
   await expectFullyPainted(tooltip);
+  // Keep controls scrolling under the pointer from opening a different tooltip.
+  await page.mouse.move(20, 20);
   await page.mouse.wheel(0, 100);
   await expect(tooltip).toHaveCount(0);
 });

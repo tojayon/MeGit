@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RepositoryAvatar } from './RepositoryAvatar';
 import { ArrowRightLeft, Check, GitBranch, GitBranchPlus, Search, Trash2 } from 'lucide-react';
-import type { Branch, BranchAction, RepoState, Repository } from '../../shared/types';
+import type { Branch, BranchAction, Commit, RepoState, Repository } from '../../shared/types';
 import { isBranchName } from '../../shared/refs';
 import { Dialog } from './Dialogs';
 import { Button } from './Button';
@@ -10,9 +10,11 @@ import { IconButton } from './IconButton';
 import { Field } from './Field';
 import { formatError } from '../lib/messages';
 import { GitHelp, HelpTip } from './GitHelp';
+import { Tooltip } from './Tooltip';
+import { actionArguments, createBranchArguments, statusArguments } from '../../shared/git-commands';
 
 export type BranchSelection =
-  | { type: 'createBranch'; state: RepoState; startPoint: string }
+  | { type: 'createBranch'; state: RepoState; startPoint: string; commit?: Commit }
   | { type: 'switchBranch' | 'deleteBranch'; state: RepoState; branch: Branch };
 
 export function BranchDialog({
@@ -47,6 +49,7 @@ export function BranchDialog({
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
   const creating = selection.type === 'createBranch';
+  const commit = creating ? selection.commit : undefined;
   const title = creating
     ? t('branches.create')
     : selection.type === 'switchBranch'
@@ -58,13 +61,26 @@ export function BranchDialog({
       : name && state.branches.some((b) => !b.remote && b.name.toLowerCase() === name.toLowerCase())
         ? 'branchExists'
         : null;
-  const startHash =
-    startPoint === 'HEAD'
+  const startHash = commit
+    ? commit.hash
+    : startPoint === 'HEAD'
       ? state.head
       : state.branches.find(
           (b) => `${b.remote ? 'refs/remotes/' : 'refs/heads/'}${b.name}` === startPoint,
         )?.hash;
   const working = pending || busy;
+  const expected = { branch: state.branch, head: state.head, detached: state.detached };
+  const action: BranchAction | null =
+    selection.type === 'createBranch'
+      ? !name || nameError || !startHash
+        ? null
+        : { type: 'createBranch', name, startPoint, startHash, checkout, track, expected }
+      : {
+          type: selection.type,
+          name: selection.branch.name,
+          targetHash: selection.branch.hash,
+          expected,
+        };
   return (
     <Dialog
       title={title}
@@ -86,26 +102,7 @@ export function BranchDialog({
       <form
         onSubmit={async (event) => {
           event.preventDefault();
-          if (pendingRef.current || busy || (creating && (!name || nameError || !startHash)))
-            return;
-          const expected = { branch: state.branch, head: state.head, detached: state.detached };
-          const action: BranchAction =
-            selection.type === 'createBranch'
-              ? {
-                  type: 'createBranch',
-                  name,
-                  startPoint,
-                  startHash: startHash!,
-                  checkout,
-                  track,
-                  expected,
-                }
-              : {
-                  type: selection.type,
-                  name: selection.branch.name,
-                  targetHash: selection.branch.hash,
-                  expected,
-                };
+          if (pendingRef.current || busy || !action) return;
           pendingRef.current = true;
           setPending(true);
           setError(null);
@@ -160,39 +157,49 @@ export function BranchDialog({
                   onChange={(event) => setName(event.target.value)}
                 />
               </Field>
-              <Field label={t('branches.startPoint')}>
-                <select
-                  value={startPoint}
-                  disabled={working}
-                  onChange={(event) => {
-                    setStartPoint(event.target.value);
-                    setTrack(event.target.value.startsWith('refs/remotes/'));
-                  }}
-                >
-                  <option value="HEAD">
-                    {t('branches.currentCommit')} · {state.head?.slice(0, 7)}
-                  </option>
-                  {[false, true].map((remote) => (
-                    <optgroup
-                      label={
-                        remote ? t('repository.remoteBranches') : t('repository.localBranches')
-                      }
-                      key={String(remote)}
-                    >
-                      {state.branches
-                        .filter((b) => b.remote === remote)
-                        .map((b) => (
-                          <option
-                            key={b.name}
-                            value={`${remote ? 'refs/remotes/' : 'refs/heads/'}${b.name}`}
-                          >
-                            {b.name} · {b.hash.slice(0, 7)}
-                          </option>
-                        ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </Field>
+              {commit ? (
+                <div className="commit-branch-origin">
+                  <span>
+                    {t('branches.startPoint')} <HelpTip topic="createFromCommit" />
+                  </span>
+                  <strong>{commit.subject}</strong>
+                  <code>{commit.hash}</code>
+                </div>
+              ) : (
+                <Field label={t('branches.startPoint')}>
+                  <select
+                    value={startPoint}
+                    disabled={working}
+                    onChange={(event) => {
+                      setStartPoint(event.target.value);
+                      setTrack(event.target.value.startsWith('refs/remotes/'));
+                    }}
+                  >
+                    <option value="HEAD">
+                      {t('branches.currentCommit')} · {state.head?.slice(0, 7)}
+                    </option>
+                    {[false, true].map((remote) => (
+                      <optgroup
+                        label={
+                          remote ? t('repository.remoteBranches') : t('repository.localBranches')
+                        }
+                        key={String(remote)}
+                      >
+                        {state.branches
+                          .filter((b) => b.remote === remote)
+                          .map((b) => (
+                            <option
+                              key={b.name}
+                              value={`${remote ? 'refs/remotes/' : 'refs/heads/'}${b.name}`}
+                            >
+                              {b.name} · {b.hash.slice(0, 7)}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </Field>
+              )}
               {startPoint.startsWith('refs/remotes/') && (
                 <label className="branch-checkbox">
                   <input
@@ -227,27 +234,37 @@ export function BranchDialog({
               <p className="error-message" role="alert">
                 {formatError(error)}
               </p>
-              <button
-                type="button"
-                className="text-button"
-                disabled={working}
-                onClick={async () => {
-                  if (pendingRef.current) return;
-                  pendingRef.current = true;
-                  setPending(true);
-                  try {
-                    await onRefresh();
-                    onClose();
-                  } catch (err) {
-                    setError(err);
-                  } finally {
-                    pendingRef.current = false;
-                    setPending(false);
-                  }
-                }}
+              <Tooltip
+                detailed
+                content={
+                  <GitHelp
+                    topic="checked"
+                    preview={{ when: 'read', commands: [statusArguments] }}
+                  />
+                }
               >
-                {t('branches.refresh')}
-              </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={working}
+                  onClick={async () => {
+                    if (pendingRef.current) return;
+                    pendingRef.current = true;
+                    setPending(true);
+                    try {
+                      await onRefresh();
+                      onClose();
+                    } catch (err) {
+                      setError(err);
+                    } finally {
+                      pendingRef.current = false;
+                      setPending(false);
+                    }
+                  }}
+                >
+                  {t('branches.refresh')}
+                </button>
+              </Tooltip>
             </div>
           )}
         </div>
@@ -259,17 +276,33 @@ export function BranchDialog({
           >
             {t('common.cancel')}
           </Button>
-          <Button
-            type="submit"
-            variant={selection.type === 'deleteBranch' ? 'danger' : 'primary'}
-            busy={working}
-            icon={
-              selection.type === 'deleteBranch' ? <Trash2 size={16} /> : <GitBranch size={16} />
+          <Tooltip
+            detailed
+            content={
+              <GitHelp
+                topic={
+                  creating
+                    ? 'createBranch'
+                    : selection.type === 'switchBranch'
+                      ? 'switchBranch'
+                      : 'deleteBranch'
+                }
+                preview={{ commands: action ? [actionArguments(action, state)] : [] }}
+              />
             }
-            disabled={creating && (!name || !!nameError || !startHash)}
           >
-            {title}
-          </Button>
+            <Button
+              type="submit"
+              variant={selection.type === 'deleteBranch' ? 'danger' : 'primary'}
+              busy={working}
+              icon={
+                selection.type === 'deleteBranch' ? <Trash2 size={16} /> : <GitBranch size={16} />
+              }
+              disabled={creating && (!name || !!nameError || !startHash)}
+            >
+              {title}
+            </Button>
+          </Tooltip>
         </footer>
       </form>
     </Dialog>
@@ -308,7 +341,25 @@ export function BranchesPanel({
         </label>
         <IconButton
           label={t('branches.new')}
-          help={<GitHelp topic="createBranch" />}
+          help={
+            <GitHelp
+              topic="createBranch"
+              preview={{
+                when: 'name',
+                commands: state.head
+                  ? [
+                      createBranchArguments({
+                        name: '<branch-name>',
+                        startPoint: 'HEAD',
+                        startHash: state.head,
+                        checkout: false,
+                        track: false,
+                      }),
+                    ]
+                  : [],
+              }}
+            />
+          }
           disabled={blocked}
           onClick={() => setSelection({ type: 'createBranch', state, startPoint: 'HEAD' })}
         >
@@ -364,7 +415,23 @@ export function BranchesPanel({
                       <IconButton
                         size="small"
                         label={t('branches.fromRemote', { name: branch.name })}
-                        help={<GitHelp topic="tracking" />}
+                        help={
+                          <GitHelp
+                            topic="tracking"
+                            preview={{
+                              when: 'confirm',
+                              commands: [
+                                createBranchArguments({
+                                  name: branch.name.replace(/^[^/]+\//, ''),
+                                  startPoint: `refs/remotes/${branch.name}`,
+                                  startHash: branch.hash,
+                                  checkout: false,
+                                  track: true,
+                                }),
+                              ],
+                            }}
+                          />
+                        }
                         disabled={blocked}
                         onClick={() =>
                           setSelection({
@@ -382,7 +449,25 @@ export function BranchesPanel({
                           <IconButton
                             size="small"
                             label={t('branches.switchTo', { name: branch.name })}
-                            help={<GitHelp topic="switchBranch" />}
+                            help={
+                              <GitHelp
+                                topic="switchBranch"
+                                preview={{
+                                  when: 'confirm',
+                                  commands: [
+                                    actionArguments(
+                                      {
+                                        type: 'switchBranch',
+                                        name: branch.name,
+                                        targetHash: branch.hash,
+                                        expected: state,
+                                      },
+                                      state,
+                                    ),
+                                  ],
+                                }}
+                              />
+                            }
                             disabled={blocked || !!state.changed || !!branch.inWorktree}
                             onClick={() => setSelection({ type: 'switchBranch', state, branch })}
                           >
@@ -392,7 +477,25 @@ export function BranchesPanel({
                             size="small"
                             variant="danger"
                             label={t('branches.deleteNamed', { name: branch.name })}
-                            help={<GitHelp topic="deleteBranch" />}
+                            help={
+                              <GitHelp
+                                topic="deleteBranch"
+                                preview={{
+                                  when: 'confirm',
+                                  commands: [
+                                    actionArguments(
+                                      {
+                                        type: 'deleteBranch',
+                                        name: branch.name,
+                                        targetHash: branch.hash,
+                                        expected: state,
+                                      },
+                                      state,
+                                    ),
+                                  ],
+                                }}
+                              />
+                            }
                             disabled={blocked || !!branch.inWorktree}
                             onClick={() => setSelection({ type: 'deleteBranch', state, branch })}
                           >

@@ -125,4 +125,47 @@ describe('分支树使用真实 DAG 的向上布局', () => {
       first.edges.map((edge) => [edge.child, edge.parent]).sort(),
     );
   });
+  it('转角与直线以及相邻曲段的曲率连续，避免接缝突然折转', () => {
+    for (const continued of [false, true]) {
+      const commits = [commit('r'), commit('b', ['r'])];
+      for (let i = 1; i <= 6; i++) commits.push(commit('a' + i, [i === 1 ? 'r' : 'a' + (i - 1)]));
+      commits.push(commit('m', ['a6', 'b']));
+      if (continued) commits.push(commit('next', ['b']));
+      const tree = buildBranchTree(
+        data(commits, [branch('main', 'm'), branch('feature', continued ? 'next' : 'b')]),
+      );
+      let curves = 0;
+      for (const edge of tree.edges) {
+        let point = [0, 0];
+        const segments: { start: number; end: number }[] = [{ start: 0, end: 0 }];
+        for (const command of edge.path.matchAll(/([MCV])([^MCV]*)/g)) {
+          const v = command[2].trim().split(/[ ,]+/).map(Number);
+          if (command[1] === 'M') point = v;
+          if (command[1] === 'V') {
+            segments.push({ start: 0, end: 0 });
+            point = [point[0], v[0]];
+          }
+          if (command[1] === 'C') {
+            const p = [point, v.slice(0, 2), v.slice(2, 4), v.slice(4, 6)];
+            const curvature = (end: boolean) => {
+              const d = end
+                ? p[3].map((n, i) => 3 * (n - p[2][i]))
+                : p[1].map((n, i) => 3 * (n - p[0][i]));
+              const dd = end
+                ? p[3].map((n, i) => 6 * (n - 2 * p[2][i] + p[1][i]))
+                : p[2].map((n, i) => 6 * (n - 2 * p[1][i] + p[0][i]));
+              return (d[0] * dd[1] - d[1] * dd[0]) / Math.hypot(...d) ** 3;
+            };
+            segments.push({ start: curvature(false), end: curvature(true) });
+            point = p[3];
+            curves++;
+          }
+        }
+        segments.push({ start: 0, end: 0 });
+        for (let i = 1; i < segments.length; i++)
+          expect(Math.abs(segments[i - 1].end - segments[i].start)).toBeLessThan(1e-8);
+      }
+      expect(curves).toBeGreaterThan(0);
+    }
+  });
 });

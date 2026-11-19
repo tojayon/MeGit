@@ -6,11 +6,11 @@ import { Dialog } from './Dialogs';
 import { languageNames } from '../i18n/languages';
 import { Field } from './Field';
 
-export function PreferencesDialog({ onClose }: { onClose: () => void }) {
+export function PreferencesDialog({ onClose, viewKey }: { onClose: () => void; viewKey?: string }) {
   const { t } = useTranslation();
   const { preferences, issue } = usePreferences();
   return (
-    <Dialog title={t('preferences.title')} onClose={onClose}>
+    <Dialog viewKey={viewKey} title={t('preferences.title')} onClose={onClose}>
       <div className="dialog-body preferences-body">
         <fieldset className="theme-fieldset">
           <legend>{t('preferences.theme')}</legend>

@@ -9,9 +9,12 @@ import {
 import { defaults } from '../preferences/storage';
 import { focusWithoutTooltip } from '../lib/overlays';
 import { Tooltip } from './Tooltip';
+import { useScrollMemory, viewStorage } from '../lib/use-view-state';
+import { isScrollPosition } from '../lib/view-storage';
 
 export function InspectorDock({
   state,
+  viewKey,
   width,
   onWidth,
   onActive,
@@ -19,6 +22,7 @@ export function InspectorDock({
   children,
 }: {
   state: InspectorState;
+  viewKey?: string;
   width: number;
   onWidth: (width: number) => void;
   onActive: (key: string) => void;
@@ -34,7 +38,11 @@ export function InspectorDock({
   const bounds = dockBounds(windowWidth);
   const clamp = (value: number) => Math.min(bounds.max, Math.max(bounds.min, value));
   const effective = clamp(dragWidth ?? width);
-  const lastRequest = useRef(-1);
+  const scrollKey = viewKey && `${viewKey}.scroll`;
+  const lastRequest = useRef(
+    scrollKey && isScrollPosition(viewStorage.read(scrollKey)) ? state.request : -1,
+  );
+  useScrollMemory(content, scrollKey);
   const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const reveal = useCallback((key: string, smooth = true) => {
     const element = content.current;

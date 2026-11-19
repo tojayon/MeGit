@@ -17,8 +17,10 @@ import { updatePreferences, usePreferences } from '../preferences/store';
 import { BrandLogo } from './BrandLogo';
 import { Tooltip } from './Tooltip';
 import { IconButton } from './IconButton';
+import { NavigationFlyout } from './NavigationFlyout';
 import { dismissPopups, focusWithoutTooltip } from '../lib/overlays';
 import { version } from '../../package.json';
+import { useScrollMemory } from '../lib/use-view-state';
 
 const narrowQuery = '(max-width: 760px)';
 function subscribeNarrow(onChange: () => void) {
@@ -32,6 +34,7 @@ function isNarrow() {
 
 export function WorkspaceNavigation({
   workspace,
+  viewKey,
   board,
   repositories,
   snapshot,
@@ -49,6 +52,7 @@ export function WorkspaceNavigation({
   onHelp,
 }: {
   workspace: Workspace;
+  viewKey?: string;
   board: Board;
   repositories: Repository[];
   snapshot: Snapshot | null;
@@ -71,6 +75,8 @@ export function WorkspaceNavigation({
   const collapsed = !narrow && preferences.navigationCollapsed;
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const scroll = useRef<HTMLDivElement>(null);
+  useScrollMemory(scroll, viewKey, !collapsed && (!narrow || mobileOpen));
 
   useEffect(() => {
     if (!narrow && mobileOpen) onMobileClose();
@@ -156,6 +162,64 @@ export function WorkspaceNavigation({
     );
   }
 
+  function workflowList() {
+    return (
+      <div className="board-list">
+        {workspace.boards.map((item) => (
+          <button
+            className={`board-item ${item.id === board.id ? 'active' : ''}`}
+            key={item.id}
+            aria-current={item.id === board.id ? true : undefined}
+            onClick={() => {
+              onSelectBoard(item.id);
+              if (narrow) onMobileClose();
+            }}
+          >
+            <Network size={16} />
+            <span>{item.name}</span>
+            <small>{item.nodes.length}</small>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  function repositoryList() {
+    return (
+      <>
+        {board.groups?.map((group) => (
+          <div className="outline-group" key={group.id}>
+            <button
+              className={`outline-repo outline-group-title ${selectedGroup === group.id ? 'selected' : ''}`}
+              aria-pressed={selectedGroup === group.id}
+              onClick={() => {
+                onSelectGroup(group.id);
+                if (narrow) onMobileClose();
+              }}
+            >
+              <Group size={14} />
+              <span>{group.name}</span>
+              <small>{group.nodeIds.length}</small>
+            </button>
+            {board.nodes
+              .filter((node) => group.nodeIds.includes(node.id))
+              .map((node) => repositoryItem(repositories.find((repo) => repo.id === node.repoId)!))}
+          </div>
+        ))}
+        {repositories
+          .filter(
+            (repo) =>
+              !board.groups?.some((group) =>
+                group.nodeIds.some(
+                  (id) => board.nodes.find((node) => node.id === id)?.repoId === repo.id,
+                ),
+              ),
+          )
+          .map(repositoryItem)}
+      </>
+    );
+  }
+
   return (
     <>
       <aside
@@ -220,7 +284,34 @@ export function WorkspaceNavigation({
           )}
           {action(t('nav.repositories'), <FolderGit2 size={20} />, onRepositories)}
         </nav>
-        <div id="workspace-navigation-content" className="navigation-scroll" hidden={collapsed}>
+        {collapsed && (
+          <div className="navigation-actions navigation-collapsed-sections">
+            <NavigationFlyout
+              label={t('nav.workflows')}
+              icon={<Network size={20} />}
+              actions={
+                <IconButton label={t('nav.create')} onClick={onCreate}>
+                  <Plus size={16} />
+                </IconButton>
+              }
+            >
+              {workflowList()}
+            </NavigationFlyout>
+            <NavigationFlyout label={t('nav.onBoard')} icon={<FolderGit2 size={20} />}>
+              {repositories.length ? (
+                repositoryList()
+              ) : (
+                <p className="navigation-flyout-empty">{t('nav.onBoardEmpty')}</p>
+              )}
+            </NavigationFlyout>
+          </div>
+        )}
+        <div
+          id="workspace-navigation-content"
+          className="navigation-scroll"
+          hidden={collapsed}
+          ref={scroll}
+        >
           <div className="sidebar-section-heading">
             <span>{t('nav.workflows')}</span>
             <Tooltip content={t('nav.create')}>
@@ -229,58 +320,14 @@ export function WorkspaceNavigation({
               </button>
             </Tooltip>
           </div>
-          <div className="board-list">
-            {workspace.boards.map((item) => (
-              <button
-                className={`board-item ${item.id === board.id ? 'active' : ''}`}
-                key={item.id}
-                aria-current={item.id === board.id ? true : undefined}
-                onClick={() => {
-                  onSelectBoard(item.id);
-                  if (narrow) onMobileClose();
-                }}
-              >
-                <Network size={16} />
-                <span>{item.name}</span>
-                <small>{item.nodes.length}</small>
-              </button>
-            ))}
-          </div>
+          {workflowList()}
           {repositories.length > 0 && (
             <section className="flow-outline">
               <div className="sidebar-section-heading">
                 <span>{t('nav.onBoard')}</span>
                 <FolderGit2 size={13} />
               </div>
-              {board.groups?.map((group) => (
-                <div className="outline-group" key={group.id}>
-                  <button
-                    className={`outline-repo outline-group-title ${selectedGroup === group.id ? 'selected' : ''}`}
-                    aria-pressed={selectedGroup === group.id}
-                    onClick={() => {
-                      onSelectGroup(group.id);
-                      if (narrow) onMobileClose();
-                    }}
-                  >
-                    <Group size={14} />
-                    <span>{group.name}</span>
-                    <small>{group.nodeIds.length}</small>
-                  </button>
-                  {board.nodes
-                    .filter((n) => group.nodeIds.includes(n.id))
-                    .map((n) => repositoryItem(repositories.find((r) => r.id === n.repoId)!))}
-                </div>
-              ))}
-              {repositories
-                .filter(
-                  (repo) =>
-                    !board.groups?.some((g) =>
-                      g.nodeIds.some(
-                        (id) => board.nodes.find((n) => n.id === id)?.repoId === repo.id,
-                      ),
-                    ),
-                )
-                .map(repositoryItem)}
+              {repositoryList()}
             </section>
           )}
         </div>

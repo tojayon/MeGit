@@ -52,7 +52,7 @@ test('工具集中在地图右上角，树干按需选择且不切换代码', as
     await expect(page.locator('.branch-tree-toolbar')).toHaveCount(0);
     await expect(page.getByRole('combobox')).toHaveCount(0);
     const controls = page.locator('.branch-tree-graphic .branch-tree-view-controls');
-    await expect(controls.getByRole('button', { name: '新建分支', exact: true })).toBeVisible();
+    await expect(controls.getByRole('button', { name: '新建分支', exact: true })).toHaveCount(0);
     await expect(
       controls.getByRole('button', { name: '分支生长树说明', exact: true }),
     ).toBeVisible();
@@ -118,7 +118,7 @@ test('工具集中在地图右上角，树干按需选择且不切换代码', as
   }
 });
 
-test('滚轮与双指只缩放地图，保持鼠标锚点且不写入白板', async ({ page, request }) => {
+test('Ctrl滚轮与双指缩放保持鼠标锚点且不写入白板', async ({ page, request }) => {
   const f = await fixture();
   try {
     const root = await commitFile(f.repo);
@@ -155,13 +155,14 @@ test('滚轮与双指只缩放地图，保持鼠标锚点且不写入白板', as
     // Opposite wheel events in one frame can return to the same scale while moving the anchor at a scroll boundary.
     await tree.evaluate((element, point) => {
       element.scrollTop = 0;
-      for (const deltaY of [160, -160])
+      for (const deltaY of [40, -40])
         element.dispatchEvent(
           new WheelEvent('wheel', {
             bubbles: true,
             cancelable: true,
             clientX: point.x,
             clientY: point.y,
+            ctrlKey: true,
             deltaY,
           }),
         );
@@ -170,7 +171,9 @@ test('滚轮与双指只缩放地图，保持鼠标锚点且不写入白板', as
     await expect.poll(() => scaleOf(tree)).toBe(1);
     const burstAnchor = await worldAtPoint();
     await page.mouse.move(point.x, point.y);
+    await page.keyboard.down('Control');
     await page.mouse.wheel(0, -25);
+    await page.keyboard.up('Control');
     await expect.poll(() => scaleOf(tree)).toBeGreaterThan(1);
     const afterBurst = await worldAtPoint();
     expect(Math.abs(afterBurst.x - burstAnchor.x)).toBeLessThan(2);
@@ -180,7 +183,9 @@ test('滚轮与双指只缩放地图，保持鼠标锚点且不写入白板', as
     const standaloneScale = await scaleOf(tree);
     const standaloneAnchor = await worldAtPoint();
     await page.mouse.move(point.x, point.y);
-    await page.mouse.wheel(0, -100);
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, -25);
+    await page.keyboard.up('Control');
     await expect.poll(() => scaleOf(tree)).toBeGreaterThan(standaloneScale);
     const anchored = await worldAtPoint();
     expect(Math.abs(anchored.x - standaloneAnchor.x)).toBeLessThan(2);
@@ -218,7 +223,7 @@ test('滚轮与双指只缩放地图，保持鼠标锚点且不写入白板', as
     }, point);
     expect(dispatched.rapid.every(Boolean)).toBe(true);
     expect(dispatched.horizontal).toBe(false);
-    expect(dispatched.shift).toBe(false);
+    expect(dispatched.shift).toBe(true);
     await expect.poll(() => scaleOf(tree)).toBe(2);
     await tree.evaluate((element, point) => {
       for (let i = 0; i < 20; i++)
@@ -294,7 +299,8 @@ test.describe('明亮英文触控', () => {
         path: '.megit/verification/branch-tree-controls/light-en-touch.png',
         animations: 'disabled',
       });
-      await page.setViewportSize({ width: 390, height: 480 });
+      // The compact heading leaves more map space; keep this case short enough to overflow.
+      await page.setViewportSize({ width: 390, height: 420 });
       await page.locator('.dock-panels').evaluate((element) => {
         element.scrollLeft = element.scrollWidth;
       });

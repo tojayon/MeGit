@@ -9,6 +9,27 @@ export interface InspectorState {
   request: number;
 }
 export const emptyDock: InspectorState = { boardId: '', items: [], active: '', request: 0 };
+export function isInspectorState(value: unknown): value is InspectorState {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as InspectorState;
+  return (
+    typeof state.boardId === 'string' &&
+    typeof state.active === 'string' &&
+    Number.isSafeInteger(state.request) &&
+    state.request >= 0 &&
+    Array.isArray(state.items) &&
+    state.items.length <= 10000 &&
+    state.items.every(
+      (item) =>
+        !!item &&
+        ['repository', 'relation'].includes(item.kind) &&
+        typeof item.id === 'string' &&
+        item.id.length > 0 &&
+        item.id.length <= 1000,
+    ) &&
+    new Set(state.items.map(inspectorKey)).size === state.items.length
+  );
+}
 export const inspectorKey = (item: InspectorItem) => `${item.kind}:${item.id}`;
 export function openInspector(
   state: InspectorState,

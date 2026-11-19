@@ -3,15 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { Dialog } from './Dialogs';
 import { Field } from './Field';
 import { Button } from './Button';
+import { Tooltip } from './Tooltip';
+import { GitHelp } from './GitHelp';
+import type { GitCommandPreviewData } from './GitCommandPreview';
 
 export function BranchTrunkDialog({
   value,
   options,
+  previewForRef,
   onApply,
   onClose,
 }: {
   value: string;
   options: { ref: string; name: string }[];
+  previewForRef?: (ref: string) => GitCommandPreviewData;
   onApply: (ref: string) => void;
   onClose: () => void;
 }) {
@@ -42,13 +47,23 @@ export function BranchTrunkDialog({
         </div>
         <footer className="dialog-footer">
           <Button onClick={onClose}>{t('common.cancel')}</Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!options.some((option) => option.ref === selected)}
+          <Tooltip
+            detailed
+            content={
+              <GitHelp
+                topic="treeComparison"
+                preview={previewForRef?.(selected) ?? { empty: 'view' }}
+              />
+            }
           >
-            {t('branchTree.applyTrunk')}
-          </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!options.some((option) => option.ref === selected)}
+            >
+              {t('branchTree.applyTrunk')}
+            </Button>
+          </Tooltip>
         </footer>
       </form>
     </Dialog>

@@ -3,18 +3,33 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
   type KeyboardEvent,
   type PointerEvent,
   type RefObject,
 } from 'react';
 import { clampDialogOffset } from './dialog-position';
 import { dismissTooltips } from './overlays';
+import { useViewState } from './use-view-state';
+import { isFiniteNumber } from './view-storage';
 
 type Offset = { x: number; y: number };
 
-export function useDialogDrag(ref: RefObject<HTMLDialogElement | null>, enabled: boolean) {
-  const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
+export function useDialogDrag(
+  ref: RefObject<HTMLDialogElement | null>,
+  enabled: boolean,
+  viewKey?: string,
+) {
+  const [offset, setOffset] = useViewState<Offset>(
+    viewKey && `${viewKey}.offset`,
+    { x: 0, y: 0 },
+    (v): v is Offset =>
+      !!v &&
+      typeof v === 'object' &&
+      'x' in v &&
+      'y' in v &&
+      isFiniteNumber(v.x) &&
+      isFiniteNumber(v.y),
+  );
   const currentOffset = useRef(offset);
   const renderedOffset = useRef(offset);
   const gesture = useRef<{ id: number; x: number; y: number; origin: Offset } | null>(null);
@@ -42,7 +57,7 @@ export function useDialogDrag(ref: RefObject<HTMLDialogElement | null>, enabled:
       currentOffset.current = bounded;
       setOffset(bounded);
     },
-    [ref],
+    [ref, setOffset],
   );
 
   useEffect(() => {
@@ -56,7 +71,9 @@ export function useDialogDrag(ref: RefObject<HTMLDialogElement | null>, enabled:
     };
     window.addEventListener('resize', resize);
     window.addEventListener('blur', blur);
+    const frame = requestAnimationFrame(resize);
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener('resize', resize);
       window.removeEventListener('blur', blur);
     };

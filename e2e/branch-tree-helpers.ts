@@ -1,6 +1,17 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+export async function newBranchAtCommit(page: Page, hash: string, english = false) {
+  await page.locator(`[data-commit="${hash}"]`).click();
+  await page
+    .getByRole('dialog', { name: english ? 'Commit actions' : '提交操作', exact: true })
+    .getByRole('button', {
+      name: english ? 'New branch from this commit' : '从此提交新建分支',
+      exact: true,
+    })
+    .click();
+}
+
 export async function selectBranch(panel: Page | Locator, name: string, english = false) {
   await panel
     .getByRole('button', { name: `${english ? 'View branch ' : '查看分支 '}${name}`, exact: true })

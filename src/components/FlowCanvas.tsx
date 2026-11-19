@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { RepositoryAvatar } from './RepositoryAvatar';
+import { RepositoryPorts } from './RepositoryPorts';
+import { useSelectedConnectionPorts } from '../lib/use-selected-connection-ports';
 import { repositoryImage } from '../lib/repository-images';
 import { memo, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
@@ -20,6 +22,7 @@ import {
   useStoreApi,
   useUpdateNodeInternals,
   useViewport,
+  useConnection,
   type Edge,
   type Node,
   type NodeProps,
@@ -50,7 +53,12 @@ import {
   LockKeyhole,
   UnlockKeyhole,
   StickyNote,
+  Route,
+  RotateCcw,
 } from 'lucide-react';
+import { useEdgeRoute, type RouteEditing } from './EdgeRouteEditor';
+import type { RoutePoint } from '../lib/edge-route';
+import { IconButton } from './IconButton';
 import type {
   Board,
   FlowEdge as Relation,
@@ -77,6 +85,7 @@ import {
   selectedNodeIds,
   selectionUnits,
   moveSelection,
+  reconnectedFlowConnection,
   type Point,
   type Size,
 } from '../lib/whiteboard';
@@ -84,7 +93,12 @@ import { Tooltip } from './Tooltip';
 import { portSides } from './RelationAppearance';
 import { CanvasTools } from './CanvasTools';
 import { downloadBoard, type ExportColors, type ExportScene } from '../lib/board-export';
-import { NOTE_SIZE, REPOSITORY_SIZE } from '../lib/whiteboard';
+import { REPOSITORY_SIZE } from '../lib/whiteboard';
+import { noteSize } from '../lib/whiteboard';
+import { FlowStep } from './FlowStep';
+import { ProcessEdge, type ProcessEdgeType } from './ProcessEdge';
+import { useViewState } from '../lib/use-view-state';
+import { isBoolean, isStrings, viewKey } from '../lib/view-storage';
 
 type RepoNode = Node<
   {
@@ -106,10 +120,10 @@ type GroupNode = Node<
   },
   'group'
 >;
-type NoteNode = Node<{ note: FlowNote; onOpen: (id: string) => void }, 'note'>;
+type NoteNode = Node<{ note: FlowNote; connected: boolean; onOpen: (id: string) => void }, 'note'>;
 type CanvasNode = RepoNode | GroupNode | NoteNode;
 type RelationEdge = Edge<
-  {
+  RouteEditing & {
     relation: Relation;
     result?: Snapshot['relations'][string];
     focused: boolean;
@@ -118,6 +132,7 @@ type RelationEdge = Edge<
   },
   'relation'
 >;
+type CanvasEdge = RelationEdge | ProcessEdgeType;
 const positions = {
   top: Position.Top,
   right: Position.Right,
@@ -138,21 +153,7 @@ const RepositoryNode = memo(function RepositoryNode({ data, selected }: NodeProp
       className={`repository-node ${selected ? 'is-selected' : ''}`}
       data-testid="repository-node"
     >
-      {portSides.flatMap((side) =>
-        (['target', 'source'] as const).map((type) => (
-          <Handle
-            key={`${type}-${side}`}
-            id={`${type}-${side}`}
-            type={type}
-            position={positions[side]}
-            style={portStyle(side, type === 'target' ? 43 : 57)}
-            aria-label={t(type === 'target' ? 'routing.input' : 'routing.output', {
-              name: repo.name,
-              side: t(`routing.${side}`),
-            })}
-          />
-        )),
-      )}
+      <RepositoryPorts name={repo.name} />
       <div className="node-heading">
         <div className="repo-symbol">
           <RepositoryAvatar repo={repo} />
@@ -304,10 +305,9 @@ const WorkflowEdge = memo(function WorkflowEdge({
   markerEnd,
 }: EdgeProps<RelationEdge>) {
   const { t } = useTranslation();
-  if (!data) return null;
-  const { relation, result, focused, labelOffset } = data;
+  const { relation, result, focused, labelOffset } = data!;
   const options = { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition };
-  const [edgePath, labelX, labelY] =
+  const [automaticPath, automaticX, automaticY] =
     relation.routing === 'bezier'
       ? getBezierPath(options)
       : relation.routing === 'straight'
@@ -317,6 +317,19 @@ const WorkflowEdge = memo(function WorkflowEdge({
             borderRadius: relation.routing === 'step' ? 0 : 14,
             offset: 32,
           });
+  const route = useEdgeRoute({
+    id,
+    automaticPath,
+    source: { x: sourceX, y: sourceY },
+    target: { x: targetX, y: targetY },
+    waypoints: relation.waypoints,
+    radius: relation.routing === 'step' || relation.routing === 'straight' ? 0 : 12,
+    editing: data!.editing,
+    onRoute: data!.onRoute,
+  });
+  const edgePath = route.path;
+  const labelX = route.custom ? route.label.x : automaticX;
+  const labelY = route.custom ? route.label.y : automaticY;
   const status =
     relation.kind === 'integration'
       ? result?.state === 'integrated'
@@ -351,12 +364,12 @@ const WorkflowEdge = memo(function WorkflowEdge({
           className={`edge-label nodrag nopan ${selected ? 'selected' : ''} ${focused ? 'context-related' : ''}`}
           data-edge-id={id}
           style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + labelOffset}px)`,
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + labelOffset + (data!.editing ? 24 : 0)}px)`,
             pointerEvents: 'all',
           }}
           onClick={(e) => {
             e.stopPropagation();
-            data.onOpen(id);
+            data!.onOpen(id);
           }}
           aria-label={`${relation.label || t(`relation.${relation.kind}`)} · ${status}`}
         >
@@ -372,40 +385,80 @@ const WorkflowEdge = memo(function WorkflowEdge({
           </span>
         </button>
       </EdgeLabelRenderer>
+      {route.controls}
     </>
   );
 });
 
 const AnnotationNode = memo(function AnnotationNode({ data, selected }: NodeProps<NoteNode>) {
   const { t } = useTranslation();
+  const selectedPorts = useSelectedConnectionPorts().split(',');
+  const connecting = useConnection();
+  const handles =
+    (data.connected || (data.note.kind && data.note.kind !== 'note')) &&
+    portSides.flatMap((side) =>
+      (['target', 'source'] as const).map((type) => (
+        <Handle
+          key={`${type}-${side}`}
+          id={`${type}-${side}`}
+          className={selectedPorts.includes(`${type}-${side}`) ? 'is-edge-selected' : undefined}
+          type={type}
+          position={positions[side]}
+          style={{
+            ...portStyle(side, 50),
+            pointerEvents: connecting.inProgress
+              ? type !== connecting.fromHandle.type
+                ? 'all'
+                : 'none'
+              : type === 'source'
+                ? 'all'
+                : 'none',
+          }}
+          aria-label={t(type === 'target' ? 'routing.input' : 'routing.output', {
+            name: data.note.title,
+            side: t(`routing.${side}`),
+          })}
+        />
+      )),
+    );
+  if (data.note.kind && data.note.kind !== 'note')
+    return (
+      <>
+        {handles}
+        <FlowStep note={data.note} selected={selected} />
+      </>
+    );
   return (
-    <article className={`note-node ${selected ? 'is-selected' : ''}`} data-testid="note-node">
-      <div className="note-kind">
-        <StickyNote size={14} />
-        {t('note.manual')}
-      </div>
-      <div className="node-heading">
-        <h3>{data.note.title}</h3>
-        <Tooltip content={t('note.details')} placement="top">
-          <button
-            className="node-open icon-button nodrag nopan"
-            aria-label={t('note.details')}
-            onClick={(e) => {
-              e.stopPropagation();
-              data.onOpen(data.note.id);
-            }}
-          >
-            <ArrowUpRight size={16} />
-          </button>
-        </Tooltip>
-      </div>
-      <p className={data.note.text ? '' : 'muted'}>{data.note.text || t('note.empty')}</p>
-    </article>
+    <>
+      {handles}
+      <article className={`note-node ${selected ? 'is-selected' : ''}`} data-testid="note-node">
+        <div className="note-kind">
+          <StickyNote size={14} />
+          {t('note.manual')}
+        </div>
+        <div className="node-heading">
+          <h3>{data.note.title}</h3>
+          <Tooltip content={t('note.details')} placement="top">
+            <button
+              className="node-open icon-button nodrag nopan"
+              aria-label={t('note.details')}
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onOpen(data.note.id);
+              }}
+            >
+              <ArrowUpRight size={16} />
+            </button>
+          </Tooltip>
+        </div>
+        <p className={data.note.text ? '' : 'muted'}>{data.note.text || t('note.empty')}</p>
+      </article>
+    </>
   );
 });
 
 const nodeTypes = { repository: RepositoryNode, group: RepositoryGroup, note: AnnotationNode };
-const edgeTypes = { relation: WorkflowEdge };
+const edgeTypes = { relation: WorkflowEdge, process: ProcessEdge };
 
 function CanvasContents({
   board,
@@ -417,6 +470,10 @@ function CanvasContents({
   selectedIds,
   onSelectRepo,
   onSelectEdge,
+  onSelectConnection,
+  onEditConnection,
+  onReconnect,
+  onRoute,
   onEditSelection,
   onRemoveSelection,
   onSelectGroup,
@@ -429,6 +486,7 @@ function CanvasContents({
   onSelection,
   onSelectNote,
   onAddNote,
+  onAddStep,
   onLock,
   onHistory,
   canUndo,
@@ -444,6 +502,10 @@ function CanvasContents({
   selectedIds: string[];
   onSelectRepo: (id: string) => void;
   onSelectEdge: (id: string) => void;
+  onSelectConnection: (id: string) => void;
+  onEditConnection: (id: string) => void;
+  onReconnect: (id: string, connection: Connection) => void;
+  onRoute: (id: string, points: RoutePoint[] | undefined) => void;
   onEditSelection: () => void;
   onRemoveSelection: () => void;
   onSelectGroup: (id: string) => void;
@@ -456,6 +518,7 @@ function CanvasContents({
   onSelection: (ids: string[]) => void;
   onSelectNote: (id: string) => void;
   onAddNote: (position: Point) => void;
+  onAddStep: (position: Point) => void;
   onLock: () => void;
   onHistory: (direction: 'undo' | 'redo') => void;
   canUndo: boolean;
@@ -465,9 +528,10 @@ function CanvasContents({
   const { t } = useTranslation();
   const { preferences } = usePreferences();
   const { zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
-  const flowStore = useStoreApi<CanvasNode, RelationEdge>();
+  const flowStore = useStoreApi<CanvasNode, CanvasEdge>();
   const updateNodeInternals = useUpdateNodeInternals();
   const shellRef = useRef<HTMLDivElement>(null);
+  const reconnectingId = useRef<string | null>(null);
   const { x: viewportX, y: viewportY, zoom } = useViewport();
   const [positionDraft, setPositionDraft] = useState<{
     nodes: Board['nodes'];
@@ -489,11 +553,31 @@ function CanvasContents({
       })),
     [board.nodes, board.notes],
   );
-  const [tool, setTool] = useState<'select' | 'pan'>('select');
-  const [zoomLocked, setZoomLocked] = useState(false);
-  const [focus, setFocus] = useState<{ ids: string[]; context: boolean } | null>(null);
+  const [tool, setTool] = useViewState<'select' | 'pan'>(
+    viewKey(board.id, 'canvas-tool'),
+    'select',
+    (v): v is 'select' | 'pan' => v === 'select' || v === 'pan',
+  );
+  const [zoomLocked, setZoomLocked] = useViewState(
+    viewKey(board.id, 'canvas-zoom-lock'),
+    false,
+    isBoolean,
+  );
+  const [focus, setFocus] = useViewState<{ ids: string[]; context: boolean } | null>(
+    viewKey(board.id, 'canvas-focus'),
+    null,
+    (v): v is { ids: string[]; context: boolean } | null =>
+      v === null ||
+      (!!v &&
+        typeof v === 'object' &&
+        'ids' in v &&
+        isStrings(v.ids) &&
+        'context' in v &&
+        isBoolean(v.context)),
+  );
   const lastFocus = useRef(focus);
   const [exporting, setExporting] = useState(false);
+  const [routeEditing, setRouteEditing] = useState<string | null>(null);
   const [exportError, setExportError] = useState(false);
   const [dimensions, setDimensions] = useState<Record<string, Size>>({});
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
@@ -525,7 +609,7 @@ function CanvasContents({
   const focusIds =
     focus && focusedIds.length
       ? focus.context
-        ? flowContext(board.edges, focusedIds).nodeIds
+        ? flowContext([...board.edges, ...(board.connections || [])], focusedIds).nodeIds
         : new Set(focusedIds)
       : null;
   if (
@@ -540,7 +624,7 @@ function CanvasContents({
     : selectedRepo
       ? board.nodes.filter((n) => n.repoId === selectedRepo).map((n) => n.id)
       : groups.find((g) => g.id === selectedGroup)?.nodeIds || [];
-  const context = flowContext(board.edges, seeds);
+  const context = flowContext([...board.edges, ...(board.connections || [])], seeds);
   const viewBoard = {
     ...board,
     groups,
@@ -568,6 +652,22 @@ function CanvasContents({
                 type,
                 side,
                 offset: 25 + (50 * (index + 1)) / (edges.length + 1),
+              }),
+            );
+            const flowEdges = (board.connections || []).filter(
+              (e) =>
+                group.nodeIds.includes(e[type]) &&
+                !group.nodeIds.includes(e[type === 'source' ? 'target' : 'source']) &&
+                (e[type === 'source' ? 'sourcePort' : 'targetPort'] ||
+                  (type === 'source' ? 'bottom' : 'top')) === side &&
+                (!focusIds || (focusIds.has(e.source) && focusIds.has(e.target))),
+            );
+            flowEdges.forEach((e, index) =>
+              ports.push({
+                id: `${type}-${side}:${e.id}`,
+                type,
+                side,
+                offset: 25 + (50 * (index + 1)) / (flowEdges.length + 1),
               }),
             );
           }
@@ -626,10 +726,20 @@ function CanvasContents({
         measured: dimensions[note.id],
         zIndex: 2,
         selected: selectedIds.includes(note.id),
-        connectable: false,
-        domAttributes: { 'aria-roledescription': t('note.role') },
+        connectable:
+          (!!note.kind && note.kind !== 'note') ||
+          !!board.connections?.some((c) => c.source === note.id || c.target === note.id),
+        domAttributes: {
+          'aria-roledescription': t(
+            note.kind && note.kind !== 'note' ? 'flowchart.role' : 'note.role',
+          ),
+        },
         ariaLabel: note.title,
-        data: { note, onOpen: onSelectNote },
+        data: {
+          note,
+          connected: !!board.connections?.some((c) => c.source === note.id || c.target === note.id),
+          onOpen: onSelectNote,
+        },
       })),
   ];
   const parallel = new Map<string, string[]>();
@@ -642,7 +752,7 @@ function CanvasContents({
     ]);
     parallel.set(key, [...(parallel.get(key) || []), e.relation.id]);
   }
-  const edges: RelationEdge[] = visible.map(({ relation, source, target }) => {
+  const edges: CanvasEdge[] = visible.map(({ relation, source, target }): RelationEdge => {
     const focused = seeds.length > 0 && context.edgeIds.has(relation.id);
     const color =
       relation.id === selectedEdge || focused
@@ -663,6 +773,7 @@ function CanvasContents({
       source,
       target,
       type: 'relation',
+      reconnectable: false,
       zIndex: 1,
       sourceHandle: `source-${relation.sourcePort || 'right'}${source === relation.source ? '' : `:${relation.id}`}`,
       targetHandle: `target-${relation.targetPort || 'left'}${target === relation.target ? '' : `:${relation.id}`}`,
@@ -681,6 +792,14 @@ function CanvasContents({
       selected: relation.id === selectedEdge,
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
       data: {
+        editing:
+          routeEditing === relation.id &&
+          selectedEdge === relation.id &&
+          tool === 'select' &&
+          !board.layoutLocked &&
+          source === relation.source &&
+          target === relation.target,
+        onRoute,
         relation,
         result: snapshot?.relations[relation.id],
         focused,
@@ -689,6 +808,54 @@ function CanvasContents({
       },
     };
   });
+  for (const connection of board.connections || []) {
+    const sourceGroup = groups.find((g) => g.collapsed && g.nodeIds.includes(connection.source));
+    const targetGroup = groups.find((g) => g.collapsed && g.nodeIds.includes(connection.target));
+    const source = sourceGroup?.id || connection.source;
+    const target = targetGroup?.id || connection.target;
+    if (
+      source === target ||
+      !nodes.some((n) => n.id === source) ||
+      !nodes.some((n) => n.id === target)
+    )
+      continue;
+    edges.push({
+      id: connection.id,
+      source,
+      target,
+      type: 'process',
+      reconnectable:
+        selectedEdge === connection.id &&
+        tool === 'select' &&
+        !board.layoutLocked &&
+        !sourceGroup &&
+        !targetGroup,
+      zIndex: 1,
+      sourceHandle: `source-${connection.sourcePort || 'bottom'}${sourceGroup ? `:${connection.id}` : ''}`,
+      targetHandle: `target-${connection.targetPort || 'top'}${targetGroup ? `:${connection.id}` : ''}`,
+      selected: selectedEdge === connection.id,
+      ariaLabel: connection.label || t('flowchart.connection'),
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: 'var(--edge-neutral)',
+        width: 18,
+        height: 18,
+      },
+      data: {
+        connection,
+        focused: context.edgeIds.has(connection.id),
+        onOpen: onEditConnection,
+        editing:
+          routeEditing === connection.id &&
+          selectedEdge === connection.id &&
+          tool === 'select' &&
+          !board.layoutLocked &&
+          !sourceGroup &&
+          !targetGroup,
+        onRoute,
+      },
+    });
+  }
 
   useEffect(() => {
     const frame = requestAnimationFrame(() =>
@@ -699,7 +866,15 @@ function CanvasContents({
       ]),
     );
     return () => cancelAnimationFrame(frame);
-  }, [board.nodes, board.notes, board.groups, board.edges, focus, updateNodeInternals]);
+  }, [
+    board.nodes,
+    board.notes,
+    board.groups,
+    board.edges,
+    board.connections,
+    focus,
+    updateNodeInternals,
+  ]);
   useEffect(() => {
     const count = board.nodes.length + (board.notes?.length || 0);
     if (!zoomLocked && count && (previousCount.current !== count || !board.viewport)) {
@@ -887,7 +1062,7 @@ function CanvasContents({
       const scene: ExportScene = {
         title: board.name,
         nodes: nodes.map((node) => {
-          const fallback = node.type === 'note' ? NOTE_SIZE : REPOSITORY_SIZE;
+          const fallback = node.type === 'note' ? noteSize(node.data.note) : REPOSITORY_SIZE;
           const base = {
             id: node.id,
             position: node.position,
@@ -919,7 +1094,12 @@ function CanvasContents({
               kind: 'note',
               title: node.data.note.title,
               subtitle: t('note.manual'),
-              lines: [node.data.note.text || t('note.empty')],
+              lines: [
+                node.data.note.kind && node.data.note.kind !== 'note'
+                  ? node.data.note.summary || ''
+                  : node.data.note.text || t('note.empty'),
+              ],
+              shape: node.data.note.kind,
             };
           const state = node.data.state;
           const conflicts = state?.files.filter((f) => f.conflicted).length || 0;
@@ -954,12 +1134,36 @@ function CanvasContents({
         }),
         edges: [],
       };
-      const paths = [...shellRef.current.querySelectorAll<SVGPathElement>('.workflow-edge-path')];
+      const paths = [
+        ...shellRef.current.querySelectorAll<SVGPathElement>(
+          '.workflow-edge-path, .process-edge-path',
+        ),
+      ];
       const labels = [...shellRef.current.querySelectorAll<HTMLButtonElement>('.edge-label')];
       for (const edge of edges) {
         const path = paths.find((p) => p.id === edge.id);
         const label = labels.find((l) => l.dataset.edgeId === edge.id);
         if (!path || !label || !edge.data) continue;
+        if (edge.type === 'process') {
+          const box = path.getBBox();
+          const labelBox = label.getBoundingClientRect();
+          const position = screenToFlowPosition(
+            { x: labelBox.x + labelBox.width / 2, y: labelBox.y + labelBox.height / 2 },
+            { snapToGrid: false },
+          );
+          scene.edges.push({
+            id: edge.id,
+            path: path.getAttribute('d') || '',
+            bounds: { x: box.x, y: box.y, width: box.width, height: box.height },
+            position,
+            width: label.offsetWidth,
+            label: edge.data.connection.label,
+            kind: 'process',
+            status: '',
+          });
+          continue;
+        }
+        if (!('relation' in edge.data)) continue;
         const { relation, result } = edge.data;
         const box = path.getBBox();
         const matrix = new DOMMatrixReadOnly(getComputedStyle(label).transform);
@@ -1080,20 +1284,56 @@ function CanvasContents({
         onMove(next);
       }}
     >
-      <ReactFlow<CanvasNode, RelationEdge>
+      <ReactFlow<CanvasNode, CanvasEdge>
         colorMode={preferences.theme}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={handleChanges}
+        onEdgesChange={(changes) => {
+          const selected = changes.find((change) => change.type === 'select' && change.selected);
+          if (selected?.type === 'select') {
+            if (board.connections?.some((connection) => connection.id === selected.id))
+              onSelectConnection(selected.id);
+            else if (board.edges.some((edge) => edge.id === selected.id)) onSelectEdge(selected.id);
+          }
+        }}
         onConnect={onConnect}
+        edgesReconnectable={false}
+        reconnectRadius={9}
+        onReconnectStart={(_event, edge) => {
+          reconnectingId.current = edge.id;
+        }}
+        onReconnectEnd={() => {
+          reconnectingId.current = null;
+        }}
+        onReconnect={(edge, connection) => {
+          if (tool === 'select' && edge.type === 'process') onReconnect(edge.id, connection);
+        }}
+        isValidConnection={(connection) => {
+          if (tool !== 'select' || board.layoutLocked) return false;
+          if (reconnectingId.current)
+            return !!reconnectedFlowConnection(board, reconnectingId.current, {
+              ...connection,
+              sourceHandle: connection.sourceHandle || null,
+              targetHandle: connection.targetHandle || null,
+            });
+          const endpoints = [...board.nodes, ...(board.notes || [])];
+          return (
+            connection.source !== connection.target &&
+            endpoints.some((n) => n.id === connection.source) &&
+            endpoints.some((n) => n.id === connection.target)
+          );
+        }}
         onNodeClick={(event, node) => {
           if (event.shiftKey || event.ctrlKey || event.metaKey) return;
           if (node.type === 'group' || node.type === 'note') onSelection([node.id]);
           else onSelectRepo(node.data.repo.id);
         }}
-        onEdgeClick={(_e, edge) => onSelectEdge(edge.id)}
+        onEdgeClick={(_e, edge) =>
+          edge.type === 'process' ? onSelectConnection(edge.id) : onSelectEdge(edge.id)
+        }
         onNodeDragStart={(event, node, dragged) => {
           dragCancelled.current = false;
           const ids = [...new Set([node.id, ...dragged.map((n) => n.id)])];
@@ -1151,7 +1391,7 @@ function CanvasContents({
         panOnScroll
         nodesDraggable={tool === 'select' && !board.layoutLocked && !dragBlocked}
         autoPanOnNodeDrag={!dragBlocked}
-        nodesConnectable={tool === 'select'}
+        nodesConnectable={tool === 'select' && !board.layoutLocked}
         selectionOnDrag={tool === 'select'}
         selectionMode={SelectionMode.Partial}
         selectionKeyCode={null}
@@ -1273,9 +1513,57 @@ function CanvasContents({
             : undefined
         }
         editLabel={t(
-          selectedEdge ? 'relation.edit' : selectedGroup ? 'group.edit' : 'note.details',
+          selectedEdge && board.connections?.some((c) => c.id === selectedEdge)
+            ? 'flowchart.connection'
+            : selectedEdge
+              ? 'relation.edit'
+              : selectedGroup
+                ? 'group.edit'
+                : 'note.details',
         )}
         onRemove={onRemoveSelection}
+        selectionActions={
+          selectedEdge
+            ? (() => {
+                const edge =
+                  board.edges.find((e) => e.id === selectedEdge) ||
+                  board.connections?.find((e) => e.id === selectedEdge);
+                if (!edge) return null;
+                const projected = groups.some(
+                  (g) =>
+                    g.collapsed &&
+                    (g.nodeIds.includes(edge.source) || g.nodeIds.includes(edge.target)),
+                );
+                return (
+                  <>
+                    <IconButton
+                      className="canvas-tool"
+                      label={t('routing.editRoute')}
+                      aria-pressed={routeEditing === selectedEdge}
+                      disabled={!!board.layoutLocked || tool !== 'select' || projected}
+                      onClick={() =>
+                        setRouteEditing((current) =>
+                          current === selectedEdge ? null : selectedEdge,
+                        )
+                      }
+                    >
+                      <Route size={17} />
+                    </IconButton>
+                    {edge.waypoints?.length ? (
+                      <IconButton
+                        className="canvas-tool"
+                        label={t('routing.resetRoute')}
+                        disabled={!!board.layoutLocked || tool !== 'select' || projected}
+                        onClick={() => onRoute(selectedEdge, undefined)}
+                      >
+                        <RotateCcw size={17} />
+                      </IconButton>
+                    ) : null}
+                  </>
+                );
+              })()
+            : null
+        }
         unitCount={selectionUnits(board, selectedIds).length}
         canGroup={
           selectedNodeIds(board, selectedIds).filter((id) => board.nodes.some((n) => n.id === id))
@@ -1289,6 +1577,15 @@ function CanvasContents({
             screenToFlowPosition({
               x: rect.x + rect.width / 2 - 138,
               y: rect.y + rect.height / 2 - 90,
+            }),
+          );
+        }}
+        onStep={() => {
+          const rect = shellRef.current!.getBoundingClientRect();
+          onAddStep(
+            screenToFlowPosition({
+              x: rect.x + rect.width / 2 - 130,
+              y: rect.y + rect.height / 2 - 53,
             }),
           );
         }}

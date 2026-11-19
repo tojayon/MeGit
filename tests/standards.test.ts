@@ -31,6 +31,7 @@ describe('开发标准', () => {
         ['muted', 'surface-raised'],
         ['accent', 'accent-soft'],
         ['on-accent', 'accent-solid'],
+        ['branch-selected-text', 'branch-selected-bg'],
         ['green', 'green-soft'],
         ['orange', 'orange-soft'],
         ['danger', 'danger-soft'],

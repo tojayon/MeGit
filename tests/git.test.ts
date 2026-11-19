@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readBranchTree } from '../server/branch-tree.js';
 import { fixture, git, commitFile } from './fixtures.js';
 import {
   resolveRepository,
@@ -22,6 +24,42 @@ afterEach(async () => {
 });
 
 describe('本机 Git 投影', () => {
+  it('浅克隆空父列表只表示历史边界，不确认为初始提交', async () => {
+    const { repo, root } = await setup();
+    await commitFile(repo, 'one.txt');
+    const hash = await commitFile(repo, 'two.txt');
+    const shallow = path.join(root, 'shallow');
+    await git(root, 'clone', '--depth=1', pathToFileURL(repo).href, shallow);
+    const history = await getHistory(shallow);
+    expect(history[0]).toMatchObject({ hash, parents: [], rootUnconfirmed: true });
+    const tree = await readBranchTree(shallow);
+    expect(tree.commits.find((commit) => commit.hash === hash)?.rootUnconfirmed).toBe(true);
+    expect((await getHistory(repo)).at(-1)?.rootUnconfirmed).toBeUndefined();
+  });
+  it('命令预览读取真实推送目标，不从上游显示名称猜测，拒绝本机及无效配置', async () => {
+    const { repo, root } = await setup();
+    const hash = await commitFile(repo);
+    const remote = path.join(root, 'remote.git');
+    await git(root, 'init', '--bare', remote);
+    await git(repo, 'remote', 'add', 'team', remote);
+    await git(repo, 'update-ref', 'refs/remotes/team/release/target', hash);
+    await git(repo, 'config', 'branch.main.remote', 'team');
+    await git(repo, 'config', 'branch.main.merge', 'refs/heads/release/target');
+    expect((await readRepository(repo)).pushTarget).toEqual({
+      remote: 'team',
+      ref: 'refs/heads/release/target',
+    });
+    await git(repo, 'config', 'branch.main.remote', '.');
+    expect((await readRepository(repo)).pushTarget).toBeNull();
+    await git(repo, 'config', 'branch.main.remote', 'team');
+    await git(repo, 'config', 'branch.main.merge', 'refs/tags/not-a-branch');
+    expect((await readRepository(repo)).pushTarget).toBeNull();
+    await git(repo, 'config', 'branch.main.merge', 'refs/heads/release/target');
+    await git(repo, 'config', 'branch.main.remote', 'https://user:secret@example.invalid/repo.git');
+    const state = await readRepository(repo);
+    expect(state.pushTarget).toBeNull();
+    expect(JSON.stringify(state)).not.toContain('secret');
+  });
   it('识别空仓库，不伪造提交、跟踪分支或远端时间', async () => {
     const { repo } = await setup();
     const state = await readRepository(repo);
@@ -101,6 +139,101 @@ describe('本机 Git 投影', () => {
     expect((await readRepository(repo)).fetchedAt).not.toBeNull();
     await writeFile(path.join(repo, 'dirty.txt'), 'unsaved\n');
     await expect(performAction(repo, { type: 'pull' })).rejects.toThrow('工作区');
+  });
+
+  it('获取清理各远端已删除分支的缓存，保留本地分支、修改和已合并历史', async () => {
+    const { root, repo } = await setup();
+    await commitFile(repo);
+    await git(repo, 'switch', '-c', 'feature/completed');
+    const feature = await commitFile(repo, 'feature.txt');
+    await git(repo, 'switch', 'main');
+    await commitFile(repo, 'main.txt');
+    await git(repo, 'merge', '--no-ff', 'feature/completed', '-m', 'merge completed feature');
+    const head = await git(repo, 'rev-parse', 'HEAD');
+    for (const name of ['origin', 'community']) {
+      const remote = path.join(root, `${name}.git`);
+      await git(root, 'init', '--bare', remote);
+      await git(repo, 'remote', 'add', name, remote);
+      await git(repo, 'push', name, 'main', 'feature/completed');
+      // Delete at the remote, as another user or GitHub would; keep this client's cache stale.
+      await git(remote, 'update-ref', '-d', 'refs/heads/feature/completed');
+    }
+    await writeFile(path.join(repo, 'feature.txt'), 'uncommitted local edits\n');
+    await writeFile(path.join(repo, 'untracked.txt'), 'keep this too\n');
+    const before = await readRepository(repo);
+    expect(
+      before.branches.filter((b) => b.remote && b.name.endsWith('/feature/completed')),
+    ).toHaveLength(2);
+
+    await performAction(repo, { type: 'fetch' });
+
+    const after = await readRepository(repo);
+    expect(
+      after.branches
+        .filter((b) => b.remote)
+        .map((b) => b.name)
+        .sort(),
+    ).toEqual(['community/main', 'origin/main']);
+    expect(after.branches.find((b) => b.name === 'feature/completed' && !b.remote)?.hash).toBe(
+      feature,
+    );
+    expect(after.head).toBe(head);
+    expect(after.branch).toBe('main');
+    expect(after.files).toEqual(before.files);
+    expect(await git(repo, 'diff')).toContain('uncommitted local edits');
+    const tree = await readBranchTree(repo, { includeRemote: true });
+    expect(tree.commits.find((c) => c.hash === head)?.parents).toContain(feature);
+    expect(tree.commits.some((c) => c.hash === feature)).toBe(true);
+    expect(
+      tree.branches
+        .filter((b) => b.remote)
+        .map((b) => b.name)
+        .sort(),
+    ).toEqual(['community/main', 'origin/main']);
+  });
+
+  it('定向获取规则引用已删除分支时解释原因，修正规则后清理且保留本地分支', async () => {
+    const { root, repo } = await setup();
+    const head = await commitFile(repo);
+    await git(repo, 'branch', 'feature/retired');
+    const remote = path.join(root, 'targeted.git');
+    await git(root, 'init', '--bare', remote);
+    await git(repo, 'remote', 'add', 'origin', remote);
+    await git(repo, 'push', 'origin', 'main', 'feature/retired');
+    await git(
+      repo,
+      'config',
+      '--replace-all',
+      'remote.origin.fetch',
+      '+refs/heads/feature/retired:refs/remotes/origin/feature/retired',
+    );
+    await git(
+      repo,
+      'config',
+      '--add',
+      'remote.origin.fetch',
+      '+refs/heads/main:refs/remotes/origin/main',
+    );
+    await git(remote, 'update-ref', '-d', 'refs/heads/feature/retired');
+    await expect(performAction(repo, { type: 'fetch' })).rejects.toMatchObject({
+      code: 'remoteRefMissing',
+      details: expect.stringContaining("couldn't find remote ref refs/heads/feature/retired"),
+    });
+    expect(await git(repo, 'config', '--get-all', 'remote.origin.fetch')).toContain(
+      '+refs/heads/feature/retired:',
+    );
+    await git(
+      repo,
+      'config',
+      '--replace-all',
+      'remote.origin.fetch',
+      '+refs/heads/*:refs/remotes/origin/*',
+    );
+    await performAction(repo, { type: 'fetch' });
+    const state = await readRepository(repo);
+    expect(state.branches.some((b) => b.name === 'origin/feature/retired')).toBe(false);
+    expect(state.branches.find((b) => b.name === 'feature/retired')?.hash).toBe(head);
+    expect(state.head).toBe(head);
   });
 
   it('按提交祖先识别整合，不把目标自己的提交误算为待整合', async () => {

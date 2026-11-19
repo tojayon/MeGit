@@ -4,12 +4,47 @@ import type { LocaleResource } from '../types';
 export default {
   about: 'About {{name}}',
   topics: {
+    commitActions: {
+      title: 'Commit point actions',
+      meaning:
+        'A commit marker represents a recorded version. Select it to start a new line of development at that exact version, review its changes, or copy its ID.',
+      effect:
+        'Opening the panel, viewing differences, and copying the ID only read information. Creating a branch requires a name and confirmation and keeps your current branch and files by default.',
+    },
+    createFromCommit: {
+      title: 'New branch from this commit',
+      meaning:
+        'Create a local line of development at the selected full commit ID. The starting version stays fixed even if the original branch moves forward.',
+      effect:
+        'Enter a name and confirm to create it. Your current code and uncommitted edits are kept by default. “Switch after creation” changes file versions and requires resolving edits first. Creation does not contact a remote or push.',
+    },
+    copyCommit: {
+      title: 'Copy full commit ID',
+      meaning:
+        'The full ID identifies this historical version precisely for development notes, issue reports, or other Git tools.',
+      effect:
+        'Copies only the ID, without the repository path, and does not change branches or files. If copying fails, the panel provides the ID for manual copying.',
+    },
     branchTree: {
       title: 'Branch growth tree',
       meaning:
-        'The tree grows upwards: dots are commits, the comparison trunk is your selected comparison branch, and twigs are other development lines. Green curves show actual merges with multiple parent commits; a double ring (HEAD) marks the current checkout.',
+        'The tree grows upwards: dots are commits, and a solid square (HEAD) marks the current checkout. The comparison trunk is your selected comparison branch and is three times as thick as a twig. Green curves show actual merges with multiple parent commits. Rounded rectangles label branches; +X means X consecutive commits are collapsed in that segment.',
       effect:
-        'Select a branch tip to explore its development. Use the wheel or trackpad pinch to zoom; horizontal or Shift scrolling browses the map. Change the comparison trunk from the top-right tools menu. Changing the trunk and comparing only read history. They do not switch code, contact a remote or edit files. Explicit switching, committing and syncing change Git state.',
+        'Select a commit marker to open its actions; select a branch label to explore its development. Hover or focus a label for its full name and meaning; select +X to magnify a segment and explore individual commits. Scroll vertically with the wheel, zoom with Ctrl + wheel or trackpad pinch, and move horizontally with Shift + wheel. Hold the right mouse button and drag to pan freely. Change the comparison trunk or expand consecutive commits from the top-right tools menu. Changing the trunk and comparing only read history; they do not switch code, contact a remote or edit files.',
+    },
+    branchLabel: {
+      title: 'Branch name label',
+      meaning:
+        'A rounded rectangle labels a branch and marks the latest commit it currently points to. Multiple labels at one commit mean those branches currently point to the same version.',
+      effect:
+        'Select a label to view branch details without switching your code. Remote labels are locally cached records and may be outdated; Fetch contacts remotes to update them and remove deleted remote records. Long names are shortened in the map; hover or focus to read the full name.',
+    },
+    collapsedCommits: {
+      title: 'Collapsed consecutive commits',
+      meaning:
+        '+X counts consecutive commits hidden to keep the map compact. It does not count changed files, unpushed commits or pending merges. Collapsing never deletes or modifies commits.',
+      effect:
+        'Select +X to magnify this segment, scroll its graphical history independently, and select a commit to open the same actions as the main map. The compact card shows only the branch line and commit markers; hover or focus a marker to read its event. Viewing differences or creating a branch uses the selected ID. Escape or an outside click closes the view while keeping the main map position and zoom. The top-right tools can still expand consecutive commits across the map.',
     },
     treeComparison: {
       title: 'Compare in tree',
@@ -76,9 +111,9 @@ export default {
     fetch: {
       title: 'Fetch',
       meaning:
-        'Download new commits and branch information from configured remotes to update locally stored remote records.',
+        'Download new commits and branch information from configured remotes, and clean up local records of branches deleted on the remote.',
       effect:
-        'Contacts remotes without changing current worktree files or uploading local changes. Use it to check for server updates first.',
+        'Contacts remotes without changing current worktree files, switching branches, or uploading local changes. After success, stale remote labels disappear; local branches and merged commit history remain. Refresh status only reads local state without contacting remotes.',
     },
     pull: {
       title: 'Pull',

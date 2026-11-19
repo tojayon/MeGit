@@ -14,6 +14,14 @@ import type {
 } from '../shared/types.js';
 import { AppError, safeMessage } from './errors.js';
 import { isBranchName, isSafeRef } from '../shared/refs.js';
+import {
+  actionArguments,
+  commitDiffArguments,
+  fileDiffArguments,
+  gitExecutionOptions,
+  historyArguments,
+  statusArguments,
+} from '../shared/git-commands.js';
 
 const execute = promisify(execFile);
 const MAX_DIFF = 240_000;
@@ -21,40 +29,35 @@ const queues = new Map<string, Promise<unknown>>();
 
 async function run(repo: string, args: string[], network = false, allowExitOne = false) {
   try {
-    return await execute(
-      'git',
-      [
-        '--no-pager',
-        '--literal-pathspecs',
-        '-c',
-        'color.ui=false',
-        '-c',
-        'core.quotepath=false',
-        ...args,
-      ],
-      {
-        cwd: repo,
-        encoding: 'utf8',
-        windowsHide: true,
-        timeout: network ? 120_000 : 20_000,
-        maxBuffer: 8 * 1024 * 1024,
-        env: {
-          ...process.env,
-          GIT_TERMINAL_PROMPT: '0',
-          GCM_INTERACTIVE: 'never',
-          GIT_OPTIONAL_LOCKS: '0',
-          LC_ALL: 'C',
-          LANG: 'C',
-        },
+    return await execute('git', [...gitExecutionOptions, ...args], {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: network ? 120_000 : 20_000,
+      maxBuffer: 8 * 1024 * 1024,
+      env: {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: '0',
+        GCM_INTERACTIVE: 'never',
+        GIT_OPTIONAL_LOCKS: '0',
+        LC_ALL: 'C',
+        LANG: 'C',
       },
-    );
+    });
   } catch (error) {
-    const result = error as Error & { stdout?: string; stderr?: string; killed?: boolean; code?: number | string };
+    const result = error as Error & {
+      stdout?: string;
+      stderr?: string;
+      killed?: boolean;
+      code?: number | string;
+    };
     if (allowExitOne && result.code === 1)
       return { stdout: result.stdout || '', stderr: result.stderr || '' };
     if (result.code === 'ENOENT') throw new AppError('gitMissing');
     if (result.killed) throw new AppError('gitTimeout', 504);
     const message = result.stderr?.trim() || safeMessage(error);
+    if (args[0] === 'fetch' && /fatal: couldn't find remote ref refs\/heads\//.test(message))
+      throw new AppError('remoteRefMissing', 422, safeMessage(new Error(message)));
     throw new AppError('gitFailed', 422, safeMessage(new Error(message)));
   }
 }
@@ -83,7 +86,7 @@ export async function resolveRepository(input: string): Promise<string> {
 
 export async function readRepository(repo: string): Promise<RepoState> {
   const [raw, refResult, remoteResult, fetchFile] = await Promise.all([
-    run(repo, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=normal']),
+    run(repo, statusArguments),
     run(repo, [
       'for-each-ref',
       '--format=%(refname)%09%(HEAD)%09%(objectname)%09%(if)%(worktreepath)%(then)1%(else)0%(end)%09%(symref)',
@@ -131,12 +134,31 @@ export async function readRepository(repo: string): Promise<RepoState> {
   const operation = fetchFile
     ? await readOperation(path.dirname(path.resolve(repo, fetchFile)))
     : undefined;
+  const branch = headers['branch.head'] === '(detached)' ? '' : headers['branch.head'] || '';
+  const upstream = headers['branch.upstream'] || null;
+  const remoteNames = remoteResult.stdout.trim().split('\n').filter(Boolean);
+  let pushTarget: RepoState['pushTarget'] = null;
+  if (branch && upstream) {
+    const [remote, ref] = await Promise.all([
+      optional(repo, ['config', '--get', `branch.${branch}.remote`]),
+      optional(repo, ['config', '--get', `branch.${branch}.merge`]),
+    ]);
+    if (
+      remote &&
+      remoteNames.includes(remote) &&
+      !remote.startsWith('-') &&
+      remote !== '.' &&
+      ref?.startsWith('refs/heads/')
+    )
+      pushTarget = { remote, ref };
+  }
   return {
-    branch: headers['branch.head'] === '(detached)' ? '' : headers['branch.head'] || '',
+    branch,
     head:
       headers['branch.oid'] && headers['branch.oid'] !== '(initial)' ? headers['branch.oid'] : null,
     detached: headers['branch.head'] === '(detached)',
-    upstream: headers['branch.upstream'] || null,
+    upstream,
+    pushTarget,
     ahead: counts ? Number(counts[1]) : null,
     behind: counts ? Number(counts[2]) : null,
     changed: files.length,
@@ -145,7 +167,7 @@ export async function readRepository(repo: string): Promise<RepoState> {
     ...(operation ? { operation } : {}),
     fetchedAt,
     checkedAt: new Date().toISOString(),
-    remotes: remoteResult.stdout.trim().split('\n').filter(Boolean),
+    remotes: remoteNames,
     branches: refResult.stdout
       .trim()
       .split('\n')
@@ -182,16 +204,9 @@ async function readOperation(gitDirectory: string): Promise<RepoState['operation
 export async function getHistory(repo: string, skip = 0): Promise<Commit[]> {
   const head = await optional(repo, ['rev-parse', '--verify', 'HEAD']);
   if (!head) return [];
-  const result = await run(repo, [
-    'log',
-    '--all',
-    'HEAD',
-    '--topo-order',
-    '--max-count=40',
-    `--skip=${Math.max(0, Math.min(100_000, Math.floor(skip)))}`,
-    '-z',
-    '--format=%H%x1f%P%x1f%h%x1f%an%x1f%aI%x1f%D%x1f%s',
-  ]);
+  const result = await run(repo, historyArguments(skip));
+  const shallow =
+    (await run(repo, ['rev-parse', '--is-shallow-repository'])).stdout.trim() === 'true';
   return result.stdout
     .split('\0')
     .filter(Boolean)
@@ -202,6 +217,7 @@ export async function getHistory(repo: string, skip = 0): Promise<Commit[]> {
       return {
         hash,
         parents: parents ? parents.split(' ') : [],
+        ...(shallow && !parents ? { rootUnconfirmed: true } : {}),
         shortHash,
         author,
         date,
@@ -221,7 +237,6 @@ async function commitHash(repo: string, ref: string) {
 }
 
 export async function getDiff(repo: string, query: DiffQuery): Promise<DiffResult> {
-  const args = ['--no-ext-diff', '--no-textconv', '--no-color', '--unified=3'];
   if (
     query.path &&
     (query.path.includes('\0') ||
@@ -232,15 +247,7 @@ export async function getDiff(repo: string, query: DiffQuery): Promise<DiffResul
   if (query.commit) {
     const hash = await commitHash(repo, query.commit);
     if (!hash) throw new AppError('commitMissing');
-    const result = await run(repo, [
-      'show',
-      '--diff-merges=first-parent',
-      '--format=',
-      ...args,
-      hash,
-      '--',
-      ...(query.path ? [query.path] : []),
-    ]);
+    const result = await run(repo, commitDiffArguments(hash, query.path));
     return limitDiff(result.stdout);
   }
   if (!query.path) throw new AppError('fileRequired');
@@ -274,18 +281,7 @@ export async function getDiff(repo: string, query: DiffQuery): Promise<DiffResul
       await file.close();
     }
   }
-  return limitDiff(
-    (
-      await run(repo, [
-        'diff',
-        ...args,
-        ...(query.staged ? ['--cached'] : []),
-        '--',
-        entry.path,
-        ...(entry.originalPath ? [entry.originalPath] : []),
-      ])
-    ).stdout,
-  );
+  return limitDiff((await run(repo, fileDiffArguments(entry, !!query.staged)!)).stdout);
 }
 
 function limitDiff(text: string): DiffResult {
@@ -365,32 +361,43 @@ async function branchArguments(
       throw new AppError('branchName');
     if (state.branches.some((b) => !b.remote && b.name.toLowerCase() === action.name.toLowerCase()))
       throw new AppError('branchExists', 409);
-    const start =
+    let start =
       action.startPoint === 'HEAD'
         ? state.head
         : state.branches.find(
             (b) => `${b.remote ? 'refs/remotes/' : 'refs/heads/'}${b.name}` === action.startPoint,
           )?.hash;
+    if (action.startPoint === 'COMMIT') {
+      if (action.track) throw new AppError('branchStartPoint');
+      const hash = action.startHash;
+      // Accept a literal complete object ID, never a revision expression or peeled tag.
+      if (
+        !/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/.test(hash) ||
+        (await optional(repo, ['cat-file', '-t', hash])) !== 'commit'
+      )
+        throw new AppError('commitMissing', 409);
+      const inHead = await optional(repo, ['merge-base', '--is-ancestor', hash, state.head]);
+      if (inHead === null) {
+        const containing = await optional(repo, [
+          'for-each-ref',
+          `--contains=${hash}`,
+          '--format=%(refname)',
+          'refs/heads/',
+          'refs/remotes/',
+        ]);
+        const actualRefs = new Set(
+          state.branches.map((b) => `${b.remote ? 'refs/remotes/' : 'refs/heads/'}${b.name}`),
+        );
+        if (!containing?.split('\n').some((ref) => actualRefs.has(ref.trim())))
+          throw new AppError('commitMissing', 409);
+      }
+      start = hash;
+    }
     if (!start || (action.track && !action.startPoint.startsWith('refs/remotes/')))
       throw new AppError('branchStartPoint');
     if (start !== action.startHash) throw new AppError('branchTargetChanged', 409);
     if (action.checkout && state.changed) throw new AppError('dirtyBranch', 409);
-    const tracking = action.track ? '--track=direct' : '--no-track';
-    // Tracking requires the full remote ref; otherwise use its verified commit ID.
-    const source = action.track ? action.startPoint : start;
-    return action.checkout
-      ? [
-          'switch',
-          '--no-guess',
-          '--no-overwrite-ignore',
-          '--no-recurse-submodules',
-          tracking,
-          '-c',
-          action.name,
-          '--',
-          source,
-        ]
-      : ['branch', tracking, '--', action.name, source];
+    return actionArguments(action, state)!;
   }
   const branch = state.branches.find((b) => !b.remote && b.name === action.name);
   if (!branch) throw new AppError('branchMissing', 409);
@@ -399,18 +406,11 @@ async function branchArguments(
   if (branch.inWorktree && !branch.current) throw new AppError('branchInWorktree', 409);
   if (action.type === 'switchBranch') {
     if (state.changed) throw new AppError('dirtyBranch', 409);
-    return [
-      'switch',
-      '--no-guess',
-      '--no-overwrite-ignore',
-      '--no-recurse-submodules',
-      '--',
-      action.name,
-    ];
+    return actionArguments(action, state)!;
   }
   if ((await optional(repo, ['merge-base', '--is-ancestor', branch.hash, state.head])) === null)
     throw new AppError('branchNotMerged', 409);
-  return ['branch', '-d', '--', action.name];
+  return actionArguments(action, state)!;
 }
 
 export async function performAction(repo: string, action: GitAction): Promise<string> {
@@ -430,30 +430,20 @@ export async function performAction(repo: string, action: GitAction): Promise<st
         if (!action.paths.length || action.paths.length > 2000) throw new AppError('filesRequired');
         const entries = action.paths.map((p) => state.files.find((f) => f.path === p));
         if (entries.some((f) => !f)) throw new AppError('fileChanged', 409);
-        const paths = [
-          ...new Set(
-            entries.flatMap((f) => [f!.path, ...(f!.originalPath ? [f!.originalPath] : [])]),
-          ),
-        ];
-        args =
-          action.type === 'stage'
-            ? ['add', '--', ...paths]
-            : state.head
-              ? ['restore', '--staged', '--', ...paths]
-              : ['rm', '--cached', '--', ...paths];
+        args = actionArguments(action, state)!;
       } else if (action.type === 'commit') {
         if (!action.message.trim() || action.message.length > 10_000)
           throw new AppError('commitMessage');
         if (!state.staged) throw new AppError('stageRequired');
         if (state.files.some((f) => f.conflicted)) throw new AppError('resolveConflicts');
-        args = ['commit', '-m', action.message.trim()];
+        args = actionArguments(action, state)!;
       } else if (action.type === 'fetch') {
         if (!state.remotes.length) throw new AppError('noRemote');
-        args = ['fetch', '--all', '--no-recurse-submodules'];
+        args = actionArguments(action, state)!;
       } else {
         if (!state.upstream || state.detached) throw new AppError('noUpstream');
         if (action.type === 'pull' && state.changed) throw new AppError('dirtyPull');
-        if (action.type === 'pull') args = ['pull', '--ff-only', '--no-recurse-submodules'];
+        if (action.type === 'pull') args = actionArguments(action, state)!;
         else {
           const remote = await optional(repo, ['config', '--get', `branch.${state.branch}.remote`]);
           const merge = await optional(repo, ['config', '--get', `branch.${state.branch}.merge`]);
@@ -464,7 +454,7 @@ export async function performAction(repo: string, action: GitAction): Promise<st
             !merge?.startsWith('refs/heads/')
           )
             throw new AppError('pushConfig');
-          args = ['push', '--porcelain', '--', remote, `HEAD:${merge}`];
+          args = actionArguments(action, { ...state, pushTarget: { remote, ref: merge } })!;
         }
       }
       const result = await run(repo, args, ['fetch', 'pull', 'push'].includes(action.type));

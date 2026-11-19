@@ -72,10 +72,14 @@
   min-height: 0;
   min-width: 0;
   overflow: auto;
-  overscroll-behavior-y: contain;
-  overscroll-behavior-x: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   background: var(--canvas);
+}
+.branch-tree-viewport.panning,
+.branch-tree-viewport.panning * {
+  cursor: grabbing;
+  user-select: none;
 }
 .branch-tree-canvas {
   position: relative;
@@ -98,23 +102,21 @@
 .tree-edge {
   fill: none;
   stroke: var(--edge-neutral);
-  stroke-width: 2.5;
+  stroke-width: var(--branch-tree-branch-stroke);
   stroke-linecap: round;
 }
 .tree-edge.trunk {
   stroke: var(--accent);
-  stroke-width: 3.5;
+  stroke-width: var(--branch-tree-trunk-stroke);
 }
 .tree-edge.merge {
   stroke: var(--green);
 }
 .tree-edge.source-only {
   stroke: var(--green);
-  stroke-width: 4;
 }
 .tree-edge.target-only {
   stroke: var(--accent);
-  stroke-width: 4;
 }
 .comparing .tree-edge:not(.source-only):not(.target-only) {
   opacity: 0.4;
@@ -130,6 +132,17 @@
   stroke: var(--edge-neutral);
   stroke-width: 2;
 }
+.tree-node > circle,
+.tree-node > rect {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.tree-node.active > circle {
+  transform: scale(2);
+}
+.tree-node.active > rect {
+  transform: translate(-50%, -50%) scale(2);
+}
 .tree-node.trunk circle {
   stroke: var(--accent);
 }
@@ -141,10 +154,13 @@
   fill: var(--accent);
   stroke: var(--accent);
 }
-.tree-node circle.tree-head-ring {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 1.5;
+.tree-head-marker {
+  width: var(--branch-tree-head-size);
+  height: var(--branch-tree-head-size);
+  transform-box: fill-box;
+  transform: translate(-50%, -50%);
+  fill: var(--accent);
+  stroke: none;
 }
 .tree-boundary {
   fill: none;
@@ -152,9 +168,91 @@
   stroke-width: 2;
   stroke-dasharray: 3 5;
 }
+.tree-fold-anchor {
+  position: absolute;
+  transform: translateY(-50%);
+}
 .tree-fold-count {
-  fill: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--muted);
   font-size: var(--text-caption);
+  line-height: var(--leading-compact);
+  cursor: pointer;
+}
+.tree-fold-count:hover,
+.tree-fold-count[aria-expanded='true'] {
+  color: var(--accent);
+  background: transparent;
+}
+.commit-history-lens {
+  --commit-lens-tail-top: 50%;
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  width: var(--commit-lens-width);
+  max-height: min(var(--commit-lens-height), calc(100dvh - var(--space-4)));
+  max-width: calc(100vw - var(--space-4));
+  padding: 0;
+  overflow: visible;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 8px 24px var(--shadow-color);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  display: flex;
+  flex-direction: column;
+}
+.commit-history-lens::before {
+  content: '';
+  position: absolute;
+  width: var(--commit-lens-tail-size);
+  height: var(--commit-lens-tail-size);
+  top: var(--commit-lens-tail-top);
+  background: var(--canvas);
+  transform: translateY(-50%) rotate(45deg);
+  pointer-events: none;
+}
+.commit-history-lens[data-side='right']::before {
+  left: calc(var(--commit-lens-tail-size) / -2 - 1px);
+  border-left: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+.commit-history-lens[data-side='left']::before {
+  right: calc(var(--commit-lens-tail-size) / -2 - 1px);
+  border-right: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border-strong);
+}
+.commit-history-lens-map {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  overflow-anchor: none;
+  background: var(--canvas);
+  border-radius: inherit;
+}
+.commit-history-lens-chain {
+  position: relative;
+}
+.commit-history-lens-chain .tree-commit-hit {
+  cursor: pointer;
+}
+.commit-history-lens-chain > .tree-commit-anchor {
+  width: var(--control-touch);
+  height: var(--control-touch);
+  line-height: 0;
 }
 .tree-commit-anchor,
 .tree-tip-anchor {
@@ -172,8 +270,94 @@
   border-radius: 50%;
   background: transparent;
 }
+.tree-commit-hit[aria-expanded='true'] {
+  outline: none;
+  background: transparent;
+}
+.commit-point-actions {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  width: var(--commit-point-menu-width);
+  max-width: calc(100vw - var(--space-4));
+  max-height: calc(100dvh - var(--space-4));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 8px 24px var(--shadow-color);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+.commit-point-actions header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.commit-point-actions h3 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-dense);
+  font-weight: var(--weight-strong);
+}
+.commit-point-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.commit-point-summary > span {
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.commit-point-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.commit-point-buttons > .tooltip-anchor,
+.commit-point-buttons .button {
+  width: 100%;
+}
+.commit-point-buttons .button {
+  justify-content: flex-start;
+  min-height: var(--control-touch);
+  text-align: start;
+}
+.commit-point-actions p {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-caption);
+}
+.commit-point-copy-failure code,
+.commit-branch-origin code {
+  display: block;
+  overflow-wrap: anywhere;
+  user-select: all;
+  font-size: var(--text-caption);
+}
+.commit-branch-origin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.commit-branch-origin > span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+}
+.commit-branch-origin strong {
+  overflow-wrap: anywhere;
+}
 .tree-tip-anchor {
-  transform: translateX(-50%);
+  transform: translate(-50%, -100%);
 }
 .tree-tip {
   display: flex;
@@ -206,8 +390,9 @@
   background: var(--accent-soft);
 }
 .tree-tip.selected {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  color: var(--branch-selected-text);
+  background: var(--branch-selected-bg);
+  border-color: var(--branch-selected-bg);
 }
 .tree-tip.remote {
   border-style: dashed;
@@ -215,6 +400,9 @@
 .tree-head-mark {
   color: var(--accent);
   font-size: var(--text-micro);
+}
+.tree-tip.selected .tree-head-mark {
+  color: inherit;
 }
 .branch-tree-view-controls {
   position: absolute;
@@ -313,8 +501,7 @@
 .branch-tree-current-tag i {
   width: var(--space-2);
   height: var(--space-2);
-  border: 3px double var(--accent);
-  border-radius: 50%;
+  background: var(--accent);
 }
 .branch-tree-selection-body {
   overflow: auto;
@@ -364,6 +551,19 @@
 }
 .branch-tree-worktree-button {
   width: 100%;
+}
+.branch-tree-selection-body .commit-composer {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  gap: var(--space-2);
+  background: var(--surface-raised);
+}
+.branch-tree-selection-body .commit-composer .commit-help {
+  top: var(--space-3);
+  right: var(--space-3);
+}
+.branch-tree-selection-body .commit-composer textarea {
+  min-height: var(--commit-compact-input-height);
 }
 .branch-tree-comparison {
   padding: var(--space-3);

@@ -1,9 +1,76 @@
-import type { Board, FlowEdge, FlowGroup, FlowNode } from '../../shared/types';
+import type {
+  Board,
+  FlowConnection,
+  FlowEdge,
+  FlowGroup,
+  FlowNode,
+  FlowNote,
+  PortSide,
+} from '../../shared/types';
+
+// Validate real endpoints again at commit time; projected group handles are view-only.
+export function reconnectedFlowConnection(
+  board: Board,
+  id: string,
+  next: {
+    source: string;
+    target: string;
+    sourceHandle: string | null;
+    targetHandle: string | null;
+  },
+): FlowConnection | null {
+  const previous = board.connections?.find((connection) => connection.id === id);
+  const endpoints = [...board.nodes, ...(board.notes || [])];
+  const port = (handle: string | null, type: 'source' | 'target') => {
+    const side = handle?.slice(type.length + 1);
+    return handle?.startsWith(`${type}-`) && ['top', 'right', 'bottom', 'left'].includes(side || '')
+      ? (side as PortSide)
+      : null;
+  };
+  const sourcePort = port(next.sourceHandle, 'source');
+  const targetPort = port(next.targetHandle, 'target');
+  if (
+    !previous ||
+    board.layoutLocked ||
+    !sourcePort ||
+    !targetPort ||
+    next.source === next.target ||
+    !endpoints.some((node) => node.id === next.source) ||
+    !endpoints.some((node) => node.id === next.target) ||
+    board.connections?.some(
+      (connection) =>
+        connection.id !== id &&
+        connection.source === next.source &&
+        connection.target === next.target &&
+        connection.label === previous.label,
+    ) ||
+    (previous.source === next.source &&
+      previous.target === next.target &&
+      (previous.sourcePort || 'bottom') === sourcePort &&
+      (previous.targetPort || 'top') === targetPort)
+  )
+    return null;
+  return {
+    id: previous.id,
+    source: next.source,
+    target: next.target,
+    label: previous.label,
+    sourcePort,
+    targetPort,
+  };
+}
 
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };
 export const REPOSITORY_SIZE: Size = { width: 276, height: 148 };
 export const NOTE_SIZE: Size = { width: 276, height: 180 };
+export function noteSize(note: Pick<FlowNote, 'kind'>): Size {
+  if (!note.kind || note.kind === 'note') return NOTE_SIZE;
+  return {
+    width: 260,
+    height: note.kind === 'decision' ? 138 : note.kind === 'process' ? 106 : 64,
+  };
+}
 
 export function groupBounds(
   group: FlowGroup,
@@ -79,7 +146,7 @@ export function selectionUnits(board: Board, ids: string[], dimensions: Record<s
       .map((n) => ({
         ids: [n.id],
         ...n.position,
-        ...(dimensions[n.id] || ('repoId' in n ? REPOSITORY_SIZE : NOTE_SIZE)),
+        ...(dimensions[n.id] || ('repoId' in n ? REPOSITORY_SIZE : noteSize(n))),
       })),
   ];
 }
@@ -147,6 +214,9 @@ export function saveGroup(board: Board, group: FlowGroup) {
 
 export function removeNode(board: Board, id: string) {
   board.nodes = board.nodes.filter((n) => n.id !== id);
+  if (board.notes) board.notes = board.notes.filter((n) => n.id !== id);
+  if (board.connections)
+    board.connections = board.connections.filter((e) => e.source !== id && e.target !== id);
   board.edges = board.edges.filter((e) => e.source !== id && e.target !== id);
   if (board.groups)
     board.groups = board.groups
@@ -157,7 +227,7 @@ export function removeNode(board: Board, id: string) {
       .filter((g) => g.nodeIds.length);
 }
 
-export function flowContext(edges: FlowEdge[], seeds: string[]) {
+export function flowContext(edges: Pick<FlowEdge, 'id' | 'source' | 'target'>[], seeds: string[]) {
   const nodeIds = new Set(seeds);
   const edgeIds = new Set<string>();
   for (const direction of ['source', 'target'] as const) {

@@ -23,7 +23,7 @@ export function Tooltip({
   className = '',
   detailed = false,
   toggleOnClick = false,
-  openDelay = 0,
+  openDelay,
 }: {
   content: ReactNode;
   children: ReactElement<{ 'aria-describedby'?: string; 'aria-expanded'?: boolean }>;
@@ -61,15 +61,39 @@ export function Tooltip({
       if (!anchor.current) return;
       const rect = anchor.current.getBoundingClientRect();
       const width = hint.offsetWidth;
-      const height = hint.offsetHeight;
-      const side =
+      const naturalHeight = Math.min(hint.scrollHeight + 2, window.innerHeight - 16);
+      const above = Math.max(0, rect.top - 16);
+      const below = Math.max(0, window.innerHeight - rect.bottom - 16);
+      let side: 'left' | 'right' | 'top' | 'bottom' =
         placement === 'right' && rect.right + width + 8 > window.innerWidth - 8
-          ? 'left'
-          : placement === 'top' && rect.top - height - 8 < 8
+          ? rect.left - width - 8 >= 8
+            ? 'left'
+            : above > below
+              ? 'top'
+              : 'bottom'
+          : placement === 'top' && rect.top - naturalHeight - 8 < 8
             ? 'bottom'
-            : placement === 'bottom' && rect.bottom + height + 8 > window.innerHeight - 8
+            : placement === 'bottom' && rect.bottom + naturalHeight + 8 > window.innerHeight - 8
               ? 'top'
               : placement;
+      let availableHeight = window.innerHeight - 16;
+      if (side === 'top' || side === 'bottom') {
+        if (naturalHeight > (side === 'top' ? above : below)) {
+          if (naturalHeight <= (side === 'top' ? below : above)) {
+            side = side === 'top' ? 'bottom' : 'top';
+          } else if (rect.left - width - 8 >= 8) {
+            side = 'left';
+          } else if (rect.right + width + 8 <= window.innerWidth - 8) {
+            side = 'right';
+          } else {
+            side = above > below ? 'top' : 'bottom';
+          }
+        }
+        if (side === 'top' || side === 'bottom') availableHeight = side === 'top' ? above : below;
+      }
+      // Keep the opener reachable even when combined help is taller than the viewport.
+      hint.style.maxHeight = `${availableHeight}px`;
+      const height = hint.offsetHeight;
       const left =
         side === 'left'
           ? rect.left - width - 8
@@ -186,7 +210,13 @@ export function Tooltip({
     if (visible) return;
     clearTimeout(openTimer.current);
     dismissTooltips();
-    if (immediate || openDelay <= 0) {
+    const timing = getComputedStyle(anchor.current!)
+      .getPropertyValue('--tooltip-open-delay')
+      .trim();
+    // Production CSS may normalize 500ms to .5s; preserve the duration in either form.
+    const cssDelay = parseFloat(timing) * (timing.endsWith('ms') ? 1 : 1000);
+    const delay = openDelay ?? (Number.isFinite(cssDelay) ? cssDelay : 500);
+    if (immediate || delay <= 0) {
       setWaiting(false);
       setOpen(true);
     } else {
@@ -194,7 +224,7 @@ export function Tooltip({
       openTimer.current = setTimeout(() => {
         setWaiting(false);
         setOpen(true);
-      }, openDelay);
+      }, delay);
     }
   }
 
@@ -252,6 +282,12 @@ export function Tooltip({
         setOpen(false);
       }}
       onKeyDown={(event) => {
+        // Menu items own directional navigation; PageUp/PageDown still scroll long hints.
+        if (
+          anchor.current?.closest('[data-keyboard-navigation]') &&
+          ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)
+        )
+          return;
         const element = bubble.current;
         if (!visible || !detailed || !element || element.scrollHeight <= element.clientHeight)
           return;

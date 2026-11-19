@@ -7,26 +7,30 @@ export const portSides: PortSide[] = ['top', 'right', 'bottom', 'left'];
 export function RelationAppearance({
   edge,
   onChange,
+  portsOnly = false,
 }: {
   edge: Pick<FlowEdge, 'routing' | 'sourcePort' | 'targetPort'>;
   onChange: (change: Partial<FlowEdge>) => void;
+  portsOnly?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <div className="relation-appearance inspector-fields">
-      <Field label={t('routing.label')}>
-        <select
-          aria-label={t('routing.label')}
-          value={edge.routing || 'smoothstep'}
-          onChange={(e) => onChange({ routing: e.target.value as EdgeRouting })}
-        >
-          {(['smoothstep', 'step', 'bezier', 'straight'] as const).map((routing) => (
-            <option key={routing} value={routing}>
-              {t(`routing.${routing}`)}
-            </option>
-          ))}
-        </select>
-      </Field>
+      {!portsOnly && (
+        <Field label={t('routing.label')}>
+          <select
+            aria-label={t('routing.label')}
+            value={edge.routing || 'smoothstep'}
+            onChange={(e) => onChange({ routing: e.target.value as EdgeRouting })}
+          >
+            {(['smoothstep', 'step', 'bezier', 'straight'] as const).map((routing) => (
+              <option key={routing} value={routing}>
+                {t(`routing.${routing}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
       <div className="two-fields">
         {(['sourcePort', 'targetPort'] as const).map((key) => (
           <Field key={key} label={t(`routing.${key}`)}>

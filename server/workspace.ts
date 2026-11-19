@@ -43,10 +43,26 @@ export const workspaceSchema = z.object({
               id,
               title: z.string().trim().min(1).max(100),
               text: z.string().max(2000),
+              kind: z.enum(['note', 'process', 'decision', 'start', 'end']).optional(),
+              summary: z.string().max(200).optional(),
               position: point,
             }),
           )
           .max(200)
+          .optional(),
+        connections: z
+          .array(
+            z.object({
+              id,
+              source: id,
+              target: id,
+              label: z.string().max(100),
+              sourcePort: port.optional(),
+              targetPort: port.optional(),
+              waypoints: z.array(point).max(20).optional(),
+            }),
+          )
+          .max(600)
           .optional(),
         layoutLocked: z.boolean().optional(),
         edges: z
@@ -60,6 +76,7 @@ export const workspaceSchema = z.object({
               sourceRef: ref,
               targetRef: ref,
               routing: z.enum(['smoothstep', 'step', 'bezier', 'straight']).optional(),
+              waypoints: z.array(point).max(20).optional(),
               sourcePort: port.optional(),
               targetPort: port.optional(),
             }),
@@ -104,6 +121,19 @@ function validate(data: unknown): Workspace {
     )
       throw new AppError('duplicateNode');
     const nodes = new Set(board.nodes.map((n) => n.id));
+    const endpoints = new Set([...nodes, ...(board.notes || []).map((n) => n.id)]);
+    const connections = board.connections || [];
+    if (
+      connections.some(
+        (e) => !endpoints.has(e.source) || !endpoints.has(e.target) || e.source === e.target,
+      )
+    )
+      throw new AppError('invalidEdge');
+    if (
+      !unique([...board.edges, ...connections].map((e) => e.id)) ||
+      !unique(connections.map((e) => `${e.source}:${e.target}:${e.label}`))
+    )
+      throw new AppError('duplicateRelation');
     const groups = board.groups || [];
     const members = groups.flatMap((g) => g.nodeIds);
     if (

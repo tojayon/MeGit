@@ -12,6 +12,9 @@ import { IconButton } from './IconButton';
 import { Field, focusFirstError } from './Field';
 import { dismissPopups, focusWithoutTooltip, withoutFocusTooltip } from '../lib/overlays';
 import { useDialogDrag } from '../lib/use-dialog-drag';
+import { useScrollMemory } from '../lib/use-view-state';
+
+const dialogOpeners = new WeakMap<HTMLDialogElement, HTMLElement | null>();
 
 export function Dialog({
   title,
@@ -24,6 +27,8 @@ export function Dialog({
   className = '',
   draggable = false,
   persistent = false,
+  viewKey,
+  restoreReady = true,
 }: {
   title: string;
   children: ReactNode;
@@ -35,21 +40,38 @@ export function Dialog({
   className?: string;
   draggable?: boolean;
   persistent?: boolean;
+  viewKey?: string;
+  restoreReady?: boolean;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const drag = useDialogDrag(ref, draggable);
+  const drag = useDialogDrag(ref, draggable, viewKey);
+  useScrollMemory(ref, viewKey && `${viewKey}.scroll`, restoreReady);
   useEffect(() => {
     const dialog = ref.current;
+    if (!dialog) return;
     dismissPopups();
-    const prior = document.activeElement as HTMLElement | null;
     withoutFocusTooltip(() => {
-      dialog?.showModal();
-      dialog?.querySelector<HTMLElement>('[data-dialog-initial-focus="true"]')?.focus();
+      // On reload a nested difference window mounts with its parent. Open ancestors first
+      // so the parent cannot cover the child when its own effect runs later.
+      const chain: HTMLDialogElement[] = [dialog];
+      let ancestor = dialog.parentElement?.closest('dialog');
+      while (ancestor) {
+        chain.push(ancestor);
+        ancestor = ancestor.parentElement?.closest('dialog') ?? null;
+      }
+      for (const item of chain.reverse()) {
+        if (item.open) continue;
+        dialogOpeners.set(item, document.activeElement as HTMLElement | null);
+        item.showModal();
+        item.querySelector<HTMLElement>('[data-dialog-initial-focus="true"]')?.focus();
+      }
     });
+    const prior = dialogOpeners.get(dialog);
     return () => {
-      withoutFocusTooltip(() => dialog?.close());
+      dialogOpeners.delete(dialog);
+      withoutFocusTooltip(() => dialog.close());
       if (prior?.isConnected) focusWithoutTooltip(prior);
     };
   }, []);
@@ -287,6 +309,10 @@ export function RelationDialog({
           }
           onSave({
             ...appearance,
+            waypoints:
+              source === initial?.source && target === initial?.target
+                ? initial?.waypoints
+                : undefined,
             id: initial?.id || crypto.randomUUID(),
             source,
             target,

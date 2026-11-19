@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { editedRoute } from './lib/edge-route';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Check,
@@ -22,7 +23,15 @@ import {
   X,
 } from 'lucide-react';
 import type { Connection } from '@xyflow/react';
-import type { FlowEdge, FlowGroup, PortSide, Repository, Snapshot } from '../shared/types';
+import type {
+  FlowEdge,
+  FlowGroup,
+  FlowConnection,
+  PortSide,
+  Repository,
+  Snapshot,
+} from '../shared/types';
+import { FlowConnectionDialog } from './components/FlowConnectionDialog';
 import { useWorkspace } from './lib/use-workspace';
 import { api, timeAgo } from './lib/api';
 import { createRefreshQueue } from './lib/refresh-queue';
@@ -35,11 +44,13 @@ import { formatError, formatNotice, type NoticeMessage } from './lib/messages';
 import { updatePreferences, usePreferences } from './preferences/store';
 import { BrandLogo } from './components/BrandLogo';
 import { Tooltip } from './components/Tooltip';
+import { GitCommandPreview } from './components/GitCommandPreview';
+import { statusArguments } from '../shared/git-commands';
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { GroupDialog } from './components/GroupDialog';
 import { GroupPanel } from './components/GroupPanel';
 import { BoardPanel } from './components/BoardPanel';
-import { removeNode, saveGroup } from './lib/whiteboard';
+import { removeNode, saveGroup, reconnectedFlowConnection } from './lib/whiteboard';
 import { NotePanel } from './components/NotePanel';
 import { Button } from './components/Button';
 import { InspectorDock } from './components/InspectorDock';
@@ -49,6 +60,7 @@ import {
   closeInspector,
   reconcileInspectors,
   type InspectorItem,
+  isInspectorState,
 } from './lib/inspector-dock';
 import { PopupMenu } from './components/PopupMenu';
 import { RemoveBoardDialog } from './components/RemoveBoardDialog';
@@ -56,6 +68,9 @@ import { focusWithoutTooltip } from './lib/overlays';
 import { GitLearningDialog } from './components/GitLearningDialog';
 import { RepositoryAvatar } from './components/RepositoryAvatar';
 import { RepositoryAvatarDialog } from './components/RepositoryAvatarDialog';
+import { WorkflowHeader } from './components/WorkflowHeader';
+import { useViewState, useViewIssue, viewStorage } from './lib/use-view-state';
+import { isBoolean, isNullableText, isStrings, viewKey } from './lib/view-storage';
 
 type Modal =
   | 'add'
@@ -69,8 +84,20 @@ type Modal =
   | 'group'
   | 'group-details'
   | 'note-details'
+  | 'flow-connection'
   | 'board-details'
   | null;
+
+const restorableModal = (value: unknown): value is Modal =>
+  value === null ||
+  [
+    'help',
+    'repositories',
+    'preferences',
+    'board-details',
+    'group-details',
+    'note-details',
+  ].includes(value as string);
 
 export default function App() {
   const { t } = useTranslation();
@@ -89,33 +116,45 @@ export default function App() {
   const error = formatError(workspaceError);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [dock, setDock] = useState(emptyDock);
-  const [modal, setModal] = useState<Modal>(null);
-  const [learningOpen, setLearningOpen] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useViewState('app.repository', null, isNullableText);
+  const [selectedEdge, setSelectedEdge] = useViewState('app.relation', null, isNullableText);
+  const [selectedGroup, setSelectedGroup] = useViewState('app.group', null, isNullableText);
+  const [selectedIds, setSelectedIds] = useViewState('app.selection', [], isStrings);
+  const [dock, setDock] = useViewState('app.dock', emptyDock, isInspectorState);
+  const [modal, setModal] = useState<Modal>(() => {
+    const saved = viewStorage.read('app.dialog');
+    return restorableModal(saved) ? saved : null;
+  });
+  useLayoutEffect(() => {
+    viewStorage.write('app.dialog', restorableModal(modal) ? modal : null);
+  }, [modal]);
+  const [learningOpen, setLearningOpen] = useViewState('app.learning', false, isBoolean);
+  const viewIssue = useViewIssue();
   const [avatarRepositoryId, setAvatarRepositoryId] = useState<string | null>(null);
   const [removalTarget, setRemovalTarget] = useState<{ id: string; name: string } | null>(null);
   const [relationDraft, setRelationDraft] = useState<Partial<FlowEdge> | undefined>();
+  const [connectionDraft, setConnectionDraft] = useState<Partial<FlowConnection> | undefined>();
   const [groupDraft, setGroupDraft] = useState<FlowGroup | undefined>();
   const [groupMembers, setGroupMembers] = useState<string[]>([]);
   const [notice, setNotice] = useState<{ text: NoticeMessage; error: boolean } | null>(null);
-  const [sidebar, setSidebar] = useState(false);
-  const closeSidebar = useCallback(() => setSidebar(false), []);
+  const [sidebar, setSidebar] = useViewState('app.sidebar', false, isBoolean);
+  const [closedBoardId, setClosedBoardId] = useViewState('app.closed-board', null, isNullableText);
+  const closeSidebar = useCallback(() => setSidebar(false), [setSidebar]);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boardIdRef = useRef('');
   const snapshotVersion = useRef(0);
   const savedRef = useRef(false);
   const refreshQueue = useRef<(() => Promise<void>) | null>(null);
   const board = workspace?.boards.find((b) => b.id === workspace.activeBoardId);
+  useLayoutEffect(() => {
+    if (board) viewStorage.write('app.board', board.id);
+  }, [board]);
   const openDetails = useCallback(
     (kind: InspectorItem['kind'], id: string, scope?: string) => {
       const boardId = scope || board?.id;
       if (boardId) setDock((previous) => openInspector(previous, boardId, { kind, id }));
     },
-    [board?.id],
+    [board?.id, setDock],
   );
   useEffect(() => {
     if (!board) return;
@@ -124,7 +163,44 @@ export default function App() {
       ...board.edges.map((edge) => `relation:${edge.id}`),
     ];
     queueMicrotask(() => setDock((previous) => reconcileInspectors(previous, board.id, valid)));
-  }, [board]);
+  }, [board, setDock]);
+  useEffect(() => {
+    if (!board) return;
+    queueMicrotask(() => {
+      if (selectedRepo && !board.nodes.some((node) => node.repoId === selectedRepo))
+        setSelectedRepo(null);
+      if (
+        selectedEdge &&
+        ![...board.edges, ...(board.connections ?? [])].some((edge) => edge.id === selectedEdge)
+      )
+        setSelectedEdge(null);
+      const groupExists = board.groups?.some((group) => group.id === selectedGroup);
+      if (selectedGroup && !groupExists) setSelectedGroup(null);
+      const validIds = new Set([
+        ...board.nodes.map((node) => node.id),
+        ...(board.groups?.map((group) => group.id) ?? []),
+        ...(board.notes?.map((note) => note.id) ?? []),
+      ]);
+      if (selectedIds.some((id) => !validIds.has(id)))
+        setSelectedIds(selectedIds.filter((id) => validIds.has(id)));
+      if (
+        (modal === 'group-details' && !groupExists) ||
+        (modal === 'note-details' && !board.notes?.some((note) => selectedIds.includes(note.id)))
+      )
+        setModal(null);
+    });
+  }, [
+    board,
+    modal,
+    selectedRepo,
+    selectedEdge,
+    selectedGroup,
+    selectedIds,
+    setSelectedRepo,
+    setSelectedEdge,
+    setSelectedGroup,
+    setSelectedIds,
+  ]);
   useEffect(() => {
     boardIdRef.current = board?.id || '';
     savedRef.current = saveStatus === 'saved';
@@ -173,6 +249,7 @@ export default function App() {
 
   const openRepo = useCallback(
     (id: string, targetBoardId?: string) => {
+      setClosedBoardId(null);
       setSelectedRepo(id);
       setSelectedEdge(null);
       setSelectedGroup(null);
@@ -191,7 +268,17 @@ export default function App() {
           current.groups!.find((g) => g.id === group.id)!.collapsed = false;
         });
     },
-    [board, workspace, update, openDetails],
+    [
+      board,
+      workspace,
+      update,
+      openDetails,
+      setClosedBoardId,
+      setSelectedRepo,
+      setSelectedEdge,
+      setSelectedGroup,
+      setSelectedIds,
+    ],
   );
   const openEdge = useCallback(
     (id: string) => {
@@ -201,34 +288,41 @@ export default function App() {
       setSelectedGroup(null);
       openDetails('relation', id);
     },
-    [openDetails],
+    [openDetails, setSelectedIds, setSelectedEdge, setSelectedRepo, setSelectedGroup],
   );
-  const openGroup = useCallback((id: string) => {
-    setSelectedIds([id]);
-    setSelectedRepo(null);
-    setSelectedEdge(null);
-    setSelectedGroup(id);
-    setModal('group-details');
-  }, []);
+  const openGroup = useCallback(
+    (id: string) => {
+      setClosedBoardId(null);
+      setSelectedIds([id]);
+      setSelectedRepo(null);
+      setSelectedEdge(null);
+      setSelectedGroup(id);
+      setModal('group-details');
+    },
+    [setClosedBoardId, setSelectedIds, setSelectedRepo, setSelectedEdge, setSelectedGroup],
+  );
   const selectBackground = useCallback(() => {
     setSelectedIds([]);
     setSelectedRepo(null);
     setSelectedEdge(null);
     setSelectedGroup(null);
-  }, []);
+  }, [setSelectedIds, setSelectedRepo, setSelectedEdge, setSelectedGroup]);
   const clearSelection = useCallback(() => {
     setSelectedIds([]);
     setSelectedRepo(null);
     setSelectedEdge(null);
     setSelectedGroup(null);
-  }, []);
-  const openNote = useCallback((id: string) => {
-    setSelectedIds([id]);
-    setSelectedRepo(null);
-    setSelectedEdge(null);
-    setSelectedGroup(null);
-    setModal('note-details');
-  }, []);
+  }, [setSelectedIds, setSelectedRepo, setSelectedEdge, setSelectedGroup]);
+  const openNote = useCallback(
+    (id: string) => {
+      setSelectedIds([id]);
+      setSelectedRepo(null);
+      setSelectedEdge(null);
+      setSelectedGroup(null);
+      setModal('note-details');
+    },
+    [setSelectedIds, setSelectedRepo, setSelectedEdge, setSelectedGroup],
+  );
   const historyAction = useCallback(
     (direction: 'undo' | 'redo') => {
       if (!board || board.layoutLocked) return;
@@ -241,6 +335,7 @@ export default function App() {
     const handleHistory = (event: KeyboardEvent) => {
       if (
         modal ||
+        closedBoardId === board?.id ||
         !(event.ctrlKey || event.metaKey) ||
         event.altKey ||
         (event.target instanceof HTMLElement &&
@@ -254,20 +349,33 @@ export default function App() {
     };
     window.addEventListener('keydown', handleHistory);
     return () => window.removeEventListener('keydown', handleHistory);
-  }, [modal, historyAction]);
+  }, [modal, historyAction, closedBoardId, board?.id]);
 
   function openRelation(draft?: Partial<FlowEdge>) {
     setRelationDraft(draft);
     setModal('relation');
   }
   function connect(connection: Connection) {
-    if (connection.source && connection.target && connection.source !== connection.target)
+    if (connection.source && connection.target && connection.source !== connection.target) {
+      if (
+        [connection.source, connection.target].some((id) => board?.notes?.some((n) => n.id === id))
+      ) {
+        setConnectionDraft({
+          source: connection.source,
+          target: connection.target,
+          sourcePort: connection.sourceHandle?.replace('source-', '') as PortSide,
+          targetPort: connection.targetHandle?.replace('target-', '') as PortSide,
+        });
+        setModal('flow-connection');
+        return;
+      }
       openRelation({
         source: connection.source,
         target: connection.target,
         sourcePort: connection.sourceHandle?.replace('source-', '') as PortSide | undefined,
         targetPort: connection.targetHandle?.replace('target-', '') as PortSide | undefined,
       });
+    }
   }
 
   function toggleGroup(id: string) {
@@ -318,7 +426,9 @@ export default function App() {
         >
           <Settings2 size={20} />
         </button>
-        {modal === 'preferences' && <PreferencesDialog onClose={() => setModal(null)} />}
+        {modal === 'preferences' && (
+          <PreferencesDialog viewKey="app.preferences" onClose={() => setModal(null)} />
+        )}
         <BrandLogo variant="full" className="boot-logo" />
         {error ? (
           <>
@@ -348,10 +458,12 @@ export default function App() {
     const ids = new Set(selectedIds);
     update((draft) => {
       const current = draft.boards.find((item) => item.id === board!.id)!;
-      for (const node of [...current.nodes]) if (ids.has(node.id)) removeNode(current, node.id);
-      current.notes = current.notes?.filter((note) => !ids.has(note.id));
+      for (const node of [...current.nodes, ...(current.notes || [])])
+        if (ids.has(node.id)) removeNode(current, node.id);
       current.groups = current.groups?.filter((group) => !ids.has(group.id));
       if (selectedEdge) current.edges = current.edges.filter((edge) => edge.id !== selectedEdge);
+      if (selectedEdge && current.connections)
+        current.connections = current.connections.filter((edge) => edge.id !== selectedEdge);
     });
     clearSelection();
     requestAnimationFrame(() =>
@@ -359,9 +471,47 @@ export default function App() {
     );
   }
 
+  const boardClosed = closedBoardId === board.id;
+  const navigationControl = (
+    <div className="canvas-navigation-control">
+      <span className="desktop-only">
+        <Tooltip
+          content={t(preferences.navigationCollapsed ? 'nav.expand' : 'nav.collapse')}
+          placement="right"
+        >
+          <button
+            className="icon-button navigation-toggle"
+            aria-label={t(preferences.navigationCollapsed ? 'nav.expand' : 'nav.collapse')}
+            aria-expanded={!preferences.navigationCollapsed}
+            aria-controls="workspace-navigation"
+            onClick={() =>
+              updatePreferences({ navigationCollapsed: !preferences.navigationCollapsed })
+            }
+          >
+            {preferences.navigationCollapsed ? (
+              <PanelLeftOpen size={18} />
+            ) : (
+              <PanelLeftClose size={18} />
+            )}
+          </button>
+        </Tooltip>
+      </span>
+      <button
+        className="icon-button navigation-toggle mobile-only"
+        aria-label={t('nav.open')}
+        aria-expanded={sidebar}
+        aria-controls="workspace-navigation"
+        onClick={() => setSidebar(true)}
+      >
+        <Menu size={20} />
+      </button>
+    </div>
+  );
+
   return (
     <div className="app-shell">
       <WorkspaceNavigation
+        viewKey={viewKey(board.id, 'navigation')}
         workspace={workspace}
         board={board}
         repositories={boardRepos}
@@ -372,6 +522,8 @@ export default function App() {
         mobileOpen={sidebar}
         onMobileClose={closeSidebar}
         onSelectBoard={(id) => {
+          setClosedBoardId(null);
+          if (id === board.id) return;
           clearSelection();
           if (id !== board.id) setDock(emptyDock);
           setSnapshot(null);
@@ -381,6 +533,7 @@ export default function App() {
         }}
         onSelectRepo={openRepo}
         onCanvas={() => {
+          setClosedBoardId(null);
           setModal(null);
           clearSelection();
         }}
@@ -405,6 +558,12 @@ export default function App() {
             </button>
           </div>
         )}
+        {viewIssue && (
+          <div className="global-error preference-warning" role="status">
+            <CircleAlert size={16} />
+            <span>{t(`viewState.${viewIssue}`)}</span>
+          </div>
+        )}
         {error && (
           <div className="global-error" role="alert">
             <CircleAlert size={16} />
@@ -424,213 +583,288 @@ export default function App() {
           </div>
         )}
         <div className="workspace-body">
-          <div className="workspace-canvas">
-            <div className="canvas-navigation-control">
-              <span className="desktop-only">
-                <Tooltip
-                  content={t(preferences.navigationCollapsed ? 'nav.expand' : 'nav.collapse')}
-                  placement="right"
-                >
+          <section className="workflow-panel" hidden={boardClosed}>
+            <WorkflowHeader
+              board={board}
+              onClose={() => {
+                setClosedBoardId(board.id);
+                requestAnimationFrame(() =>
+                  focusWithoutTooltip(
+                    document.querySelector<HTMLElement>('[data-workflow-reopen]'),
+                  ),
+                );
+              }}
+            />
+            <div className="workspace-canvas">
+              {!boardClosed && navigationControl}
+              <div className="workspace-action-rail" role="group" aria-label={t('board.actions')}>
+                <Tooltip content={t('board.add')}>
                   <button
-                    className="icon-button navigation-toggle"
-                    aria-label={t(preferences.navigationCollapsed ? 'nav.expand' : 'nav.collapse')}
-                    aria-expanded={!preferences.navigationCollapsed}
-                    aria-controls="workspace-navigation"
-                    onClick={() =>
-                      updatePreferences({ navigationCollapsed: !preferences.navigationCollapsed })
-                    }
+                    className="icon-button primary"
+                    aria-label={t('board.add')}
+                    onClick={() => setModal('add')}
                   >
-                    {preferences.navigationCollapsed ? (
-                      <PanelLeftOpen size={18} />
-                    ) : (
-                      <PanelLeftClose size={18} />
-                    )}
+                    <Plus size={17} />
                   </button>
                 </Tooltip>
-              </span>
-              <button
-                className="icon-button navigation-toggle mobile-only"
-                aria-label={t('nav.open')}
-                aria-expanded={sidebar}
-                aria-controls="workspace-navigation"
-                onClick={() => setSidebar(true)}
-              >
-                <Menu size={20} />
-              </button>
-            </div>
-            <div className="workspace-action-rail" role="group" aria-label={t('board.actions')}>
-              <Tooltip content={t('board.add')}>
-                <button
-                  className="icon-button primary"
-                  aria-label={t('board.add')}
-                  onClick={() => setModal('add')}
+                <Tooltip
+                  detailed
+                  content={
+                    <>
+                      <strong>{t('board.refreshTitle')}</strong>
+                      <GitCommandPreview
+                        commands={[statusArguments]}
+                        when="read"
+                        scope="workspace"
+                      />
+                    </>
+                  }
                 >
-                  <Plus size={17} />
-                </button>
-              </Tooltip>
-              <Tooltip content={t('board.refreshTitle')}>
-                <button
-                  className="icon-button"
-                  aria-label={t('board.refresh')}
-                  disabled={refreshing || saveStatus === 'saving'}
-                  onClick={() => void refresh()}
-                >
-                  <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
-                </button>
-              </Tooltip>
-              <Tooltip content={t('board.connect')}>
-                <button
-                  className="icon-button"
-                  aria-label={t('board.connect')}
-                  onClick={() => openRelation()}
-                  disabled={board.nodes.length < 2}
-                >
-                  <Link2 size={16} />
-                </button>
-              </Tooltip>
-              <Tooltip content={t('group.action')}>
-                <button
-                  className="icon-button"
-                  aria-label={t('group.action')}
-                  onClick={createGroup}
-                  disabled={!board.nodes.length}
-                >
-                  <Group size={17} />
-                </button>
-              </Tooltip>
-              <Tooltip content={t('inspector.board')}>
-                <button
-                  className="icon-button"
-                  aria-label={t('inspector.board')}
-                  aria-expanded={modal === 'board-details'}
-                  aria-haspopup="dialog"
-                  onClick={() => {
-                    selectBackground();
-                    setModal('board-details');
-                  }}
-                >
-                  <SlidersHorizontal size={17} />
-                </button>
-              </Tooltip>
-              <PopupMenu
-                key={board.id}
-                label={t('board.options')}
-                icon={<MoreHorizontal size={18} />}
-                className="board-menu-container"
-                triggerClassName="icon-button"
-                menuClassName="small-menu"
-              >
-                <button
-                  onClick={() => {
-                    setModal('rename-board');
-                  }}
-                >
-                  <Pencil size={14} />
-                  {t('common.rename')}
-                </button>
-                {workspace.boards.length > 1 && (
-                  <button
-                    className="danger"
-                    onClick={() => {
-                      setRemovalTarget({ id: board.id, name: board.name });
-                      setModal('remove-board');
-                    }}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                    {t('board.remove')}
-                  </button>
-                )}
-              </PopupMenu>
-              <span className="mobile-only">
-                <Tooltip content={t('preferences.title')}>
                   <button
                     className="icon-button"
-                    aria-label={t('preferences.title')}
-                    onClick={() => setModal('preferences')}
+                    aria-label={t('board.refresh')}
+                    disabled={refreshing || saveStatus === 'saving'}
+                    onClick={() => void refresh()}
                   >
-                    <Settings2 size={19} />
+                    <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
                   </button>
                 </Tooltip>
-              </span>
-            </div>
-            <FlowCanvas
-              key={board.id}
-              board={board}
-              repositories={workspace.repositories}
-              snapshot={snapshot}
-              selectedRepo={selectedRepo}
-              selectedEdge={selectedEdge}
-              selectedGroup={selectedGroup}
-              selectedIds={selectedIds}
-              onSelectRepo={openRepo}
-              onSelectEdge={openEdge}
-              onEditSelection={() => {
-                if (contextEdge) openRelation(contextEdge);
-                else if (contextGroup) openGroup(contextGroup.id);
-                else if (contextNote) openNote(contextNote.id);
-              }}
-              onRemoveSelection={removeSelection}
-              onSelectGroup={openGroup}
-              onToggleGroup={toggleGroup}
-              onSelection={(ids) => {
-                setSelectedIds(ids);
-                const id = ids.length === 1 ? ids[0] : null;
-                setSelectedRepo(board.nodes.find((n) => n.id === id)?.repoId || null);
-                setSelectedGroup(board.groups?.some((g) => g.id === id) ? id : null);
-                setSelectedEdge(null);
-              }}
-              onSelectNote={openNote}
-              onAddNote={(position) => {
-                const id = crypto.randomUUID();
-                update((draft) => {
-                  const current = draft.boards.find((b) => b.id === board.id)!;
-                  current.notes ||= [];
-                  current.notes.push({
-                    id,
-                    title: t('note.defaultTitle'),
-                    text: '',
-                    position: {
-                      x: Math.max(-100000, Math.min(100000, position.x)),
-                      y: Math.max(-100000, Math.min(100000, position.y)),
-                    },
+                <Tooltip content={t('board.connect')}>
+                  <button
+                    className="icon-button"
+                    aria-label={t('board.connect')}
+                    onClick={() => openRelation()}
+                    disabled={board.nodes.length < 2}
+                  >
+                    <Link2 size={16} />
+                  </button>
+                </Tooltip>
+                <Tooltip content={t('group.action')}>
+                  <button
+                    className="icon-button"
+                    aria-label={t('group.action')}
+                    onClick={createGroup}
+                    disabled={!board.nodes.length}
+                  >
+                    <Group size={17} />
+                  </button>
+                </Tooltip>
+                <Tooltip content={t('inspector.board')}>
+                  <button
+                    className="icon-button"
+                    aria-label={t('inspector.board')}
+                    aria-expanded={modal === 'board-details'}
+                    aria-haspopup="dialog"
+                    onClick={() => {
+                      selectBackground();
+                      setModal('board-details');
+                    }}
+                  >
+                    <SlidersHorizontal size={17} />
+                  </button>
+                </Tooltip>
+                <PopupMenu
+                  key={board.id}
+                  label={t('board.options')}
+                  icon={<MoreHorizontal size={18} />}
+                  className="board-menu-container"
+                  triggerClassName="icon-button"
+                  menuClassName="small-menu"
+                >
+                  <button
+                    onClick={() => {
+                      setModal('rename-board');
+                    }}
+                  >
+                    <Pencil size={14} />
+                    {t('common.rename')}
+                  </button>
+                  {workspace.boards.length > 1 && (
+                    <button
+                      className="danger"
+                      onClick={() => {
+                        setRemovalTarget({ id: board.id, name: board.name });
+                        setModal('remove-board');
+                      }}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                      {t('board.remove')}
+                    </button>
+                  )}
+                </PopupMenu>
+                <span className="mobile-only">
+                  <Tooltip content={t('preferences.title')}>
+                    <button
+                      className="icon-button"
+                      aria-label={t('preferences.title')}
+                      onClick={() => setModal('preferences')}
+                    >
+                      <Settings2 size={19} />
+                    </button>
+                  </Tooltip>
+                </span>
+              </div>
+              <FlowCanvas
+                key={board.id}
+                board={board}
+                repositories={workspace.repositories}
+                snapshot={snapshot}
+                selectedRepo={selectedRepo}
+                selectedEdge={selectedEdge}
+                selectedGroup={selectedGroup}
+                selectedIds={selectedIds}
+                onSelectRepo={openRepo}
+                onSelectEdge={openEdge}
+                onSelectConnection={(id) => {
+                  setSelectedIds([]);
+                  setSelectedRepo(null);
+                  setSelectedGroup(null);
+                  setSelectedEdge(id);
+                }}
+                onEditConnection={(id) => {
+                  setSelectedIds([]);
+                  setSelectedRepo(null);
+                  setSelectedGroup(null);
+                  setSelectedEdge(id);
+                  setConnectionDraft(board.connections?.find((c) => c.id === id));
+                  setModal('flow-connection');
+                }}
+                onEditSelection={() => {
+                  if (contextEdge) openRelation(contextEdge);
+                  else if (contextGroup) openGroup(contextGroup.id);
+                  else if (contextNote) openNote(contextNote.id);
+                  else if (selectedEdge && board.connections?.some((c) => c.id === selectedEdge)) {
+                    setConnectionDraft(board.connections.find((c) => c.id === selectedEdge));
+                    setModal('flow-connection');
+                  }
+                }}
+                onRemoveSelection={removeSelection}
+                onSelectGroup={openGroup}
+                onToggleGroup={toggleGroup}
+                onSelection={(ids) => {
+                  setSelectedIds(ids);
+                  const id = ids.length === 1 ? ids[0] : null;
+                  setSelectedRepo(board.nodes.find((n) => n.id === id)?.repoId || null);
+                  setSelectedGroup(board.groups?.some((g) => g.id === id) ? id : null);
+                  setSelectedEdge(null);
+                }}
+                onSelectNote={openNote}
+                onAddNote={(position) => {
+                  const id = crypto.randomUUID();
+                  update((draft) => {
+                    const current = draft.boards.find((b) => b.id === board.id)!;
+                    current.notes ||= [];
+                    current.notes.push({
+                      id,
+                      title: t('note.defaultTitle'),
+                      text: '',
+                      position: {
+                        x: Math.max(-100000, Math.min(100000, position.x)),
+                        y: Math.max(-100000, Math.min(100000, position.y)),
+                      },
+                    });
                   });
-                });
-                openNote(id);
-              }}
-              onLock={() =>
-                update((draft) => {
-                  const current = draft.boards.find((b) => b.id === board.id)!;
-                  current.layoutLocked = !current.layoutLocked;
-                })
-              }
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onHistory={historyAction}
-              onGroupSelection={(ids) => {
-                setGroupDraft(undefined);
-                setGroupMembers(ids.filter((id) => board.nodes.some((n) => n.id === id)));
-                setModal('group');
-              }}
-              onConnect={connect}
-              onMove={(positions) =>
-                update((draft) => {
-                  const current = draft.boards.find((b) => b.id === board.id)!;
-                  if (current.layoutLocked) return;
-                  for (const node of [...current.nodes, ...(current.notes || [])])
-                    if (positions[node.id]) node.position = positions[node.id];
-                })
-              }
-              onViewport={(viewport) =>
-                update((draft) => {
-                  draft.boards.find((b) => b.id === board.id)!.viewport = viewport;
-                })
-              }
-              onAdd={() => setModal('add')}
-              onClear={selectBackground}
-            />
-          </div>
+                  openNote(id);
+                }}
+                onAddStep={(position) => {
+                  const id = crypto.randomUUID();
+                  update((draft) => {
+                    const current = draft.boards.find((b) => b.id === board.id)!;
+                    current.notes ||= [];
+                    current.notes.push({
+                      id,
+                      kind: 'process',
+                      title: t('flowchart.process'),
+                      summary: '',
+                      text: '',
+                      position: {
+                        x: Math.max(-100000, Math.min(100000, position.x)),
+                        y: Math.max(-100000, Math.min(100000, position.y)),
+                      },
+                    });
+                  });
+                  openNote(id);
+                }}
+                onLock={() =>
+                  update((draft) => {
+                    const current = draft.boards.find((b) => b.id === board.id)!;
+                    current.layoutLocked = !current.layoutLocked;
+                  })
+                }
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onHistory={historyAction}
+                onGroupSelection={(ids) => {
+                  setGroupDraft(undefined);
+                  setGroupMembers(ids.filter((id) => board.nodes.some((n) => n.id === id)));
+                  setModal('group');
+                }}
+                onConnect={connect}
+                onRoute={(id, points) =>
+                  update((draft) => {
+                    const current = draft.boards.find((b) => b.id === board.id)!;
+                    const next = editedRoute(current, id, points);
+                    if (!next) return;
+                    if ('kind' in next)
+                      current.edges = current.edges.map((e) => (e.id === id ? next : e));
+                    else
+                      current.connections = current.connections?.map((e) =>
+                        e.id === id ? next : e,
+                      );
+                  })
+                }
+                onReconnect={(id, connection) =>
+                  update((draft) => {
+                    const current = draft.boards.find((b) => b.id === board.id)!;
+                    const next = reconnectedFlowConnection(current, id, connection);
+                    if (next)
+                      current.connections = current.connections!.map((c) =>
+                        c.id === id ? next : c,
+                      );
+                  })
+                }
+                onMove={(positions) =>
+                  update((draft) => {
+                    const current = draft.boards.find((b) => b.id === board.id)!;
+                    if (current.layoutLocked) return;
+                    for (const node of [...current.nodes, ...(current.notes || [])])
+                      if (positions[node.id]) node.position = positions[node.id];
+                  })
+                }
+                onViewport={(viewport) =>
+                  update((draft) => {
+                    draft.boards.find((b) => b.id === board.id)!.viewport = viewport;
+                  })
+                }
+                onAdd={() => setModal('add')}
+                onClear={selectBackground}
+              />
+            </div>
+          </section>
+          {boardClosed && (
+            <div className="workflow-panel-closed">
+              {navigationControl}
+              <div className="workflow-panel-reopen">
+                <p>{t('board.panelClosed')}</p>
+                <Button
+                  data-workflow-reopen
+                  onClick={() => {
+                    setClosedBoardId(null);
+                    requestAnimationFrame(() =>
+                      focusWithoutTooltip(
+                        document.querySelector<HTMLElement>('.workflow-panel [data-panel-close]'),
+                      ),
+                    );
+                  }}
+                >
+                  {t('board.reopen')}
+                </Button>
+              </div>
+            </div>
+          )}
           {!!visibleDock.items.length && (
             <InspectorDock
+              viewKey={viewKey(board.id, 'dock')}
               state={visibleDock}
               width={preferences.inspectorWidth}
               onWidth={(inspectorWidth) => updatePreferences({ inspectorWidth })}
@@ -652,6 +886,7 @@ export default function App() {
                   <>
                     {activeRepo && (
                       <RepositoryPanel
+                        viewKey={viewKey(board.id, activeRepo.id, activeRepo.path)}
                         key={activeRepo.id}
                         repo={activeRepo}
                         state={snapshot?.repositories[activeRepo.id]}
@@ -680,6 +915,7 @@ export default function App() {
                     )}
                     {activeEdge && (
                       <RelationPanel
+                        viewKey={viewKey(board.id, activeEdge.id, 'relation')}
                         edge={activeEdge}
                         source={workspace.repositories.find(
                           (r) =>
@@ -721,6 +957,9 @@ export default function App() {
             {t('board.repositories', { count: board.nodes.length })}
             <span className="statusbar-dot">·</span>
             {t('board.relations', { count: board.edges.length })}
+            {!!board.connections?.length && (
+              <> · {t('flowchart.connections', { count: board.connections.length })}</>
+            )}
           </span>
           <span data-mobile-label={t('nav.service')}>
             {refreshing
@@ -733,10 +972,13 @@ export default function App() {
           </span>
         </footer>
       </main>
-      {modal === 'preferences' && <PreferencesDialog onClose={() => setModal(null)} />}
+      {modal === 'preferences' && (
+        <PreferencesDialog viewKey="app.preferences" onClose={() => setModal(null)} />
+      )}
       {modal === 'board-details' && (
         <BoardPanel
           key={board.id}
+          viewKey={viewKey(board.id, 'details')}
           board={board}
           onClose={() => setModal(null)}
           onGroup={openGroup}
@@ -752,6 +994,7 @@ export default function App() {
       )}
       {modal === 'group-details' && contextGroup && (
         <GroupPanel
+          viewKey={viewKey(board.id, contextGroup.id, 'details')}
           group={contextGroup}
           board={board}
           repositories={workspace.repositories}
@@ -771,6 +1014,7 @@ export default function App() {
       {modal === 'note-details' && contextNote && (
         <NotePanel
           key={contextNote.id}
+          viewKey={viewKey(board.id, contextNote.id, 'details')}
           note={contextNote}
           onClose={() => setModal(null)}
           onSave={(fields) =>
@@ -781,6 +1025,23 @@ export default function App() {
                   .notes!.find((note) => note.id === contextNote.id)!,
                 fields,
               );
+            })
+          }
+        />
+      )}
+      {modal === 'flow-connection' && (
+        <FlowConnectionDialog
+          board={board}
+          repositories={workspace.repositories}
+          initial={connectionDraft}
+          onClose={() => setModal(null)}
+          onSave={(connection) =>
+            update((draft) => {
+              const current = draft.boards.find((b) => b.id === board.id)!;
+              current.connections ||= [];
+              const index = current.connections.findIndex((c) => c.id === connection.id);
+              if (index < 0) current.connections.push(connection);
+              else current.connections[index] = connection;
             })
           }
         />
@@ -842,6 +1103,7 @@ export default function App() {
             });
             clearSelection();
             setDock(emptyDock);
+            setClosedBoardId(null);
           }}
           onClose={() => setModal(null)}
         />
@@ -884,6 +1146,7 @@ export default function App() {
       )}
       {modal === 'help' && (
         <Dialog
+          viewKey="app.help"
           title={t('help.title')}
           onClose={() => setModal(null)}
           headerActions={
@@ -913,9 +1176,15 @@ export default function App() {
           </div>
         </Dialog>
       )}
-      {learningOpen && <GitLearningDialog onClose={() => setLearningOpen(false)} />}
+      {learningOpen && (
+        <GitLearningDialog viewKey="learning" onClose={() => setLearningOpen(false)} />
+      )}
       {modal === 'repositories' && (
-        <Dialog title={t('nav.repositories')} onClose={() => setModal(null)}>
+        <Dialog
+          viewKey="app.repositories"
+          title={t('nav.repositories')}
+          onClose={() => setModal(null)}
+        >
           <div className="dialog-body">
             <p className="muted">{t('board.indexHelp')}</p>
             {workspace.repositories.length ? (

@@ -24,7 +24,7 @@ export const errorMessages = {
   branchNoCommits: '仓库尚无提交，请先完成首次提交。',
   branchStateChanged: '当前分支或提交已变化，请刷新后重新确认。',
   branchTargetChanged: '目标分支或起点已变化，请刷新后重新确认。',
-  branchStartPoint: '请选择现有本地分支、远端分支或当前提交作为起点。',
+  branchStartPoint: '请选择图上的提交、现有本地分支、远端分支或当前提交作为起点。',
   branchMissing: '找不到这个本地分支，请刷新后重试。',
   branchCurrent: '不能删除当前分支，请先切换到其他分支。',
   branchInWorktree: '这个分支正在其他工作树中使用，请先在那里切换分支。',
@@ -37,6 +37,8 @@ export const errorMessages = {
   gitMissing: '找不到 Git，请先安装 Git 并加入 PATH。',
   gitTimeout: 'Git 操作超时。请检查网络或仓库状态后重试。',
   gitFailed: 'Git 操作未完成。',
+  remoteRefMissing:
+    '获取规则指定的远端分支已不存在。请检查该远端的获取规则，移除失效的指定分支规则或改为获取所有分支，然后重新获取。这不是网络连接失败；本地分支和文件不受此错误影响。',
   invalidRef: '分支或提交引用无效。',
   invalidPath: '文件路径无效。',
   commitMissing: '找不到这个提交。',

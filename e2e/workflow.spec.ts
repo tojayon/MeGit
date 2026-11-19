@@ -1,5 +1,6 @@
 import { openRepositoryTools } from './branch-tree-helpers';
 import { test, expect } from './test';
+import { dragConnection } from './connection-helpers';
 import { fixture, commitFile, git } from '../tests/fixtures.js';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -33,7 +34,7 @@ test('流程白板连接真实仓库，保存布局，查看历史与暂存提�
       .getByTestId('repository-node')
       .filter({ hasText: '在线服务' })
       .locator('.react-flow__handle[data-handleid="target-left"]');
-    await sourceHandle.dragTo(targetHandle);
+    await dragConnection(page, sourceHandle, targetHandle);
     await expect(page.getByRole('dialog', { name: '建立流程关系' })).toBeVisible();
     await page.getByLabel('来源仓库').selectOption({ label: '公共编辑器' });
     await page.getByLabel('目标仓库').selectOption({ label: '在线服务' });
@@ -52,19 +53,23 @@ test('流程白板连接真实仓库，保存布局，查看历史与暂存提�
     await expect(page.getByTestId('repository-node')).toHaveCount(2);
     await expect(page.getByRole('button', { name: /代码整合.*已包含/ })).toBeVisible();
     await page.getByRole('button', { name: '查看公共编辑器' }).click();
-    await openRepositoryTools(page, 'history');
+    const sourcePanel = page.getByRole('complementary', {
+      name: '公共编辑器 仓库详情',
+      exact: true,
+    });
+    await openRepositoryTools(page, 'history', sourcePanel);
     await page.locator('.commit-row').filter({ hasText: '测试提交' }).first().click();
     await expect(page.getByTestId('diff-view')).toContainText('+first');
     await writeFile(path.join(f.repo, 'browser.txt'), 'saved in browser\n');
     await page.getByRole('button', { name: '关闭差异' }).click();
     await page.getByRole('button', { name: '关闭提交历史', exact: true }).click();
     await page.getByRole('button', { name: '刷新本地状态' }).click();
-    await openRepositoryTools(page, 'worktree');
+    await openRepositoryTools(page, 'worktree', sourcePanel);
     await page.getByRole('button', { name: '暂存 browser.txt' }).click();
     await page.getByLabel('提交说明').fill('通过 MeGit 提交');
     await page.getByRole('button', { name: /提交 1 个文件/ }).click();
     await expect(page.getByText('工作区干净', { exact: true })).toBeVisible();
-    await openRepositoryTools(page, 'history');
+    await openRepositoryTools(page, 'history', sourcePanel);
     await expect(page.getByRole('button', { name: /通过 MeGit 提交/ })).toBeVisible();
     await expect(page.locator('.commit-row').first()).toBeVisible();
     await page.getByRole('button', { name: '关闭提交历史', exact: true }).click();
@@ -80,7 +85,7 @@ test('流程白板连接真实仓库，保存布局，查看历史与暂存提�
     });
     if (await page.getByRole('dialog', { name: '提交历史', exact: true }).count())
       await page.getByRole('button', { name: '关闭提交历史', exact: true }).click();
-    await page.getByRole('button', { name: '关闭仓库详情' }).click();
+    await sourcePanel.getByRole('button', { name: '关闭仓库详情' }).click();
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByRole('button', { name: '添加仓库', exact: true }).first()).toBeVisible();
     expect(

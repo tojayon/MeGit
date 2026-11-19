@@ -38,6 +38,50 @@ async function setup() {
 }
 
 describe('本机 API 边界与端到端 Git 数据', () => {
+  it('提交点创建沿用会话和登记校验，严格接收完整提交编号', async () => {
+    const { base, headers, repo } = await setup();
+    const workspace = (await fetch(`${base}/api/workspace`, { headers }).then((r) =>
+      r.json(),
+    )) as Workspace;
+    workspace.repositories.push({ id: 'commit-api', name: 'fixture', path: repo });
+    expect(
+      (
+        await fetch(`${base}/api/workspace`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(workspace),
+        })
+      ).status,
+    ).toBe(200);
+    const hash = await git(repo, 'rev-parse', 'HEAD');
+    const action = {
+      type: 'createBranch',
+      name: 'from-commit',
+      startPoint: 'COMMIT',
+      startHash: hash,
+      checkout: false,
+      track: false,
+      expected: { branch: 'main', head: hash, detached: false },
+    };
+    const send = (id: string, body: unknown, withToken = true) =>
+      fetch(`${base}/api/repositories/${id}/actions`, {
+        method: 'POST',
+        headers: withToken ? headers : { 'Content-Type': 'application/json', Origin: base },
+        body: JSON.stringify(body),
+      });
+    expect((await send('commit-api', action, false)).status).toBe(403);
+    expect((await send('unknown', action)).status).toBe(404);
+    for (const startHash of ['HEAD~1', hash.slice(0, 7), '--help']) {
+      const response = await send('commit-api', { ...action, startHash });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'invalidAction' });
+    }
+    const response = await send('commit-api', action);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ state: { branch: 'main', head: hash } });
+    expect(await git(repo, 'rev-parse', 'refs/heads/from-commit')).toBe(hash);
+  });
+
   it('应用错误使用稳定代码返回，供页面按所选语言呈现', async () => {
     const { base, headers } = await setup();
     const response = await fetch(`${base}/api/repositories/inspect`, {

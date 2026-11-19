@@ -25,6 +25,92 @@ const makeBoard = (): Board => ({
   edges: [edge('ab', 'a', 'b'), edge('ac', 'a', 'c'), edge('bc', 'b', 'c')],
 });
 
+describe('流程连线端点重连', () => {
+  const setup = () => {
+    const board = makeBoard();
+    board.connections = [
+      {
+        id: 'flow',
+        source: 'a',
+        target: 'b',
+        label: '通过',
+        sourcePort: 'bottom',
+        targetPort: 'top',
+        waypoints: [{ x: 20, y: 30 }],
+      },
+    ];
+    return board;
+  };
+  it('保留身份和条件，更换目标与端口，清除旧折点且不修改原白板', () => {
+    const board = setup();
+    const before = structuredClone(board);
+    expect(
+      whiteboard.reconnectedFlowConnection(board, 'flow', {
+        source: 'a',
+        target: 'c',
+        sourceHandle: 'source-bottom',
+        targetHandle: 'target-left',
+      }),
+    ).toEqual({
+      id: 'flow',
+      source: 'a',
+      target: 'c',
+      label: '通过',
+      sourcePort: 'bottom',
+      targetPort: 'left',
+    });
+    expect(board).toEqual(before);
+  });
+  it('可以只更换来源端口，也可将来源改为流程步骤', () => {
+    const board = setup();
+    board.notes = [
+      { id: 'step', title: '步骤', text: '', kind: 'process', position: { x: 0, y: 0 } },
+    ];
+    expect(
+      whiteboard.reconnectedFlowConnection(board, 'flow', {
+        source: 'a',
+        target: 'b',
+        sourceHandle: 'source-right',
+        targetHandle: 'target-top',
+      })?.sourcePort,
+    ).toBe('right');
+    expect(
+      whiteboard.reconnectedFlowConnection(board, 'flow', {
+        source: 'step',
+        target: 'b',
+        sourceHandle: 'source-right',
+        targetHandle: 'target-top',
+      })?.source,
+    ).toBe('step');
+  });
+  it('拒绝自连接、悬空、投影端点、无效端口、重复、未变化和锁定操作', () => {
+    const board = setup();
+    const valid = {
+      source: 'a',
+      target: 'c',
+      sourceHandle: 'source-bottom',
+      targetHandle: 'target-left',
+    };
+    for (const change of [
+      { target: 'a' },
+      { target: 'missing' },
+      { target: 'g' },
+      { targetHandle: 'target-left:projected' },
+      { sourceHandle: 'target-top' },
+      { sourceHandle: null },
+      { target: 'b', targetHandle: 'target-top' },
+    ])
+      expect(
+        whiteboard.reconnectedFlowConnection(board, 'flow', { ...valid, ...change }),
+      ).toBeNull();
+    board.connections!.push({ id: 'duplicate', source: 'a', target: 'c', label: '通过' });
+    expect(whiteboard.reconnectedFlowConnection(board, 'flow', valid)).toBeNull();
+    board.connections!.pop();
+    board.layoutLocked = true;
+    expect(whiteboard.reconnectedFlowConnection(board, 'flow', valid)).toBeNull();
+  });
+});
+
 describe('白板分组投影', () => {
   it('边界包围成员，采用实际测量的节点尺寸', () => {
     expect(
@@ -72,6 +158,18 @@ describe('白板分组投影', () => {
 });
 
 describe('上下游高亮', () => {
+  it('流程步骤上下游可达，移除端点清理流程线，保持 Git 关系独立', () => {
+    const board = makeBoard();
+    board.notes = [
+      { id: 'step', kind: 'process', title: '检查', text: '', position: { x: 0, y: 0 } },
+    ];
+    board.connections = [{ id: 'flow', source: 'a', target: 'step', label: '检查' }];
+    expect(whiteboard.flowContext(board.connections, ['a']).nodeIds.has('step')).toBe(true);
+    whiteboard.removeNode(board, 'step');
+    expect(board.notes).toEqual([]);
+    expect(board.connections).toEqual([]);
+    expect(board.edges).toHaveLength(3);
+  });
   it('追踪上下游所有可达边，跳过旁支并处理环', () => {
     const edges = [
       edge('ab', 'a', 'b'),

@@ -6,6 +6,26 @@ import repositoryAvatar from './repository-avatar-en';
 import branchTree from './branch-tree-en';
 
 const en = {
+  viewState: {
+    unavailable: 'The browser cannot save view positions right now. You can continue working.',
+    invalid: 'Unreadable view records were ignored. Board data is unchanged.',
+  },
+  gitCommands: {
+    title: 'Git command preview',
+    workspaceScope:
+      'PowerShell · Checks local state in each registered repository without fetching remotes.',
+    now: 'Click to run these primary commands.',
+    confirm: 'Opens a confirmation dialog; runs after confirmation.',
+    name: 'Opens the creation dialog; <branch-name> is the name to enter before running.',
+    read: 'Reads repository information without changing versions.',
+    scope:
+      'PowerShell · Run in the current repository. Local state is also checked before and after the operation.',
+    pending:
+      'Parameters are incomplete or the current state does not support this action; no command is generated.',
+    clipboard: 'Copies to the clipboard without running Git.',
+    view: 'Changes only the interface view; no Git command runs.',
+    untracked: 'Reads the local untracked file directly without running a Git diff command.',
+  },
   branchTree,
   repositoryAvatar,
   learning,
@@ -53,11 +73,17 @@ const en = {
     relations: 'Relations',
     pending: 'Pending',
     onBoard: 'Repositories on board',
+    onBoardEmpty: 'No repositories on this board yet.',
     tip: 'Relationships between repositories are part of development, too.',
     service: 'Local service',
   },
   board: {
     actions: 'Board actions',
+    information: 'Workflow information',
+    closePanel: 'Close workflow panel',
+    reopen: 'Reopen workflow',
+    panelClosed: 'Workflow panel closed',
+    noDescription: 'No workflow description yet',
     workflow: 'Workflows',
     saving: 'Saving',
     failed: 'Unsaved',
@@ -109,8 +135,10 @@ const en = {
     select: 'Select',
     pan: 'Pan',
     snapping: 'Auto snap',
-    snappingOn: 'Auto snap is on: align edges, centers and equal gaps. Hold Alt to bypass.',
-    snappingOff: 'Auto snap is off. Click to align edges, centers and equal gaps.',
+    snappingOn:
+      'Auto snap is on: align edges, centers, equal gaps and horizontal or vertical route positions. Hold Alt to bypass.',
+    snappingOff:
+      'Auto snap is off. Click to enable element alignment and horizontal or vertical route snapping.',
     lockLayout: 'Lock layout',
     unlockLayout: 'Unlock layout',
     layoutLocked: 'Layout locked',
@@ -164,6 +192,35 @@ const en = {
     empty: 'Click to edit note',
     help: 'Maintained by you; does not represent live Git status.',
     role: 'Note node',
+  },
+  flowchart: {
+    add: 'Add workflow step',
+    details: 'Workflow step details',
+    role: 'Workflow step',
+    shape: 'Node shape',
+    note: 'Note',
+    process: 'Process',
+    decision: 'Decision',
+    start: 'Start',
+    end: 'End',
+    summary: 'Diagram summary',
+    connection: 'Workflow connection',
+    source: 'Source',
+    target: 'Target',
+    condition: 'Condition or action',
+    manual:
+      'Workflow connections show order and conditions, not completed checks, Git integration or deployment.',
+    namedConnection: 'Workflow connection: {{name}}',
+    resetRoute: 'Reset to automatic route',
+    reconnectHelp:
+      'Click the label to edit its condition. Select the line, then drag either circular endpoint to another step or side. Dropping on empty space keeps the original line. Expand collapsed groups first; reconnecting is disabled while the layout is locked or Pan mode is active.',
+    example: 'Connected workflow steps',
+    steps_one: '{{count}} step',
+    steps_other: '{{count}} steps',
+    connections_one: '{{count}} workflow connection',
+    connections_other: '{{count}} workflow connections',
+    exampleSummary:
+      'Connect steps with arrows and label decision branches. Open details to read commands.',
   },
   repository: {
     conflicts_one: '{{count}} conflict',
@@ -224,6 +281,7 @@ const en = {
     stage: 'Stage',
     fileAction: '{{action}} {{path}}',
     message: 'Commit message',
+    commitSection: 'Save this commit',
     messagePlaceholder: 'What changed?',
     commitFiles_one: 'Commit {{count}} file',
     commitFiles_other: 'Commit {{count}} files',
@@ -292,7 +350,7 @@ const en = {
     switchBranch: '{{name}}: local branch switched',
     deleteBranch: '{{name}}: local branch safely deleted',
     commit: '{{name}}: Commit saved to the local repository',
-    fetch: '{{name}}: Remote references updated',
+    fetch: '{{name}}: Remote records updated and stale records cleaned up',
     push: '{{name}}: Push completed',
     pull: '{{name}}: Fast-forward pull completed',
     stage: '{{name}}: Files staged',
@@ -429,6 +487,14 @@ const en = {
     groups_other: '{{count}} groups',
   },
   routing: {
+    editRoute: 'Edit connection route',
+    resetRoute: 'Restore automatic route',
+    point: 'Route point {{count}}',
+    segment: 'Route segment {{count}}',
+    pointHelp:
+      'Drag to move this point. When snapping is enabled, align horizontally or vertically; hold Alt to bypass. Arrow keys adjust. Double-click or Delete removes only this point.',
+    segmentHelp:
+      'Drag to move this segment. When snapping is enabled, align horizontally or vertically; hold Alt to bypass. Double-click adds a point. Arrow keys adjust, Shift increases steps, Escape cancels.',
     label: 'Edge style',
     sourcePort: 'Source port',
     targetPort: 'Target port',
@@ -442,6 +508,15 @@ const en = {
     left: 'Left',
     input: '{{name}} · {{side}} input',
     output: '{{name}} · {{side}} output',
+    connectionPoint: '{{name}} · {{side}} connection point (input or output)',
+    example: 'Repository connection points',
+    exampleHelp:
+      'Connections in one direction share a centered point. Input and output split symmetrically only when both are present on the same side.',
+    exampleMode: 'Connection direction',
+    none: 'No connections',
+    incoming: 'Input only',
+    outgoing: 'Output only',
+    both: 'Input and output',
   },
   help: {
     title: 'About MeGit',
@@ -450,7 +525,7 @@ const en = {
       'Place local repositories on a board. Directed connections describe code integration, dependencies and delivery.',
     board: 'Using the board',
     boardHelp:
-      'Drag nodes to arrange them, scroll to pan, and Ctrl+scroll to zoom. Connect any output handle to another node’s input, or choose Connect. Selecting a repository highlights its upstream and downstream paths. Use Group repositories to organize nodes, drag a group title to move its members, and collapse it to keep only external relations. Arrow keys move focused nodes and groups. Relation details offer edge styles and ports; Board details edits the name and description.',
+      'Drag nodes to arrange them, scroll to pan, and Ctrl+scroll to zoom. Connect any output handle to another node’s input, or choose Connect. Selecting a repository highlights its upstream and downstream paths. Use Group repositories to organize nodes, drag a group title to move its members, and collapse it to keep only external relations. Arrow keys move focused nodes and groups. Git relation details offer edge styles and ports. Select a workflow line and drag either circular endpoint to reconnect it; click its label to edit the condition. Workflow shapes have transparent interiors; open details with Enter or the selection toolbar; Board details edits the name and description.',
     tools: 'Board tools',
     toolsHelp:
       'In Select mode, drag empty space to select or Shift/Ctrl click multiple items. Align, distribute, move or group the selection. The magnet toggles auto snap to nearby edges, centers and equal gaps; hold Alt to bypass. This browser remembers the setting. Pan mode drags the board. Layout and zoom locks independently fix positions and scale. Ctrl+Z undoes board content; Ctrl+Shift+Z or Ctrl+Y redoes it. Each board keeps 50 edits until the page reloads. Git operations are excluded. Manual notes are maintained by you. Focus filters the view; SVG/PNG export keeps the current theme and visible content.',
@@ -540,7 +615,7 @@ const en = {
     branchStateChanged: 'The current branch or commit changed. Refresh and confirm again.',
     branchTargetChanged: 'The target branch or starting point changed. Refresh and confirm again.',
     branchStartPoint:
-      'Choose an existing local branch, remote branch or the current commit as a starting point.',
+      'Choose a commit on the map, an existing local branch, a remote branch or the current commit as a starting point.',
     branchMissing: 'Local branch was not found. Refresh and try again.',
     branchCurrent: 'Switch to another branch before deleting the current branch.',
     branchInWorktree: 'This branch is in use by another worktree. Switch branches there first.',
@@ -556,6 +631,8 @@ const en = {
     gitMissing: 'Git was not found. Install Git and add it to PATH.',
     gitTimeout: 'Git operation timed out. Check the network or repository and try again.',
     gitFailed: 'Git operation could not be completed.',
+    remoteRefMissing:
+      'A remote branch specified by the fetch rules no longer exists. Review that remote’s fetch rules, remove the obsolete branch rule or fetch all branches, then fetch again. This is not a network connection failure; this error does not change local branches or files.',
     invalidRef: 'Invalid branch or commit reference.',
     invalidPath: 'Invalid file path.',
     commitMissing: 'Commit was not found.',

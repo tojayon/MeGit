@@ -19,6 +19,7 @@ import {
   Pencil,
   Redo2,
   StickyNote,
+  Workflow,
   Undo2,
   Trash2,
   UnlockKeyhole,
@@ -62,10 +63,12 @@ export function CanvasTools({
   canRedo,
   onHistory,
   onNote,
+  onStep,
   count,
   onEdit,
   editLabel,
   onRemove,
+  selectionActions,
   unitCount,
   canGroup,
   onGroup,
@@ -88,10 +91,12 @@ export function CanvasTools({
   canRedo: boolean;
   onHistory: (direction: 'undo' | 'redo') => void;
   onNote: () => void;
+  onStep: () => void;
   count: number;
   onEdit?: () => void;
   editLabel: string;
   onRemove: () => void;
+  selectionActions?: ReactNode;
   unitCount: number;
   canGroup: boolean;
   onGroup: () => void;
@@ -165,6 +170,9 @@ export function CanvasTools({
             <StickyNote size={17} />
           </button>
         </Tooltip>
+        <IconButton label={t('flowchart.add')} onClick={onStep} className="canvas-tool">
+          <Workflow size={17} />
+        </IconButton>
         <Tooltip content={t(locked ? 'tools.unlockLayout' : 'tools.lockLayout')}>
           <button
             className="canvas-tool"
@@ -274,6 +282,7 @@ export function CanvasTools({
               <Pencil size={17} />
             </IconButton>
           )}
+          {selectionActions}
           <IconButton
             className="canvas-tool"
             variant="danger"

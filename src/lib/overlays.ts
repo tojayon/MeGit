@@ -26,7 +26,7 @@ export function dismissTooltips() {
   document.dispatchEvent(new Event(dismissTooltipEvent));
 }
 
-export function dismissPopups() {
+export function dismissPopups(preserve?: HTMLElement | null) {
   dismissTooltips();
-  document.dispatchEvent(new Event(dismissPopupEvent));
+  document.dispatchEvent(new CustomEvent(dismissPopupEvent, { detail: { preserve } }));
 }

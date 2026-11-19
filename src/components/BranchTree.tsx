@@ -11,9 +11,14 @@ import { useTranslation } from 'react-i18next';
 import { GitBranch, LocateFixed, Minus, Plus } from 'lucide-react';
 import type { BranchComparison, BranchTreeData, Commit } from '../../shared/types';
 import { buildBranchTree } from '../lib/branch-tree';
-import { GitHelp } from './GitHelp';
+import { CommitEvent } from './CommitEvent';
 import { IconButton } from './IconButton';
 import { Tooltip } from './Tooltip';
+import { CommitPointActions } from './CommitPointActions';
+import { CollapsedCommitsPopover } from './CollapsedCommitsPopover';
+import { dismissPopups } from '../lib/overlays';
+import { useScrollMemory, viewStorage } from '../lib/use-view-state';
+import { isFiniteNumber, isScrollPosition } from '../lib/view-storage';
 import './branch-tree.css';
 
 const minimumScale = 0.5;
@@ -23,30 +28,71 @@ const mapInset = (element: HTMLElement) =>
 
 export function BranchTree({
   data,
+  viewKey,
   selectedRef,
   comparison,
   expanded = false,
   onSelect,
   onCommit,
+  onCreateBranch,
+  createDisabled,
   tools,
 }: {
   data: BranchTreeData;
+  viewKey?: string;
   selectedRef: string | null;
   comparison?: BranchComparison | null;
   expanded?: boolean;
   onSelect: (ref: string) => void;
   onCommit: (commit: Commit) => void;
+  onCreateBranch: (commit: Commit) => void;
+  createDisabled?: string;
   tools?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const [activeCommit, setActiveCommit] = useState<string | null>(null);
+  const onCommitOpen = useCallback((hash: string, open: boolean) => {
+    setActiveCommit((current) => (open ? hash : current === hash ? null : current));
+  }, []);
   const layout = useMemo(() => buildBranchTree(data, { expanded }), [data, expanded]);
   const viewport = useRef<HTMLDivElement>(null);
+  const [initialScale] = useState(() => {
+    const saved = viewKey ? viewStorage.read(`${viewKey}.scale`) : undefined;
+    return isFiniteNumber(saved) && saved >= minimumScale && saved <= maximumScale ? saved : 1;
+  });
+  const [hasSavedPosition] = useState(
+    () => !!viewKey && isScrollPosition(viewStorage.read(`${viewKey}.scroll`)),
+  );
+  useScrollMemory(viewport, viewKey && `${viewKey}.scroll`);
   const [view, setView] = useState<{ scale: number; scroll: { left: number; top: number } | null }>(
-    { scale: 1, scroll: null },
+    { scale: initialScale, scroll: null },
   );
   const { scale } = view;
-  const currentScale = useRef(1);
+  const currentScale = useRef(initialScale);
   const pendingScroll = useRef<{ left: number; top: number } | null>(null);
+  const drag = useRef<{ pointer: number; x: number; y: number; left: number; top: number } | null>(
+    null,
+  );
+  const [panning, setPanning] = useState(false);
+  const stopPan = useCallback(() => {
+    const active = drag.current;
+    drag.current = null;
+    const element = viewport.current;
+    if (active && element?.hasPointerCapture(active.pointer))
+      element.releasePointerCapture(active.pointer);
+    setPanning(false);
+  }, []);
+  useEffect(() => {
+    const hidden = () => {
+      if (document.hidden) stopPan();
+    };
+    window.addEventListener('blur', stopPan);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('blur', stopPan);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, [stopPan]);
   const zoom = useCallback(
     (requested: number, point?: { x: number; y: number }) => {
       const element = viewport.current;
@@ -80,10 +126,11 @@ export function BranchTree({
         ),
       };
       currentScale.current = next;
+      if (viewKey) viewStorage.write(`${viewKey}.scale`, next);
       // Keep scroll and scale in one update, even when a burst returns to the rendered scale.
       setView({ scale: next, scroll: pendingScroll.current });
     },
-    [layout.width, layout.height],
+    [layout.width, layout.height, viewKey],
   );
   useLayoutEffect(() => {
     if (view.scroll) {
@@ -95,18 +142,29 @@ export function BranchTree({
     const element = viewport.current;
     if (!element) return;
     const wheel = (event: WheelEvent) => {
-      // Horizontal and Shift scrolling keep their native map / multi-panel behavior.
-      if (
-        !event.deltaY ||
-        event.shiftKey ||
-        (!event.ctrlKey && Math.abs(event.deltaX) > Math.abs(event.deltaY))
-      )
+      // Top-layer menus / detailed hints are still DOM descendants of the map.
+      // Their content must scroll independently, without bubbling into map zoom.
+      if (event.target instanceof Element && event.target.closest('[popover]')) {
+        if (event.ctrlKey) event.preventDefault();
         return;
+      }
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1;
+      if (!event.ctrlKey) {
+        if (event.shiftKey) {
+          event.preventDefault();
+          event.stopPropagation();
+          const delta =
+            Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+          element.scrollBy({ left: delta * unit, behavior: 'instant' });
+        }
+        // Ordinary wheel and two-finger scrolling retain native vertical / horizontal movement.
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
-      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1;
+      if (!event.deltaY) return;
       const delta = Math.max(-160, Math.min(160, event.deltaY * unit));
-      zoom(currentScale.current * Math.exp(-delta * (event.ctrlKey ? 0.01 : 0.0025)), {
+      zoom(currentScale.current * Math.exp(-delta * 0.01), {
         x: event.clientX,
         y: event.clientY,
       });
@@ -119,7 +177,7 @@ export function BranchTree({
   const target = new Set(comparison?.targetCommits || []);
   const baseHash = data.branches.find((branch) => branch.ref === data.baseRef)?.hash || data.head;
   const trunkTop = layout.nodes.find((node) => node.commit.hash === baseHash)?.y || 0;
-  const center = () => {
+  const center = useCallback(() => {
     const element = viewport.current;
     if (element)
       element.scrollTo({
@@ -127,39 +185,72 @@ export function BranchTree({
         top: Math.max(0, trunkTop * currentScale.current + mapInset(element) - 128),
         behavior: 'instant',
       });
-  };
-  // Keep layout changes centered while ordinary inspector resizing preserves the view.
-  useEffect(() => {
-    const element = viewport.current;
-    if (element)
-      element.scrollTo({
-        left: Math.max(0, (layout.width * currentScale.current - element.clientWidth) / 2),
-        top: Math.max(0, trunkTop * currentScale.current + mapInset(element) - 128),
-        behavior: 'instant',
-      });
-  }, [data.baseRef, layout.width, trunkTop]);
-  const selectedNode = layout.nodes.find((node) =>
-    node.branches.some((branch) => branch.ref === selectedRef),
-  );
-  const selectedX = selectedNode?.x;
-  const selectedY = selectedNode?.y;
-  useEffect(() => {
-    const element = viewport.current;
-    if (element && selectedX !== undefined && selectedY !== undefined)
-      element.scrollTo({
-        left: Math.max(0, selectedX * currentScale.current - element.clientWidth / 2),
-        top: Math.max(0, selectedY * currentScale.current + mapInset(element) - 128),
-        behavior: 'instant',
-      });
-  }, [selectedRef, selectedX, selectedY]);
+  }, [layout.width, trunkTop]);
+  const positioned = useRef(false);
+  // Position once before the first paint. Selection and later data updates
+  // preserve the user's view; only the explicit center control repositions it.
+  useLayoutEffect(() => {
+    if (positioned.current || !layout.nodes.length) return;
+    positioned.current = true;
+    if (!hasSavedPosition) center();
+  }, [center, layout.nodes.length, hasSavedPosition]);
   return (
     <div className="branch-tree-graphic">
       <div
-        className="branch-tree-viewport"
+        className={`branch-tree-viewport${panning ? ' panning' : ''}`}
         ref={viewport}
         role="region"
         aria-label={t('branchTree.region')}
         tabIndex={0}
+        onContextMenu={(event) => {
+          if (event.target instanceof Element && event.target.closest('[popover]')) return;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onPointerDown={(event) => {
+          if (
+            event.button !== 2 ||
+            event.pointerType !== 'mouse' ||
+            (event.target instanceof Element && event.target.closest('[popover]'))
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          dismissPopups();
+          const element = event.currentTarget;
+          drag.current = {
+            pointer: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            left: element.scrollLeft,
+            top: element.scrollTop,
+          };
+          element.setPointerCapture(event.pointerId);
+          setPanning(true);
+        }}
+        onPointerMove={(event) => {
+          const active = drag.current;
+          if (!active || active.pointer !== event.pointerId) return;
+          if (!(event.buttons & 2)) {
+            stopPan();
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          event.currentTarget.scrollTo({
+            left: active.left + active.x - event.clientX,
+            top: active.top + active.y - event.clientY,
+            behavior: 'instant',
+          });
+        }}
+        onPointerUp={(event) => {
+          if (drag.current?.pointer !== event.pointerId) return;
+          event.preventDefault();
+          event.stopPropagation();
+          stopPan();
+        }}
+        onPointerCancel={stopPan}
+        onLostPointerCapture={stopPan}
       >
         <div
           className="branch-tree-canvas"
@@ -200,17 +291,6 @@ export function BranchTree({
                           onClick={() => onSelect(branchRef)}
                         />
                       )}
-                      {!!edge.via.length && (
-                        <text
-                          className="tree-fold-count"
-                          x={layout.nodes.find((node) => node.commit.hash === edge.child)!.x + 12}
-                          y={
-                            (layout.nodes.find((node) => node.commit.hash === edge.child)!.y +
-                              layout.nodes.find((node) => node.commit.hash === edge.parent)!.y) /
-                            2
-                          }
-                        >{`+${edge.via.length}`}</text>
-                      )}
                     </g>
                   );
                 })}
@@ -224,53 +304,48 @@ export function BranchTree({
                 {layout.nodes.map((node) => (
                   <g
                     key={node.commit.hash}
-                    className={`tree-node ${node.onTrunk ? 'trunk' : ''} ${source.has(node.commit.hash) ? 'source-only' : target.has(node.commit.hash) ? 'target-only' : ''}`}
+                    data-node-commit={node.commit.hash}
+                    className={`tree-node ${activeCommit === node.commit.hash ? 'active' : ''} ${node.onTrunk ? 'trunk' : ''} ${source.has(node.commit.hash) ? 'source-only' : target.has(node.commit.hash) ? 'target-only' : ''}`}
                   >
-                    {data.head === node.commit.hash && (
-                      <circle className="tree-head-ring" cx={node.x} cy={node.y} r={12} />
+                    {data.head === node.commit.hash ? (
+                      <rect className="tree-head-marker" x={node.x} y={node.y} />
+                    ) : (
+                      <circle cx={node.x} cy={node.y} r={node.branches.length ? 6 : 4} />
                     )}
-                    <circle cx={node.x} cy={node.y} r={node.branches.length ? 6 : 4} />
                   </g>
                 ))}
               </svg>
               {layout.nodes.map((node) => (
                 <div key={node.commit.hash}>
                   <span className="tree-commit-anchor" style={{ left: node.x, top: node.y }}>
-                    <Tooltip
-                      detailed
-                      content={
-                        <>
-                          <strong>{node.commit.subject}</strong>
-                          <span>
-                            {node.commit.author} · {node.commit.shortHash}
-                          </span>
-                          <GitHelp topic="commitDiff" />
-                        </>
-                      }
-                    >
-                      <button
-                        type="button"
-                        className="tree-commit-hit"
-                        aria-label={t('branchTree.viewCommit', {
-                          hash: node.commit.shortHash,
-                          subject: node.commit.subject,
-                        })}
-                        onClick={() => onCommit(node.commit)}
-                      />
-                    </Tooltip>
+                    <CommitPointActions
+                      commit={node.commit}
+                      onOpenChange={onCommitOpen}
+                      scale={scale}
+                      current={data.head === node.commit.hash}
+                      onCreate={onCreateBranch}
+                      onDiff={onCommit}
+                      createDisabled={createDisabled}
+                    />
                   </span>
                   {node.branches.map((branch, index) => (
                     <span
                       key={branch.ref}
                       className="tree-tip-anchor"
-                      style={{ left: node.x, top: node.y - 42 - index * 44 }}
+                      style={{ left: node.x, top: node.y - 24 / scale - index * 44 }}
                     >
                       <Tooltip
                         detailed
                         content={
                           <>
                             <strong>{branch.name}</strong>
-                            <GitHelp topic={branch.remote ? 'remoteBranches' : 'branchTree'} />
+                            <CommitEvent
+                              commit={{
+                                ...branch,
+                                shortHash: branch.hash.slice(0, 7),
+                                refs: branch.ref,
+                              }}
+                            />
                           </>
                         }
                       >
@@ -298,6 +373,27 @@ export function BranchTree({
                   ))}
                 </div>
               ))}
+              {layout.edges
+                .filter((edge) => edge.via.length)
+                .map((edge) => {
+                  return (
+                    <span
+                      key={`fold:${edge.child}:${edge.parent}`}
+                      className="tree-fold-anchor"
+                      style={{ left: edge.label.x + 12, top: edge.label.y }}
+                    >
+                      <CollapsedCommitsPopover
+                        data={data}
+                        edge={edge}
+                        scale={scale}
+                        comparison={comparison}
+                        onCommit={onCommit}
+                        onCreateBranch={onCreateBranch}
+                        createDisabled={createDisabled}
+                      />
+                    </span>
+                  );
+                })}
             </div>
           </div>
         </div>

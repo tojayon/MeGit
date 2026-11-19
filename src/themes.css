@@ -39,6 +39,8 @@
   --handle: #4cc3f7;
   --selection-bg: #00a9f31f;
   --selection-border: #00a9f3;
+  --branch-selected-bg: #e9edf3;
+  --branch-selected-text: #01357c;
   --graph-0: #00a9f3;
   --graph-1: #86d21f;
   --graph-2: #809abe;
@@ -100,6 +102,8 @@
   --handle: #0076aa;
   --selection-bg: #01357c14;
   --selection-border: #01357c;
+  --branch-selected-bg: #01357c;
+  --branch-selected-text: #ffffff;
   --graph-0: #01357c;
   --graph-1: #0076aa;
   --graph-2: #4a7411;

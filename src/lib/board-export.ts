@@ -1,4 +1,5 @@
 import type { Point, Size } from './whiteboard';
+import type { FlowNote } from '../../shared/types';
 
 type Tone = 'success' | 'warning' | 'danger';
 type ExportNode = {
@@ -12,6 +13,7 @@ type ExportNode = {
   lines: string[];
   tone?: Tone;
   logoDataUrl?: string;
+  shape?: FlowNote['kind'];
 };
 type ExportEdge = {
   id: string;
@@ -38,13 +40,29 @@ const xml = (text: string) =>
       (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]!,
     );
 const round = (n: number) => Math.round(n * 100) / 100;
+const edgeLabelWidth = (edge: ExportEdge) =>
+  Math.max(
+    100,
+    edge.width,
+    edge.kind === 'process'
+      ? [...edge.label].reduce(
+          (width, char) => width + (char.codePointAt(0)! > 255 ? 11 : 11 * 0.57),
+          20,
+        )
+      : 0,
+  );
 
 export function exportBounds(scene: ExportScene) {
   const boxes = [
     ...scene.nodes.map((n) => ({ ...n.position, width: n.width, height: n.height })),
     ...scene.edges.flatMap((e) => [
       e.bounds,
-      { x: e.position.x - e.width / 2, y: e.position.y - 16, width: e.width, height: 32 },
+      {
+        x: e.position.x - edgeLabelWidth(e) / 2,
+        y: e.position.y - 16,
+        width: edgeLabelWidth(e),
+        height: 32,
+      },
     ]),
   ];
   if (!boxes.length) return { x: 0, y: 0, width: 640, height: 360 };
@@ -132,13 +150,41 @@ export function boardSvg(scene: ExportScene, colors: ExportColors) {
   const paths = scene.edges
     .map(
       (e) =>
-        `<path d="${xml(e.path)}" fill="none" stroke="${xml(colors.edge)}" stroke-width="1.5"${e.kind === 'integration' ? '' : ' stroke-dasharray="5 5"'} marker-end="url(#export-arrow)"/>`,
+        `<path d="${xml(e.path)}" fill="none" stroke="${xml(colors.edge)}" stroke-width="1.5"${e.kind === 'integration' || e.kind === 'process' ? '' : ' stroke-dasharray="5 5"'} marker-end="url(#export-arrow)"/>`,
     )
     .join('');
   const nodes = scene.nodes
     .filter((n) => n.kind !== 'group')
     .map((n) => {
       const { x, y } = n.position;
+      if (n.shape && n.shape !== 'note') {
+        const isDecision = n.shape === 'decision';
+        const shape = isDecision
+          ? `<polygon points="${x + n.width / 2},${y} ${x + n.width},${y + n.height / 2} ${x + n.width / 2},${y + n.height} ${x},${y + n.height / 2}" fill="none" stroke="${xml(colors.border)}"/>`
+          : `<rect x="${x}" y="${y}" width="${n.width}" height="${n.height}" rx="${n.shape === 'process' ? 8 : n.height / 2}" fill="none" stroke="${xml(colors.border)}"/>`;
+        const lineLimit = n.shape === 'start' || n.shape === 'end' ? 1 : 2;
+        const visibleLines = (value: string) => {
+          const wrapped = wrap(value, n.width - (isDecision ? 100 : 32), 12);
+          const visible = wrapped.slice(0, lineLimit);
+          if (wrapped.length > lineLimit)
+            visible[lineLimit - 1] = visible[lineLimit - 1].slice(0, -1) + '…';
+          return visible;
+        };
+        const lines = [...visibleLines(n.title), ...n.lines.filter(Boolean).flatMap(visibleLines)];
+        return (
+          shape +
+          lines
+            .map((line, i) =>
+              text(
+                x + n.width / 2,
+                y + n.height / 2 - (lines.length - 1) * 8 + i * 16 + 4,
+                line,
+                12,
+              ).replace('<text ', '<text text-anchor="middle" '),
+            )
+            .join('')
+        );
+      }
       const isNote = n.kind === 'note';
       const logo =
         !isNote &&
@@ -185,14 +231,17 @@ export function boardSvg(scene: ExportScene, colors: ExportColors) {
     })
     .join('');
   const labels = scene.edges
+    .filter((e) => e.label || e.status)
     .map((e) => {
-      const width = Math.max(100, e.width);
+      const width = edgeLabelWidth(e);
       return (
         rect(e.position.x - width / 2, e.position.y - 14, width, 28) +
         text(
           e.position.x - width / 2 + 10,
           e.position.y + 4,
-          shorten(`${e.label} · ${e.status}`, width - 20, 11),
+          e.kind === 'process'
+            ? e.label
+            : shorten([e.label, e.status].filter(Boolean).join(' · '), width - 20, 11),
           11,
           e.tone ? colors[e.tone] : colors.text,
         )

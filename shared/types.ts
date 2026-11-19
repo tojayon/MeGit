@@ -26,7 +26,18 @@ export interface FlowNote {
   id: string;
   title: string;
   text: string;
+  kind?: 'note' | 'process' | 'decision' | 'start' | 'end';
+  summary?: string;
   position: { x: number; y: number };
+}
+export interface FlowConnection {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  sourcePort?: PortSide;
+  targetPort?: PortSide;
+  waypoints?: { x: number; y: number }[];
 }
 export interface FlowEdge {
   id: string;
@@ -37,6 +48,7 @@ export interface FlowEdge {
   sourceRef: string;
   targetRef: string;
   routing?: EdgeRouting;
+  waypoints?: { x: number; y: number }[];
   sourcePort?: PortSide;
   targetPort?: PortSide;
 }
@@ -54,6 +66,7 @@ export interface Board {
   edges: FlowEdge[];
   groups?: FlowGroup[];
   notes?: FlowNote[];
+  connections?: FlowConnection[];
   layoutLocked?: boolean;
   viewport?: { x: number; y: number; zoom: number };
 }
@@ -84,6 +97,7 @@ export interface RepoState {
   head: string | null;
   detached: boolean;
   upstream: string | null;
+  pushTarget?: { remote: string; ref: string } | null;
   ahead: number | null;
   behind: number | null;
   changed: number;
@@ -98,6 +112,7 @@ export interface RepoState {
   operation?: 'merge' | 'rebase' | 'cherryPick' | 'revert' | 'bisect' | 'sequencer';
 }
 export interface Commit {
+  rootUnconfirmed?: boolean;
   hash: string;
   shortHash: string;
   parents: string[];
@@ -158,6 +173,7 @@ export type BranchAction =
   | {
       type: 'createBranch';
       name: string;
+      // HEAD, a full branch ref, or COMMIT with a verified complete startHash.
       startPoint: string;
       startHash: string;
       checkout: boolean;

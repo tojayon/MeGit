@@ -27,20 +27,100 @@ import { gitLearningDemoIds, type GitLearningDemoId } from '../lib/git-learning-
 import { RepositoryAvatar } from './RepositoryAvatar';
 import { BranchTree } from './BranchTree';
 import { BranchTrunkDialog } from './BranchTrunkDialog';
+import { BranchDialog, type BranchSelection } from './BranchesPanel';
+import { Dialog } from './Dialogs';
 import { PopupMenu } from './PopupMenu';
-import type { BranchTreeData, Commit, TreeBranch } from '../../shared/types';
+import { NavigationExample } from './NavigationExample';
+import { WorkflowHeader } from './WorkflowHeader';
+import { FlowchartExample } from './FlowchartExample';
+import { RepositoryPortsExample } from './RepositoryPortsExample';
+import { CommitComposer } from './CommitComposer';
+import type { BranchTreeData, Commit, RepoState, TreeBranch } from '../../shared/types';
 
 const sampleRepository = 'MeGit / repository-with-a-long-name-and-a-feature-branch';
+const sampleCommitIds: Record<string, string> = {
+  merge: '1'.repeat(40),
+  'main-v2': '2'.repeat(40),
+  design: '3'.repeat(40),
+  search: '4'.repeat(40),
+  root: '5'.repeat(40),
+  'main-v1': '6'.repeat(40),
+};
+const sampleCommitId = (name: string) => sampleCommitIds[name] || name;
+
+function CommitComposerExample() {
+  const { t } = useTranslation();
+  const [message, setMessage] = useState('');
+  const [files, setFiles] = useState<RepoState['files']>([
+    {
+      path: 'feature.ts',
+      indexStatus: '.',
+      worktreeStatus: 'M',
+      untracked: false,
+      conflicted: false,
+    },
+    { path: 'spec.ts', indexStatus: 'M', worktreeStatus: '.', untracked: false, conflicted: false },
+  ]);
+  const state: RepoState = {
+    branch: 'main',
+    head: sampleCommitId('root'),
+    detached: false,
+    upstream: null,
+    ahead: null,
+    behind: null,
+    changed: files.length,
+    staged: files.filter((file) => file.indexStatus !== '.').length,
+    files,
+    branches: [],
+    remotes: [],
+    fetchedAt: null,
+    checkedAt: '',
+  };
+  return (
+    <section className="design-card">
+      <h2>{t('repository.commitSection')}</h2>
+      <CommitComposer
+        state={state}
+        message={message}
+        onMessage={setMessage}
+        busy=""
+        onAction={async (action) => {
+          if (action.type === 'commit') {
+            setFiles((current) => current.filter((file) => file.indexStatus === '.'));
+            setMessage('');
+          } else if (action.type === 'stage' || action.type === 'unstage') {
+            setFiles((current) =>
+              current.map((file) =>
+                action.paths.includes(file.path)
+                  ? {
+                      ...file,
+                      indexStatus: action.type === 'stage' ? 'M' : '.',
+                      worktreeStatus: action.type === 'stage' ? '.' : 'M',
+                    }
+                  : file,
+              ),
+            );
+          }
+          return true;
+        }}
+      />
+    </section>
+  );
+}
 
 function TreeExample() {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<string | null>(null);
   const [base, setBase] = useState('refs/heads/main');
   const [choosingTrunk, setChoosingTrunk] = useState(false);
+  const [selection, setSelection] = useState<BranchSelection | null>(null);
+  const [diff, setDiff] = useState<Commit | null>(null);
+  const [created, setCreated] = useState<TreeBranch[]>([]);
+  const [current, setCurrent] = useState('feature/search');
   const commit = (hash: string, parents: string[] = []): Commit => ({
-    hash,
-    parents,
-    shortHash: hash,
+    hash: sampleCommitId(hash),
+    parents: parents.map(sampleCommitId),
+    shortHash: sampleCommitId(hash).slice(0, 7),
     subject: hash,
     author: 'MeGit',
     date: '',
@@ -49,8 +129,8 @@ function TreeExample() {
   const branch = (name: string, hash: string): TreeBranch => ({
     ref: `refs/heads/${name}`,
     name,
-    hash,
-    current: name === 'feature/search',
+    hash: sampleCommitId(hash),
+    current: name === current,
     remote: false,
     parents: [],
     subject: hash,
@@ -61,10 +141,17 @@ function TreeExample() {
     ahead: null,
     behind: null,
   });
+  const history = Array.from({ length: 36 }, (_, index) => {
+    const hash = (index + 16).toString(16).padStart(40, '0');
+    return {
+      ...commit(hash, [index ? (index + 15).toString(16).padStart(40, '0') : 'main-v1']),
+      subject: `v1.${index + 1}`,
+    };
+  });
   const data: BranchTreeData = {
     baseRef: base,
-    head: 'search',
-    currentRef: 'refs/heads/feature/search',
+    head: created.find((item) => item.name === current)?.hash || sampleCommitId('search'),
+    currentRef: `refs/heads/${current}`,
     detached: false,
     limit: 120,
     hasMore: false,
@@ -74,14 +161,32 @@ function TreeExample() {
       branch('main', 'merge'),
       branch('feature/search', 'search'),
       branch('feature/design', 'design'),
-    ],
+      ...created,
+    ].map((item) => ({ ...item, current: item.name === current })),
     commits: [
       commit('merge', ['main-v2', 'design']),
-      commit('main-v2', ['root']),
+      commit('main-v2', [history.at(-1)!.hash]),
+      ...history,
+      commit('main-v1', ['root']),
       commit('design', ['root']),
       commit('search', ['main-v2']),
       commit('root'),
     ],
+  };
+  const state: RepoState = {
+    branch: current,
+    head: data.head,
+    detached: false,
+    upstream: null,
+    ahead: null,
+    behind: null,
+    changed: 0,
+    staged: 0,
+    files: [],
+    branches: data.branches,
+    remotes: [],
+    fetchedAt: null,
+    checkedAt: '',
   };
   return (
     <section className="design-card">
@@ -91,10 +196,22 @@ function TreeExample() {
           data={data}
           selectedRef={selected}
           onSelect={setSelected}
-          onCommit={() => {}}
+          onCommit={setDiff}
+          onCreateBranch={(commit) =>
+            setSelection({ type: 'createBranch', state, startPoint: 'COMMIT', commit })
+          }
           tools={
             <>
-              <HelpTip topic="branchTree" related={['treeComparison']} />
+              <HelpTip
+                topic="branchTree"
+                related={[
+                  'treeComparison',
+                  'head',
+                  'branchLabel',
+                  'collapsedCommits',
+                  'commitActions',
+                ]}
+              />
               <PopupMenu
                 label={t('branchTree.tools')}
                 icon={<MoreHorizontal size={18} />}
@@ -110,6 +227,36 @@ function TreeExample() {
           }
         />
       </div>
+      {selection && (
+        <BranchDialog
+          repo={{ id: 'tree-demo', name: 'MeGit', path: '' }}
+          selection={selection}
+          busy={false}
+          onAction={async (action) => {
+            if (action.type === 'createBranch') {
+              setCreated((items) => [...items, branch(action.name, action.startHash)]);
+              if (action.checkout) setCurrent(action.name);
+            }
+            return true;
+          }}
+          onRefresh={async () => {}}
+          onClose={() => setSelection(null)}
+        />
+      )}
+      {diff && (
+        <Dialog title={t('branchTree.commitDiff')} onClose={() => setDiff(null)}>
+          <div className="dialog-body">
+            <strong>{diff.subject}</strong>
+            <code>{diff.hash}</code>
+            <HelpTip topic="commitDiff" />
+          </div>
+        </Dialog>
+      )}
+      {!!created.length && (
+        <p className="design-caption" role="status">
+          {t('branchTree.demoCreated', { name: created.at(-1)!.name })}
+        </p>
+      )}
       {choosingTrunk && (
         <BranchTrunkDialog
           value={base}
@@ -277,6 +424,7 @@ export function DesignSystemPage() {
   const [invalid, setInvalid] = useState(false);
   const [verified, setVerified] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [workflowOpen, setWorkflowOpen] = useState(true);
   return (
     <main className="design-system-page">
       <div className="design-system-content">
@@ -296,7 +444,29 @@ export function DesignSystemPage() {
         </div>
         <div className="design-system-grid">
           <TreeExample />
+          <CommitComposerExample />
           <DockExample />
+          <NavigationExample />
+          <FlowchartExample />
+          <RepositoryPortsExample />
+          <section className="design-card design-panel-example design-workflow-example">
+            {workflowOpen ? (
+              <WorkflowHeader
+                board={{
+                  id: 'workflow-example',
+                  name: 'MeGit / workflow-with-a-long-name-for-parallel-development',
+                  description: '',
+                  nodes: [],
+                  edges: [],
+                }}
+                onClose={() => setWorkflowOpen(false)}
+              />
+            ) : (
+              <div className="design-panel-body">
+                <Button onClick={() => setWorkflowOpen(true)}>{t('board.reopen')}</Button>
+              </div>
+            )}
+          </section>
           <section className="design-card">
             <h2>{t('learning.title')}</h2>
             <p className="design-caption">{t('learning.demoRule')}</p>

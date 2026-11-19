@@ -3,6 +3,7 @@ import type { Workspace } from '../../shared/types';
 import { api } from './api';
 import { ApiError } from './messages';
 import { BoardHistory } from './board-history';
+import { viewStorage } from './use-view-state';
 
 export function useWorkspace() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -99,6 +100,12 @@ export function useWorkspace() {
       .workspace()
       .then((data) => {
         if (!disposed) {
+          const selectedBoard = viewStorage.read('app.board');
+          if (
+            typeof selectedBoard === 'string' &&
+            data.boards.some((board) => board.id === selectedBoard)
+          )
+            data.activeBoardId = selectedBoard;
           current.current = data;
           setWorkspace(data);
         }

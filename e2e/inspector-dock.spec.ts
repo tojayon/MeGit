@@ -398,7 +398,7 @@ test('区域无标签仍可平滑横向浏览，双主题与英文窄屏保留�
     expect(await scroller.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     await page.getByRole('button', { name: '公共库', exact: true }).click();
     await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeLessThan(2);
-    await scroller.hover();
+    await scroller.hover({ position: { x: 20, y: 12 } });
     await page.mouse.wheel(350, 0);
     await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
     await page.getByRole('separator', { name: '调整详情区域宽度', exact: true }).focus();
