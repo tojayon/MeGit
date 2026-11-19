@@ -36,8 +36,11 @@ import { NavigationExample } from './NavigationExample';
 import { WorkflowHeader } from './WorkflowHeader';
 import { FlowchartExample } from './FlowchartExample';
 import { RepositoryPortsExample } from './RepositoryPortsExample';
+import { RelationBridgeExample } from './RelationBridgeExample';
+import { RelationPanelExample } from './RelationPanelExample';
 import { CommitComposer } from './CommitComposer';
 import { RepositoryCardExample } from './RepositoryCardExample';
+import { RemoteManagement, RemoteManagementCard } from './RemoteManagement';
 import type { BranchTreeData, Commit, RepoState, TreeBranch } from '../../shared/types';
 
 const sampleRepository = 'MeGit / repository-with-a-long-name-and-a-feature-branch';
@@ -87,6 +90,10 @@ function CommitComposerExample() {
         message={message}
         onMessage={setMessage}
         busy=""
+        onGenerate={async () => {
+          setMessage(t('repositoryCard.aiExample'));
+          return true;
+        }}
         onAction={async (action) => {
           if (action.type === 'commit') {
             setFiles((current) => current.filter((file) => file.indexStatus === '.'));
@@ -107,6 +114,22 @@ function CommitComposerExample() {
           return true;
         }}
       />
+    </section>
+  );
+}
+
+function RemoteManagementExample() {
+  const { t } = useTranslation();
+  const [checked, setChecked] = useState(false);
+  return (
+    <section className="design-card design-remote-management-example">
+      <h2>{t('repository.manageRemotes')}</h2>
+      <RemoteManagement count={4} onFetch={() => setChecked(false)} addDisabled onAdd={() => {}}>
+        <RemoteManagementCard name="origin" status={checked ? 'readable' : 'unchecked'} onCheck={() => setChecked(true)} />
+        <RemoteManagementCard name="community" status="readable" onCheck={() => {}} onLogin={() => {}} />
+        <RemoteManagementCard name="mirror" status="checking" onCheck={() => {}} />
+        <RemoteManagementCard name="archive" status="failed" error={t('errors.remoteReadAuth')} onCheck={() => {}} />
+      </RemoteManagement>
     </section>
   );
 }
@@ -452,11 +475,14 @@ export function DesignSystemPage() {
         <div className="design-system-grid">
           <TreeExample />
           <CommitComposerExample />
+          <RemoteManagementExample />
           <RepositoryCardExample />
           <DockExample />
           <NavigationExample />
           <FlowchartExample />
           <RepositoryPortsExample />
+          <RelationBridgeExample />
+          <RelationPanelExample />
           <section className="design-card design-panel-example design-workflow-example">
             {workflowOpen ? (
               <WorkflowHeader

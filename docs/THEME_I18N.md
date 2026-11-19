@@ -4,6 +4,10 @@
 
 ## 用户行为
 
+关系卡片、提交对比图使用现有 surface、text、accent、edge-neutral、orange、green，不新增色值或主题分支。提交胶囊详情复用 InfoPopover，新增角色和打开提示同步中英文；卡片与提交图移除重复详情，不新增颜色。完整引用、提交编号、作者和说明不翻译；角色、共同祖先、首次包含、边界、错误与加载动作使用 relation 稳定双语键。窄列上下／宽列并排由容器宽度决定，详细帮助复用 Tooltip 的焦点、500ms 悬停与 Escape 契约。
+
+仓库状态桥复用 edge-integration／edge-neutral、surface、green、orange 和 focus 语义色，无新增品牌色。圆形来源与汇入端口同时表达方向，整合状态始终以图标和文字显示。`relation.integrated/bridgeHelp/bridgeExample/bridgeLayout` 与布局选项同步中英；关系原名保留于详细提示、无障碍名称和详情。规范页使用真实组件检查布局、状态、两主题和键盘提示。
+
 连线路线编辑的工具、控制点名称、操作说明和自动路线恢复使用 `routing` 中英文资源；控制柄与焦点复用 accent／surface／focus，几何在 tokens.css 定义，不新增颜色。用户关系条件、名称及 Git 引用不翻译；两主题、键盘和粗指针共用同一编辑器。
 
 路线吸附复用全局 snappingEnabled 浏览器偏好与 accent 参考线，无新增颜色、工作区字段或偏好。routing.pointHelp／segmentHelp 同步提供中英文的横竖对齐与 Alt 跳过说明；设计规范实际编辑器和两主题共用同一实现。

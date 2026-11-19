@@ -76,6 +76,9 @@
   scrollbar-width: thin;
   background: var(--canvas);
 }
+.dock-card :is(.branch-tree-stage, .branch-tree-viewport) {
+  background: transparent;
+}
 .branch-tree-viewport.panning,
 .branch-tree-viewport.panning * {
   cursor: grabbing;
@@ -396,6 +399,7 @@
 }
 .tree-tip.remote {
   border-style: dashed;
+  border-radius: var(--control-compact);
 }
 .tree-head-mark {
   color: var(--accent);
@@ -417,12 +421,8 @@
   border-radius: var(--radius-control);
   box-shadow: 0 2px 8px var(--shadow-color);
 }
-.branch-tree-extra-tools {
-  display: flex;
-  align-items: center;
-  margin-left: var(--space-1);
-  padding-left: var(--space-1);
-  border-left: 1px solid var(--border);
+.branch-tree-map-controls {
+  z-index: 3;
 }
 .branch-tree-refresh {
   position: absolute;
@@ -436,7 +436,7 @@
 .branch-tree-selection {
   position: absolute;
   bottom: var(--space-3);
-  left: var(--space-3);
+  left: calc(var(--space-3) + var(--control-touch));
   right: var(--space-3);
   max-height: 58%;
   max-width: var(--branch-tree-detail-width);
@@ -463,22 +463,76 @@
   padding: var(--space-3);
   border-bottom: 1px solid var(--border);
 }
-.branch-tree-selection-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 var(--control-default);
-  height: var(--control-default);
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-panel);
-}
 .branch-tree-selection-heading {
   flex: 1;
   min-width: 0;
 }
-.branch-tree-selection-heading > strong {
-  display: block;
+.branch-tree-selection-repository {
+  color: var(--muted);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.branch-tree-detail-section + .branch-tree-detail-section {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-1);
+}
+.branch-tree-detail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-compact);
+  margin-bottom: var(--space-1);
+}
+.branch-tree-tracking,
+.branch-tree-tracking-name,
+.branch-tree-sync,
+.branch-tree-tracking-actions,
+.branch-tree-selection-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.branch-tree-tracking {
+  container: branch-tracking / inline-size;
+  flex-wrap: wrap;
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+.branch-tree-tracking-name {
+  overflow-wrap: anywhere;
+}
+.branch-tree-sync-heading {
+  justify-content: flex-start;
+}
+.branch-tree-sync-heading > strong {
+  flex-shrink: 0;
+}
+.branch-tree-tracking-actions {
+  gap: var(--space-1);
+  margin-inline-start: auto;
+}
+@container branch-tracking (width < 320px) {
+  .branch-tree-tracking-actions .branch-detail-action {
+    width: var(--control-compact);
+    padding-inline: 0;
+  }
+  .branch-tree-tracking-actions .button-label {
+    display: none;
+  }
+}
+.branch-tree-sync {
+  white-space: nowrap;
+}
+.branch-tree-selection-line {
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 0;
+}
+.branch-tree-selection-line > strong {
+  min-width: 0;
   overflow-wrap: anywhere;
   font-size: var(--text-heading);
   line-height: var(--leading-compact);
@@ -488,7 +542,6 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
-  margin-top: var(--space-1);
   color: var(--muted);
   font-size: var(--text-micro);
 }
@@ -535,35 +588,6 @@
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-soft);
-}
-.branch-tree-sync-actions {
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-2);
-  justify-content: flex-end;
-  gap: var(--space-1);
-}
-.branch-tree-sync-actions > .tooltip-anchor:first-child {
-  margin-right: auto;
-}
-.branch-tree-selection-body > .tooltip-anchor:has(.branch-tree-worktree-button) {
-  display: block;
-  margin-top: var(--space-3);
-}
-.branch-tree-worktree-button {
-  width: 100%;
-}
-.branch-tree-selection-body .commit-composer {
-  margin: 0 0 var(--space-3);
-  padding: var(--space-3);
-  gap: var(--space-2);
-  background: var(--surface-raised);
-}
-.branch-tree-selection-body .commit-composer .commit-help {
-  top: var(--space-3);
-  right: var(--space-3);
-}
-.branch-tree-selection-body .commit-composer textarea {
-  min-height: var(--commit-compact-input-height);
 }
 .branch-tree-comparison {
   padding: var(--space-3);

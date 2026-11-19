@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUpRight, Archive, Pencil, Plus, Search } from 'lucide-react';
+import { ArrowUpRight, Archive, FolderGit2, Pencil, Plus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Repository } from '../../shared/types';
 import { AddRepositoryDialog, Dialog } from './Dialogs';
@@ -7,6 +7,8 @@ import { RepositoryAvatar } from './RepositoryAvatar';
 import { IconButton } from './IconButton';
 import { Button } from './Button';
 import { Field } from './Field';
+import { useViewState } from '../lib/use-view-state';
+import { isBoolean } from '../lib/view-storage';
 
 export function RepositoryIndex({
   repositories,
@@ -31,7 +33,7 @@ export function RepositoryIndex({
 }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState<string | null>(null);
-  const [archived, setArchived] = useState(false);
+  const [archived, setArchived] = useViewState('app.repositories.archived', false, isBoolean);
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [consent, setConsent] = useState(false);
@@ -57,19 +59,18 @@ export function RepositoryIndex({
         </Button>
       }
     >
-      <div className="dialog-body">
-        <div className="settings-actions">
-          <Button aria-pressed={!archived} onClick={() => setArchived(false)}>
+      <div className="repository-index-layout">
+        <nav className="settings-navigation repository-index-navigation" aria-label={t('nav.repositories')}>
+          <button type="button" aria-current={!archived} onClick={() => setArchived(false)}>
+            <FolderGit2 size={16} aria-hidden="true" />
             {t('repositoryIndex.active')}
-          </Button>
-          <Button
-            aria-pressed={archived}
-            icon={<Archive size={16} />}
-            onClick={() => setArchived(true)}
-          >
+          </button>
+          <button type="button" aria-current={archived} onClick={() => setArchived(true)}>
+            <Archive size={16} aria-hidden="true" />
             {t('repositoryIndex.archived')}
-          </Button>
-        </div>
+          </button>
+        </nav>
+        <div className="repository-index-content">
         {visible.length ? (
           <div className="repository-index-grid">
             {visible.map((repo) => (
@@ -77,7 +78,20 @@ export function RepositoryIndex({
                 <div className="repository-index-identity">
                   <RepositoryAvatar repo={repo} size="large" />
                   <div className="repository-index-text">
-                    <h3>{repo.name}</h3>
+                    <div className="repository-index-title">
+                      <h3>{repo.name}</h3>
+                      {!archived && (
+                        <IconButton
+                          className="repository-index-board-action"
+                          size="small"
+                          label={t(used.has(repo.id) ? 'repositoryIndex.open' : 'repository.addToBoard')}
+                          disabled={readOnly || (!used.has(repo.id) && !canAddToBoard)}
+                          onClick={() => onOpen(repo)}
+                        >
+                          {used.has(repo.id) ? <ArrowUpRight size={16} /> : <Plus size={16} />}
+                        </IconButton>
+                      )}
+                    </div>
                     <p>{repo.path}</p>
                   </div>
                 </div>
@@ -89,16 +103,6 @@ export function RepositoryIndex({
                   >
                     <Pencil size={16} />
                   </IconButton>
-                  {!archived && (
-                    <Button
-                      size="compact"
-                      icon={used.has(repo.id) ? <ArrowUpRight size={16} /> : <Plus size={16} />}
-                      disabled={readOnly || (!used.has(repo.id) && !canAddToBoard)}
-                      onClick={() => onOpen(repo)}
-                    >
-                      {t(used.has(repo.id) ? 'repositoryIndex.open' : 'repository.addToBoard')}
-                    </Button>
-                  )}
                 </div>
               </article>
             ))}
@@ -109,6 +113,7 @@ export function RepositoryIndex({
             <p>{t(archived ? 'repositoryIndex.archiveEmpty' : 'board.indexEmpty')}</p>
           </div>
         )}
+        </div>
       </div>
       {adding && (
         <AddRepositoryDialog

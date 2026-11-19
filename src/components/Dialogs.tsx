@@ -10,6 +10,7 @@ import { RelationAppearance } from './RelationAppearance';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { Field, focusFirstError } from './Field';
+import { cardRefLabel } from '../../shared/card-refs';
 import { dismissPopups, focusWithoutTooltip, withoutFocusTooltip } from '../lib/overlays';
 import { useDialogDrag } from '../lib/use-dialog-drag';
 import { useScrollMemory } from '../lib/use-view-state';
@@ -18,6 +19,8 @@ const dialogOpeners = new WeakMap<HTMLDialogElement, HTMLElement | null>();
 
 export function Dialog({
   title,
+  titleIcon,
+  titleDetail,
   children,
   onClose,
   wide = false,
@@ -31,6 +34,8 @@ export function Dialog({
   restoreReady = true,
 }: {
   title: string;
+  titleIcon?: ReactNode;
+  titleDetail?: ReactNode;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
@@ -113,7 +118,15 @@ export function Dialog({
             <GripHorizontal size={18} />
           </IconButton>
         )}
-        <h2 id={titleId}>{title}</h2>
+        {titleIcon || titleDetail ? (
+          <div className="dialog-title-context">
+            <h2 id={titleId}>{title}</h2>
+            {titleIcon}
+            {titleDetail}
+          </div>
+        ) : (
+          <h2 id={titleId}>{title}</h2>
+        )}
         <div className="dialog-header-actions">
           {headerActions}
           <IconButton
@@ -133,6 +146,7 @@ export function Dialog({
 export function AddRepositoryDialog({
   existing,
   onAdd,
+  onChooseCard,
   onClose,
   mode = 'board',
   repo,
@@ -141,6 +155,11 @@ export function AddRepositoryDialog({
 }: {
   existing: Repository[];
   onAdd: (repo: Repository) => void;
+  onChooseCard?: (
+    repo: Repository,
+    state: Awaited<ReturnType<typeof api.inspect>>['state'],
+    displayName?: string,
+  ) => void;
   onClose: () => void;
   mode?: 'board' | 'register' | 'edit';
   repo?: Repository;
@@ -183,13 +202,15 @@ export function AddRepositoryDialog({
               setError({ code: 'repositoryArchived' });
               return;
             }
-            onAdd(
-              known || {
-                id: crypto.randomUUID(),
-                path: found.path,
-                name: name.trim() || found.name,
-              },
-            );
+            const repository = known || {
+              id: crypto.randomUUID(),
+              path: found.path,
+              name: (mode === 'board' ? '' : name.trim()) || found.name,
+            };
+            const displayName = name.trim();
+            if (onChooseCard) {
+              onChooseCard(repository, found.state, displayName || undefined);
+            } else onAdd(repository);
             onClose();
           } catch (err) {
             setError(err);
@@ -274,12 +295,14 @@ export function AddRepositoryDialog({
               {t('repositoryIndex.pickFolder')}
             </Button>
           )}
-          <Field label={t('repository.name')}>
+          <Field label={t(mode === 'board' ? 'repositoryCard.displayName' : 'repository.name')}>
             <input
               value={name}
               disabled={busy}
               onChange={(e) => setName(e.target.value)}
-              placeholder={t('repository.namePlaceholder')}
+              placeholder={t(
+                mode === 'board' ? 'repositoryCard.namePlaceholder' : 'repository.namePlaceholder',
+              )}
               maxLength={120}
             />
           </Field>
@@ -296,7 +319,6 @@ export function AddRepositoryDialog({
                     disabled={busy}
                     onClick={() => {
                       setPath(repo.path);
-                      setName(repo.name);
                       setError(null);
                     }}
                   >
@@ -361,8 +383,8 @@ export function RelationDialog({
   const [target, setTarget] = useState(initial?.target || board.nodes[1]?.id || '');
   const [kind, setKind] = useState<FlowEdge['kind']>(initial?.kind || 'integration');
   const [label, setLabel] = useState(initial?.label || '');
-  const [sourceRef, setSourceRef] = useState(initial?.sourceRef || 'HEAD');
-  const [targetRef, setTargetRef] = useState(initial?.targetRef || 'HEAD');
+  const [sourceRef, setSourceRef] = useState(initial?.sourceRef ?? '');
+  const [targetRef, setTargetRef] = useState(initial?.targetRef ?? '');
   const [appearance, setAppearance] = useState<
     Pick<FlowEdge, 'routing' | 'sourcePort' | 'targetPort'>
   >({
@@ -373,7 +395,7 @@ export function RelationDialog({
   const [error, setError] = useState<'different' | 'duplicate' | 'invalidRef' | null>(null);
   const nodes = board.nodes.map((n) => ({
     ...n,
-    repo: repositories.find((r) => r.id === n.repoId)!,
+    name: n.displayName || repositories.find((r) => r.id === n.repoId)!.name,
   }));
   return (
     <Dialog
@@ -401,7 +423,10 @@ export function RelationDialog({
             focusFirstError(event.currentTarget);
             return;
           }
-          if (kind === 'integration' && ![sourceRef, targetRef].every(isSafeRef)) {
+          if (
+            kind === 'integration' &&
+            ![sourceRef, targetRef].every((ref) => !ref || isSafeRef(ref))
+          ) {
             setError('invalidRef');
             focusFirstError(event.currentTarget);
             return;
@@ -417,8 +442,8 @@ export function RelationDialog({
             target,
             kind,
             label: label.trim(),
-            sourceRef,
-            targetRef,
+            sourceRef: sourceRef || undefined,
+            targetRef: targetRef || undefined,
           });
           onClose();
         }}
@@ -435,7 +460,7 @@ export function RelationDialog({
               >
                 {nodes.map((n) => (
                   <option value={n.id} key={n.id}>
-                    {n.repo.name}
+                    {n.ref ? `${n.name} · ${cardRefLabel(n.ref)}` : n.name}
                   </option>
                 ))}
               </select>
@@ -454,7 +479,7 @@ export function RelationDialog({
               >
                 {nodes.map((n) => (
                   <option value={n.id} key={n.id}>
-                    {n.repo.name}
+                    {n.ref ? `${n.name} · ${cardRefLabel(n.ref)}` : n.name}
                   </option>
                 ))}
               </select>
@@ -503,38 +528,38 @@ export function RelationDialog({
               <Field
                 label={t('relation.sourceRef')}
                 error={
-                  error === 'invalidRef' && !isSafeRef(sourceRef)
+                  error === 'invalidRef' && sourceRef && !isSafeRef(sourceRef)
                     ? t('relation.invalidRef')
                     : undefined
                 }
               >
                 <input
                   value={sourceRef}
+                  placeholder={t('relation.inheritCardRef')}
                   onChange={(e) => {
                     setSourceRef(e.target.value);
                     setError(null);
                   }}
                   maxLength={240}
-                  required
                   spellCheck={false}
                 />
               </Field>
               <Field
                 label={t('relation.targetRef')}
                 error={
-                  error === 'invalidRef' && !isSafeRef(targetRef)
+                  error === 'invalidRef' && targetRef && !isSafeRef(targetRef)
                     ? t('relation.invalidRef')
                     : undefined
                 }
               >
                 <input
                   value={targetRef}
+                  placeholder={t('relation.inheritCardRef')}
                   onChange={(e) => {
                     setTargetRef(e.target.value);
                     setError(null);
                   }}
                   maxLength={240}
-                  required
                   spellCheck={false}
                 />
               </Field>

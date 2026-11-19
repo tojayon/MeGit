@@ -4,6 +4,7 @@ import { RepositoryAvatar } from './RepositoryAvatar';
 import type { Board, FlowGroup, Repository, Snapshot } from '../../shared/types';
 import { Dialog } from './Dialogs';
 import { Button } from './Button';
+import { cardRefLabel, cardUsesWorktree } from '../../shared/card-refs';
 
 export function GroupPanel({
   group,
@@ -46,11 +47,15 @@ export function GroupPanel({
           {group.nodeIds.map((id) => {
             const node = board.nodes.find((n) => n.id === id)!;
             const repo = repositories.find((r) => r.id === node.repoId)!;
-            const state = snapshot?.repositories[repo.id];
+            const name = node.displayName || repo.name;
+            const rawState = snapshot?.repositories[repo.id];
+            const state =
+              rawState &&
+              (cardUsesWorktree(node.ref, rawState) ? rawState : { ...rawState, changed: 0 });
             return (
-              <button key={id} onClick={() => onRepo(repo.id)}>
+              <button key={id} onClick={() => onRepo(node.id)}>
                 <RepositoryAvatar repo={repo} size="small" />
-                <span>{repo.name}</span>
+                <span>{node.ref ? `${name} · ${cardRefLabel(node.ref)}` : name}</span>
                 <small
                   className={state?.error ? 'danger-text' : state?.changed ? 'warning-text' : ''}
                 >

@@ -7,13 +7,16 @@ import {
   FolderGit2,
   Group,
   Network,
+  ChevronsLeft,
+  ChevronsRight,
   Plus,
   Settings2,
   Palette,
   Workflow,
   X,
 } from 'lucide-react';
-import type { Board, Repository, Snapshot, Workspace } from '../../shared/types';
+import type { Board, FlowNode, Repository, Snapshot, Workspace } from '../../shared/types';
+import { cardRefLabel, cardUsesWorktree } from '../../shared/card-refs';
 import { updatePreferences, usePreferences } from '../preferences/store';
 import { BrandLogo } from './BrandLogo';
 import { Tooltip } from './Tooltip';
@@ -97,7 +100,7 @@ export function WorkspaceNavigation({
         else
           focusWithoutTooltip(
             document.querySelector<HTMLButtonElement>(
-              '.canvas-navigation-control .navigation-toggle',
+              '.navigation-edge .navigation-toggle',
             ),
           );
       });
@@ -142,24 +145,27 @@ export function WorkspaceNavigation({
     );
   }
 
-  function repositoryItem(repo: Repository) {
+  function repositoryItem(node: FlowNode) {
+    const repo = repositories.find((item) => item.id === node.repoId);
+    if (!repo) return null;
+    const state = snapshot?.repositories[repo.id];
     return (
       <button
-        className={`outline-repo ${selectedRepo === repo.id ? 'selected' : ''}`}
-        key={repo.id}
-        aria-pressed={selectedRepo === repo.id}
+        className={`outline-repo ${selectedRepo === node.id ? 'selected' : ''}`}
+        key={node.id}
+        aria-pressed={selectedRepo === node.id}
         onClick={() => {
-          onSelectRepo(repo.id);
+          onSelectRepo(node.id);
           if (narrow) onMobileClose();
         }}
       >
         <span className="outline-repository-icon">
           <RepositoryAvatar repo={repo} size="small" />
           <span
-            className={`status-dot ${snapshot?.repositories[repo.id]?.error ? 'error' : snapshot?.repositories[repo.id]?.changed ? 'modified' : ''}`}
+            className={`status-dot ${state?.error ? 'error' : state?.changed && cardUsesWorktree(node.ref, state) ? 'modified' : ''}`}
           />
         </span>
-        <span>{repo.name}</span>
+        <span>{node.ref ? `${repo.name} · ${cardRefLabel(node.ref)}` : repo.name}</span>
         <ArrowUpRight size={13} />
       </button>
     );
@@ -204,20 +210,11 @@ export function WorkspaceNavigation({
               <span>{group.name}</span>
               <small>{group.nodeIds.length}</small>
             </button>
-            {board.nodes
-              .filter((node) => group.nodeIds.includes(node.id))
-              .map((node) => repositoryItem(repositories.find((repo) => repo.id === node.repoId)!))}
+            {board.nodes.filter((node) => group.nodeIds.includes(node.id)).map(repositoryItem)}
           </div>
         ))}
-        {repositories
-          .filter(
-            (repo) =>
-              !board.groups?.some((group) =>
-                group.nodeIds.some(
-                  (id) => board.nodes.find((node) => node.id === id)?.repoId === repo.id,
-                ),
-              ),
-          )
+        {board.nodes
+          .filter((node) => !board.groups?.some((group) => group.nodeIds.includes(node.id)))
           .map(repositoryItem)}
       </>
     );
@@ -244,11 +241,8 @@ export function WorkspaceNavigation({
               href="/"
               aria-label={t('nav.home')}
             >
-              <BrandLogo
-                variant={collapsed ? 'icon' : 'full'}
-                className={collapsed ? '' : 'workspace-logo'}
-                decorative
-              />
+              <BrandLogo variant="full" className="workspace-logo" decorative />
+              <BrandLogo variant="icon" className="workspace-logo-symbol" decorative />
             </a>
             {!collapsed && (
               <span className="navigation-version" aria-label={t('brand.version', { version })}>
@@ -256,21 +250,16 @@ export function WorkspaceNavigation({
               </span>
             )}
           </div>
-          {!collapsed && (
+          {narrow && (
             <div className="navigation-brand-actions">
-              <IconButton label={t('nav.help')} onClick={onHelp}>
-                <CircleHelp size={18} />
-              </IconButton>
-              {narrow && (
-                <button
-                  ref={closeRef}
-                  className="icon-button"
-                  aria-label={t('nav.close')}
-                  onClick={onMobileClose}
-                >
-                  <X size={18} />
-                </button>
-              )}
+              <button
+                ref={closeRef}
+                className="icon-button"
+                aria-label={t('nav.close')}
+                onClick={onMobileClose}
+              >
+                <X size={18} />
+              </button>
             </div>
           )}
         </header>
@@ -336,8 +325,22 @@ export function WorkspaceNavigation({
         </div>
         <div className="navigation-bottom">
           <div className="navigation-actions">
+          {!narrow && (
+            <div className="navigation-collapse-control">
+              <IconButton
+                label={t(collapsed ? 'nav.expand' : 'nav.collapse')}
+                placement="right"
+                className="navigation-toggle"
+                aria-expanded={!collapsed}
+                aria-controls="workspace-navigation"
+                onClick={() => updatePreferences({ navigationCollapsed: !collapsed })}
+              >
+                {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+              </IconButton>
+            </div>
+          )}
             {action(t('preferences.title'), <Palette size={20} />, onPreferences)}
-            {collapsed && action(t('nav.help'), <CircleHelp size={20} />, onHelp)}
+            {action(t('nav.help'), <CircleHelp size={20} />, onHelp)}
             {action(t('settings.title'), <Settings2 size={20} />, onSettings)}
           </div>
         </div>

@@ -63,6 +63,27 @@ test('工具集中在地图右上角，树干按需选择且不切换代码', as
     });
     expect(position.top).toBeLessThanOrEqual(12);
     expect(position.right).toBeLessThanOrEqual(12);
+    const mapControls = page.locator('.branch-tree-map-controls');
+    const layout = await mapControls.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const map = element.closest('.branch-tree-graphic')!.getBoundingClientRect();
+      const buttons = [...element.querySelectorAll('button')].map((button) =>
+        button.getBoundingClientRect(),
+      );
+      return {
+        left: box.left - map.left,
+        bottom: map.bottom - box.bottom,
+        vertical:
+          buttons.length === 3 &&
+          buttons.every(
+            (button, index) =>
+              button.left === buttons[0].left && (!index || button.top > buttons[index - 1].top),
+          ),
+      };
+    });
+    expect(layout.left).toBeLessThanOrEqual(12);
+    expect(layout.bottom).toBeLessThanOrEqual(12);
+    expect(layout.vertical).toBe(true);
     await controls.getByRole('button', { name: '分支树工具', exact: true }).click();
     await page.getByRole('button', { name: '更换比较树干', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '更换比较树干', exact: true });
@@ -84,7 +105,7 @@ test('工具集中在地图右上角，树干按需选择且不切换代码', as
     expect(await git(f.repo, 'branch', '--show-current')).toBe('main');
     await tree.getByRole('button', { name: '查看分支 main', exact: true }).click();
     const details = page.getByRole('region', { name: '分支详情', exact: true });
-    await expect(details).toContainText('正在此分支开发');
+    await expect(details.getByText('HEAD', { exact: true })).toBeVisible();
     await expect(details.getByRole('button', { name: '分支原始信息', exact: true })).toBeVisible();
     await expect(details).not.toContainText('refs/heads/main');
     // A delayed selection focus must not steal focus from a button the user reaches next.

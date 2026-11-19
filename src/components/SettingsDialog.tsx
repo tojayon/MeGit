@@ -1,13 +1,15 @@
 import { useId, useState, type ComponentProps, type ReactNode } from 'react';
-import { Bot, Cable } from 'lucide-react';
+import { Bot, Cable, Network } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AiPanel } from './AiPanel';
 import { Dialog } from './Dialogs';
 import { Field } from './Field';
+import { NetworkSettingsPanel } from './NetworkSettingsPanel';
 
 const categories = [
   { id: 'service', icon: Cable, label: 'ai.service' },
   { id: 'assistant', icon: Bot, label: 'settings.assistant' },
+  { id: 'network', icon: Network, label: 'settings.network' },
 ] as const;
 
 export function SettingsDialog({
@@ -23,8 +25,9 @@ export function SettingsDialog({
   const id = useId();
   const [category, setCategory] = useState<(typeof categories)[number]['id']>('service');
   const current = categories.find((item) => item.id === category)!;
-  let content: ReactNode = <AiPanel repositories={[]} {...ai} section={category} />;
-  if (example)
+  let content: ReactNode;
+  if (category === 'network') content = <NetworkSettingsPanel example={example} />;
+  else if (example)
     content =
       category === 'service' ? (
         <div className="settings-form">
@@ -41,6 +44,7 @@ export function SettingsDialog({
       ) : (
         <p className="muted">{t('settings.openBoard')}</p>
       );
+  else content = <AiPanel repositories={[]} {...ai} section={category} />;
   return (
     <Dialog title={t('settings.title')} onClose={onClose} className="settings-dialog">
       <div className="settings-layout">

@@ -20,7 +20,7 @@ export function formatError(error: unknown): string {
   return details ? `${message}\n${details}` : message;
 }
 export type NoticeMessage =
-  | { key: `actions.${GitAction['type']}`; values: { name: string } }
+  | { key: `actions.${GitAction['type']}`; values: { name: string; target: string } }
   | { key: 'board.duplicate' }
   | Error
   | ErrorInfo;

@@ -8,11 +8,10 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, LocateFixed, Minus, Plus } from 'lucide-react';
+import { Cloud, GitBranch, LocateFixed, Minus, Plus } from 'lucide-react';
 import type { BranchComparison, BranchTreeData, Commit } from '../../shared/types';
 import { buildBranchTree } from '../lib/branch-tree';
 import { CommitEvent } from './CommitEvent';
-import { IconButton } from './IconButton';
 import { Tooltip } from './Tooltip';
 import { CommitPointActions } from './CommitPointActions';
 import { CollapsedCommitsPopover } from './CollapsedCommitsPopover';
@@ -352,12 +351,16 @@ export function BranchTree({
                         <button
                           type="button"
                           data-ref={branch.ref}
-                          className={`tree-tip ${node.onTrunk ? 'on-trunk' : ''} ${branch.current ? 'current' : ''} ${branch.remote ? 'remote' : ''} ${selectedRef === branch.ref ? 'selected' : ''}`}
+                          className={`tree-tip ${branch.ref === data.baseRef ? 'on-trunk' : ''} ${branch.current ? 'current' : ''} ${branch.remote ? 'remote' : ''} ${selectedRef === branch.ref ? 'selected' : ''}`}
                           aria-label={t('branchTree.viewBranch', { name: branch.name })}
                           aria-pressed={selectedRef === branch.ref}
                           onClick={() => onSelect(branch.ref)}
                         >
-                          <GitBranch size={13} />
+                          {branch.remote ? (
+                            <Cloud size={13} aria-hidden="true" />
+                          ) : (
+                            <GitBranch size={13} aria-hidden="true" />
+                          )}
                           <span>{branch.name}</span>
                           {branch.current && (
                             <span
@@ -398,31 +401,42 @@ export function BranchTree({
           </div>
         </div>
       </div>
-      <div
-        className="branch-tree-view-controls"
-        role="group"
-        aria-label={t('branchTree.mapControls')}
-      >
-        <IconButton
-          size="small"
-          label={t('branchTree.zoomOut')}
-          disabled={scale <= minimumScale}
-          onClick={() => zoom(Math.round((currentScale.current - 0.1) * 100) / 100)}
-        >
-          <Minus size={15} />
-        </IconButton>
-        <IconButton size="small" label={t('branchTree.fit')} onClick={center}>
-          <LocateFixed size={15} />
-        </IconButton>
-        <IconButton
-          size="small"
-          label={t('branchTree.zoomIn')}
-          disabled={scale >= maximumScale}
-          onClick={() => zoom(Math.round((currentScale.current + 0.1) * 100) / 100)}
-        >
-          <Plus size={15} />
-        </IconButton>
-        {tools && <div className="branch-tree-extra-tools">{tools}</div>}
+      {tools && <div className="branch-tree-view-controls">{tools}</div>}
+      <div className="canvas-bottom branch-tree-map-controls">
+        <div className="canvas-tools" role="group" aria-label={t('branchTree.mapControls')}>
+          <Tooltip placement="right" content={t('branchTree.zoomOut')}>
+            <button
+              type="button"
+              className="canvas-tool"
+              aria-label={t('branchTree.zoomOut')}
+              disabled={scale <= minimumScale}
+              onClick={() => zoom(Math.round((currentScale.current - 0.1) * 100) / 100)}
+            >
+              <Minus size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip placement="right" content={t('branchTree.zoomIn')}>
+            <button
+              type="button"
+              className="canvas-tool"
+              aria-label={t('branchTree.zoomIn')}
+              disabled={scale >= maximumScale}
+              onClick={() => zoom(Math.round((currentScale.current + 0.1) * 100) / 100)}
+            >
+              <Plus size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip placement="right" content={t('branchTree.fit')}>
+            <button
+              type="button"
+              className="canvas-tool"
+              aria-label={t('branchTree.fit')}
+              onClick={center}
+            >
+              <LocateFixed size={15} />
+            </button>
+          </Tooltip>
+        </div>
       </div>
     </div>
   );

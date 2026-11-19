@@ -70,7 +70,7 @@ test('刷新恢复打开的详情、地图视角、横向位置及白板关闭�
     await expect(page.locator('.dock-card')).toHaveCount(2);
     await expect(page.locator('.dock-card').first()).toHaveAttribute(
       'data-key',
-      'repository:first',
+      'repository:a',
     );
     await expect(panel.getByRole('region', { name: '分支详情', exact: true })).toContainText(
       'feature/search',
@@ -135,6 +135,7 @@ test('关系详情的展开依据和阅读位置刷新后恢复', async ({ page,
     await page.locator('[data-edge-id="integration"]').click();
     const relation = page.locator('.relation-inspector');
     await relation.locator('summary').click();
+    await expect(relation.locator('.integration-history-wires')).toBeVisible();
     const body = relation.locator('.relation-panel-body');
     await body.evaluate((el) => el.scrollTo({ top: 60, behavior: 'instant' }));
     await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBe(60);
@@ -214,7 +215,7 @@ test('每个浏览器标签独立恢复，已删除仓库与分支不再复活',
     await page.reload();
     await expect(page.locator('.dock-card')).toHaveCount(1);
     await expect(page.getByRole('region', { name: '分支详情', exact: true })).toHaveCount(0);
-    await expect(other.locator('.dock-card')).toHaveAttribute('data-key', 'repository:second');
+    await expect(other.locator('.dock-card')).toHaveAttribute('data-key', 'repository:b');
     const { token } = await (await request.get('/api/session')).json();
     const headers = { 'X-MeGit-Token': token };
     const workspace = await (await request.get('/api/workspace', { headers })).json();

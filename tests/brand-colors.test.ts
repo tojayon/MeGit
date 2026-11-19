@@ -82,16 +82,40 @@ describe('MeGit 品牌色规范', () => {
         }
       }
       for (const foreground of ['edge-integration', 'edge-neutral', 'focus', 'handle']) {
-        expect(
-          contrast(tokens[foreground], tokens.canvas),
-          `${theme}: ${foreground} on canvas`,
-        ).toBeGreaterThanOrEqual(3);
+        for (const background of ['canvas', 'whiteboard-surface']) {
+          expect(
+            contrast(tokens[foreground], tokens[background]),
+            `${theme}: ${foreground} on ${background}`,
+          ).toBeGreaterThanOrEqual(3);
+        }
+      }
+      for (const foreground of ['text', 'text-secondary']) {
+        expect(contrast(tokens[foreground], tokens['whiteboard-surface'])).toBeGreaterThanOrEqual(
+          4.5,
+        );
       }
       for (const background of ['accent-solid', 'accent-hover']) {
         expect(
           contrast(tokens['on-accent'], tokens[background]),
           `${theme}: button text on ${background}`,
         ).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const foreground of ['card-toolbar-text', 'card-toolbar-accent']) {
+        for (const background of ['card-toolbar-bg', 'card-toolbar-disabled']) {
+          expect(contrast(tokens[foreground], tokens[background])).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      for (const background of ['card-stage-bg', 'card-stage-hover']) {
+        expect(contrast(tokens['card-stage-text'], tokens[background])).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(tokens['card-toolbar-bg'], tokens['card-commit-hover'])).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      expect(contrast(tokens['card-input-accent'], tokens['card-input-hover'])).toBeGreaterThanOrEqual(
+        4.5,
+      );
+      for (const foreground of ['card-input-text', 'card-input-muted', 'card-input-accent']) {
+        expect(contrast(tokens[foreground], tokens['card-input-bg'])).toBeGreaterThanOrEqual(4.5);
       }
     }
   });

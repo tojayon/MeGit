@@ -72,6 +72,59 @@ test('Git 详情直接并排显示，不包含全局导航、标签或白板操�
   }
 });
 
+test('两套主题的左右面板同色，且与白板底色不同', async ({ page, request }) => {
+  const f = await fixture();
+  try {
+    await commitFile(f.repo);
+    await seed(request, f.repo);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.getByRole('button', { name: '公共库', exact: true }).click();
+    const canvas = page.locator('.canvas-shell');
+    const dock = page.getByRole('region', { name: '详情浏览区域', exact: true });
+    const panel = dock.getByRole('complementary', { name: '公共库 仓库详情', exact: true });
+    const stage = panel.locator('.branch-tree-stage');
+    const map = stage.locator('.branch-tree-viewport');
+    const navigation = page.locator('#workspace-navigation');
+    const matchingSurfaces = [
+      dock,
+      page.locator('.workflow-panel > .inspector-heading'),
+      panel.locator(':scope > .inspector-heading'),
+      page.locator('.workspace-statusbar'),
+    ];
+    const expectMatchingSurfaces = async () => {
+      const background = await navigation.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      );
+      for (const surface of matchingSurfaces) {
+        await expect(surface).toBeVisible();
+        await expect(surface).toHaveCSS('background-color', background);
+      }
+      await expect(canvas).not.toHaveCSS('background-color', background);
+    };
+    await expect(canvas).toBeVisible();
+    await expect(map).toBeVisible();
+    await expectMatchingSurfaces();
+    await expect(stage).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(map).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(canvas).toHaveCSS('background-color', 'rgb(0, 13, 31)');
+    await expect(panel).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(dock).toHaveCSS('border-left-width', '0px');
+    await page.screenshot({ path: '.megit/verification/inspector-surface-dark.png' });
+
+    await page.getByRole('button', { name: '偏好设置', exact: true }).click();
+    await page.getByRole('button', { name: '明亮', exact: true }).click();
+    await page.getByRole('button', { name: '关闭偏好设置', exact: true }).click();
+    await expectMatchingSurfaces();
+    await expect(canvas).toHaveCSS('background-color', 'rgb(217, 225, 235)');
+    await expect(map).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(dock).toHaveCSS('border-left-width', '0px');
+    await page.screenshot({ path: '.megit/verification/inspector-surface-light.png' });
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test('白板和说明编辑由画布打开弹窗，不占用 Git 详情区域', async ({ page, request }) => {
   const f = await fixture();
   try {
@@ -278,13 +331,16 @@ test('拖拽和键盘调宽遵守窗口 2/3 上限，宽度记忆且画布视角
     await page.getByRole('button', { name: '公共库', exact: true }).click();
     const dock = page.getByRole('region', { name: '详情浏览区域', exact: true });
     const handle = page.getByRole('separator', { name: '调整详情区域宽度', exact: true });
+    const indicator = handle.locator('span');
     await expect(page.locator('.save-state')).toHaveText('已保存');
     const { token } = await (await request.get('/api/session')).json();
     const headers = { 'X-MeGit-Token': token };
     const before = await (await request.get('/api/workspace', { headers })).json();
     const transform = await page.locator('.react-flow__viewport').getAttribute('style');
     const box = (await handle.boundingBox())!;
+    await expect(indicator).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(indicator).toHaveCSS('background-color', 'rgb(0, 169, 243)');
     await page.mouse.down();
     await page.mouse.move(10, box.y + box.height / 2, { steps: 12 });
     await page.mouse.up();
@@ -368,7 +424,7 @@ test('添加仓库直接打开新详情，同时保留原仓库内页', async ({
     await original.getByRole('button', { name: '查看分支 main', exact: true }).click();
     await page.getByRole('button', { name: '添加仓库', exact: true }).click();
     await page.getByLabel('仓库路径').fill(second);
-    await page.getByLabel('显示名称').fill('新增仓库');
+    await page.getByLabel('卡片显示名称').fill('新增仓库');
     await page.getByRole('button', { name: '添加到白板', exact: true }).click();
     await expect(page.locator('.dock-card')).toHaveCount(2);
     await page.getByRole('button', { name: '公共库', exact: true }).click();
@@ -434,8 +490,8 @@ test('区域无标签仍可平滑横向浏览，双主题与英文窄屏保留�
       path: '.megit/verification/git-inspector/light-en-mobile.png',
       animations: 'disabled',
     });
-    for (const card of ['repository:repo', 'repository:second', 'relation:link']) {
-      await page.locator('.dock-card[data-key="' + card + '"] [data-panel-close]').focus();
+    for (let remaining = 3; remaining > 0; remaining--) {
+      await page.locator('.dock-card [data-panel-close]').first().focus();
       await page.mouse.move(40, 700);
       await page.keyboard.press('Enter');
     }

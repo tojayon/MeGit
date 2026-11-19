@@ -53,6 +53,8 @@ export default {
     unknown: '历史不完整，暂时无法判断共同起点',
   },
   selection: '分支详情',
+  aheadCount: '待推送 {{value}}',
+  behindCount: '待拉取 {{value}}',
   closeSelection: '收起分支详情',
   information: '分支原始信息',
   reference: '完整引用',

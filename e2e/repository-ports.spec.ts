@@ -107,8 +107,15 @@ test('仓库各边默认单点居中，同向共用；混合方向才对称分�
     await page.setViewportSize({ width: 1600, height: 1000 });
     await page.goto('/');
     const node = page.locator('.react-flow__node[data-id="a"]');
+    await expect.poll(async () => (await visiblePorts(node)).length).toBe(0);
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
     expect((await visiblePorts(node)).every((p) => p.offset === '50%')).toBe(true);
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await visiblePorts(node)).length).toBe(0);
+    await page.keyboard.press('Tab');
+    await node.focus();
+    await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
     for (const side of ['top', 'right', 'bottom', 'left'] as PortSide[]) {
       store.board.edges = ['b', 'c'].map((target) => ({
         id: `a-${target}`,
@@ -122,6 +129,7 @@ test('仓库各边默认单点居中，同向共用；混合方向才对称分�
       }));
       await store.save(store.board);
       await page.reload();
+      await node.hover();
       await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
       expect((await visiblePorts(node)).every((p) => p.offset === '50%')).toBe(true);
       store.board.connections = [
@@ -129,6 +137,7 @@ test('仓库各边默认单点居中，同向共用；混合方向才对称分�
       ];
       await store.save(store.board);
       await page.reload();
+      await node.hover();
       await expect.poll(async () => (await visiblePorts(node)).length).toBe(5);
       const ports = await visiblePorts(node);
       expect(ports.find((p) => p.id === `target-${side}`)?.offset).toBe('43%');
@@ -175,6 +184,7 @@ test('仅有入线的共享点可以发起出线，取消不分离，保存后�
     const node = page.locator('.react-flow__node[data-id="a"]');
     const source = node.locator('[data-handleid="source-right"]');
     const target = page.locator('.react-flow__node[data-id="c"] [data-handleid="target-left"]');
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
     const box = await source.boundingBox();
     if (!box) throw new Error('Missing source');
@@ -182,16 +192,19 @@ test('仅有入线的共享点可以发起出线，取消不分离，保存后�
     await page.mouse.down();
     await page.mouse.move(box.x + 70, box.y - 70, { steps: 6 });
     await page.mouse.up();
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
     await source.click();
     await target.click();
     await expect(page.getByRole('dialog', { name: '建立流程关系' })).toBeVisible();
     await page.keyboard.press('Escape');
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
     await dragConnection(page, source, target);
     const dialog = page.getByRole('dialog', { name: '建立流程关系' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: '保存关系', exact: true }).click();
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(5);
     await expect.poll(async () => (await store.read()).boards[0].edges.length).toBe(2);
     await expectAligned(
@@ -200,10 +213,12 @@ test('仅有入线的共享点可以发起出线，取消不分离，保存后�
       '.react-flow__node[data-id="a"] [data-handleid="target-right"]',
     );
     await page.reload();
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(5);
     const outgoing = (await store.read()).boards[0].edges.find((e) => e.source === 'a')!;
     await page.locator(`.edge-label[data-edge-id="${outgoing.id}"]`).click();
     await page.getByRole('button', { name: '移除所选元素', exact: true }).click();
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
     await expectAligned(
       page,
@@ -211,6 +226,7 @@ test('仅有入线的共享点可以发起出线，取消不分离，保存后�
       '.react-flow__node[data-id="a"] [data-handleid="target-right"]',
     );
     await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(5);
     expect(outgoing.sourcePort).toBe('right');
     expect(outgoing.targetPort).toBe('left');
@@ -228,9 +244,12 @@ test('真实示例支持双主题双语、单点切换与窄屏，连接点名�
     .filter({ has: page.getByRole('heading', { name: '仓库连接点', exact: true }) });
   const node = card.locator('.react-flow__node[data-id="center"]');
   await card.scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await visiblePorts(node)).length).toBe(0);
+  await node.hover();
   await expect.poll(async () => (await visiblePorts(node)).length).toBe(5);
   for (const mode of ['none', 'incoming', 'outgoing']) {
     await card.getByLabel('连接方向', { exact: true }).selectOption(mode);
+    await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(4);
     await expect(node.locator('[data-handleid="source-right"]')).toHaveAttribute(
       'aria-label',

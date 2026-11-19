@@ -150,7 +150,9 @@ export function boardSvg(scene: ExportScene, colors: ExportColors) {
   const paths = scene.edges
     .map(
       (e) =>
-        `<path d="${xml(e.path)}" fill="none" stroke="${xml(colors.edge)}" stroke-width="1.5"${e.kind === 'integration' || e.kind === 'process' ? '' : ' stroke-dasharray="5 5"'} marker-end="url(#export-arrow)"/>`,
+        e.kind === 'process'
+          ? `<path d="${xml(e.path)}" fill="none" stroke="${xml(colors.edge)}" stroke-width="1.8" marker-end="url(#export-arrow)"/>`
+          : `<g fill="none" stroke-linejoin="round"><path d="${xml(e.path)}" stroke="${xml(colors.edge)}" stroke-width="7.5"/><path d="${xml(e.path)}" stroke="${xml(colors.canvas)}" stroke-width="5.5"/><path d="${xml(e.path)}" stroke="${xml(colors.edge)}" stroke-width="3" marker-start="url(#export-bridge-source)" marker-end="url(#export-bridge-target)"/></g>`,
     )
     .join('');
   const nodes = scene.nodes
@@ -235,20 +237,22 @@ export function boardSvg(scene: ExportScene, colors: ExportColors) {
     .map((e) => {
       const width = edgeLabelWidth(e);
       return (
-        rect(e.position.x - width / 2, e.position.y - 14, width, 28) +
+        rect(e.position.x - width / 2, e.position.y - 14, width, 28).replace(
+          'rx="8"',
+          e.kind === 'process' ? 'rx="8"' : 'rx="14"',
+        ) +
+        `<title>${xml(e.label)}</title>` +
         text(
           e.position.x - width / 2 + 10,
           e.position.y + 4,
-          e.kind === 'process'
-            ? e.label
-            : shorten([e.label, e.status].filter(Boolean).join(' · '), width - 20, 11),
+          e.kind === 'process' ? e.label : shorten(e.status || e.label, width - 20, 12),
           11,
           e.tone ? colors[e.tone] : colors.text,
         )
       );
     })
     .join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}" font-family="Segoe UI, Microsoft YaHei, sans-serif"><title>${xml(scene.title)}</title><defs><marker id="export-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="${xml(colors.edge)}"/></marker></defs><rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" fill="${xml(colors.canvas)}"/>${groups}${paths}${nodes}${labels}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${bounds.width}" height="${bounds.height}" viewBox="${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}" font-family="Segoe UI, Microsoft YaHei, sans-serif"><title>${xml(scene.title)}</title><defs><marker id="export-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="${xml(colors.edge)}"/></marker><marker id="export-bridge-source" viewBox="-6 -6 12 12" refX="0" refY="0" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto"><circle r="3.5" fill="${xml(colors.canvas)}" stroke="${xml(colors.edge)}" stroke-width="1.8"/></marker><marker id="export-bridge-target" viewBox="-8 -8 16 16" refX="0" refY="0" markerWidth="20" markerHeight="20" markerUnits="userSpaceOnUse" orient="auto"><path d="M -5 -6 Q 0 -6 0 0 Q 0 6 -5 6" fill="none" stroke="${xml(colors.edge)}" stroke-width="2" stroke-linecap="round"/></marker></defs><rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" fill="${xml(colors.canvas)}"/>${groups}${paths}${nodes}${labels}</svg>`;
 }
 
 export async function downloadBoard(

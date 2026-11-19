@@ -111,9 +111,40 @@ test('两主题覆盖白板、仓库历史和二进制差异，语言切换保�
     );
     await page.reload();
     await expect(page.getByTestId('repository-node')).toHaveCount(2);
+    const minimap = page.getByTestId('rf__minimap');
+    const toolbar = page.locator('.canvas-bottom .canvas-tools');
+    const rail = page.locator('.workspace-action-rail');
+    await page.mouse.move(0, 0);
+    await expect(toolbar).toHaveCSS('opacity', '0');
+    await expect(rail.locator(':scope > :nth-child(2)')).toHaveCSS('opacity', '0');
+    await expect(rail.locator(':scope > :first-child')).toHaveCSS('opacity', '1');
+    await rail.locator(':scope > :first-child').hover();
+    await expect(rail.locator(':scope > :nth-child(2)')).toHaveCSS('opacity', '1');
+    await toolbar.hover();
+    await expect(toolbar).toHaveCSS('opacity', '1');
+    const toggle = toolbar.getByRole('button', { name: '流程缩略图', exact: true });
+    await expect(toolbar).toHaveCSS('flex-direction', 'column');
+    await expect(toolbar).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(toolbar).toHaveCSS('border-top-width', '0px');
+    await expect(toolbar).toHaveCSS('box-shadow', 'none');
+    await expect(toolbar.locator('..')).toHaveCSS('left', '8px');
+    await expect(toolbar.locator('..')).toHaveCSS('bottom', '8px');
+    await expect(minimap).toHaveCSS('overflow', 'hidden');
+    const toolbarBox = (await toolbar.boundingBox())!;
+    const mapBox = (await minimap.boundingBox())!;
+    expect(mapBox.x).toBeGreaterThan(toolbarBox.x + toolbarBox.width);
+    expect(mapBox.y + mapBox.height).toBeCloseTo(toolbarBox.y + toolbarBox.height);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(minimap).toHaveCount(0);
+    await page.reload();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await toggle.click();
+    await expect(minimap).toBeVisible();
     await page.getByRole('button', { name: '偏好设置', exact: true }).click();
     await page.getByLabel('界面语言').selectOption('en');
     await page.getByRole('button', { name: 'Close Preferences' }).click();
+    await expect(toolbar.getByRole('button', { name: 'Workflow minimap' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('main', { name: '本地开发 / Preview', exact: true })).toBeVisible();
     await expect(
       page.getByRole('button', { name: /公共功能整合 · 自定义.*Included/ }),
@@ -213,7 +244,7 @@ test('跨页面同步语言和主题时，关系表单错误与读屏名称即�
     ]) {
       await page.getByRole('button', { name: '添加仓库', exact: true }).click();
       await page.getByLabel('仓库路径').fill(repoPath);
-      await page.getByLabel('显示名称').fill(name);
+      await page.getByLabel('卡片显示名称').fill(name);
       await page.getByRole('button', { name: '添加到白板' }).click();
       await expect(page.getByTestId('repository-node').filter({ hasText: name })).toBeVisible();
     }

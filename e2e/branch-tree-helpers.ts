@@ -52,7 +52,7 @@ export async function openRepositoryTools(
       }),
     )
     .toBe(true);
-  await tools.click();
+  if (view === 'history') await tools.click();
   await panel
     .getByRole('button', {
       name: english

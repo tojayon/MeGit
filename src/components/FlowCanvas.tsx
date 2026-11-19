@@ -11,11 +11,6 @@ import {
   ReactFlowProvider,
   Handle,
   Position,
-  BaseEdge,
-  EdgeLabelRenderer,
-  getBezierPath,
-  getSmoothStepPath,
-  getStraightPath,
   Background,
   BackgroundVariant,
   MarkerType,
@@ -25,10 +20,8 @@ import {
   useUpdateNodeInternals,
   useViewport,
   useConnection,
-  type Edge,
   type Node,
   type NodeProps,
-  type EdgeProps,
   type Connection,
   type NodeChange,
   SelectionMode,
@@ -39,15 +32,15 @@ import {
   ChevronDown,
   ChevronRight,
   CircleAlert,
-  CircleHelp,
   Expand,
+  Eye,
+  EyeOff,
   FilePenLine,
   FolderGit2,
-  GitMerge,
   GitBranch,
   Group,
-  Link2,
   LoaderCircle,
+  Map as MapIcon,
   Minus,
   Plus,
   LockKeyhole,
@@ -56,12 +49,12 @@ import {
   Route,
   RotateCcw,
 } from 'lucide-react';
-import { useEdgeRoute, type RouteEditing } from './EdgeRouteEditor';
+import { RepositoryRelationEdge, type RelationEdge } from './RepositoryRelationEdge';
+import { relationPorts } from '../lib/relation-ports';
 import type { RoutePoint } from '../lib/edge-route';
 import { IconButton } from './IconButton';
 import type {
   Board,
-  FlowEdge as Relation,
   FlowGroup,
   FlowNote,
   PortSide,
@@ -99,11 +92,14 @@ import { FlowStep } from './FlowStep';
 import { ProcessEdge, type ProcessEdgeType } from './ProcessEdge';
 import { useViewState } from '../lib/use-view-state';
 import { isBoolean, isStrings, viewKey } from '../lib/view-storage';
+import { branchRef, cardRefLabel, cardUsesWorktree } from '../../shared/card-refs';
+import { relationStatus } from '../lib/relation-status';
 
 type RepoNode = Node<
   {
     repo: Repository;
     state?: RepoState;
+    ref?: string;
     onOpen: (id: string) => void;
     boardId: string;
     onState: (id: string, state: RepoState) => void;
@@ -126,16 +122,6 @@ type GroupNode = Node<
 >;
 type NoteNode = Node<{ note: FlowNote; connected: boolean; onOpen: (id: string) => void }, 'note'>;
 type CanvasNode = RepoNode | GroupNode | NoteNode;
-type RelationEdge = Edge<
-  RouteEditing & {
-    relation: Relation;
-    result?: Snapshot['relations'][string];
-    focused: boolean;
-    labelOffset: number;
-    onOpen: (id: string) => void;
-  },
-  'relation'
->;
 type CanvasEdge = RelationEdge | ProcessEdgeType;
 const positions = {
   top: Position.Top,
@@ -148,10 +134,11 @@ function portStyle(side: PortSide, offset: number): CSSProperties {
   return side === 'top' || side === 'bottom' ? { left: `${offset}%` } : { top: `${offset}%` };
 }
 
-const RepositoryNode = memo(function RepositoryNode({ data, selected }: NodeProps<RepoNode>) {
+const RepositoryNode = memo(function RepositoryNode({ id, data, selected }: NodeProps<RepoNode>) {
   const { repo, state, onOpen } = data;
   const actions = useRepositoryActions({
     repo,
+    worktreeRef: data.ref,
     viewKey: viewKey(data.boardId, repo.id, repo.path),
     onState: (next) => data.onState(repo.id, next),
     onRefresh: data.onRefresh,
@@ -167,7 +154,12 @@ const RepositoryNode = memo(function RepositoryNode({ data, selected }: NodeProp
       busy={actions.busy}
       onAction={actions.executeAction}
       onGenerate={actions.generateCommit}
-      onOpen={() => onOpen(repo.id)}
+      reference={data.ref && cardRefLabel(data.ref)}
+      referenceMissing={
+        !!data.ref && !!state && !state.branches.some((branch) => branchRef(branch) === data.ref)
+      }
+      showWorktree={cardUsesWorktree(data.ref, state)}
+      onOpen={() => onOpen(id)}
     >
       <RepositoryPorts name={repo.name} />
     </RepositoryCard>
@@ -233,104 +225,6 @@ const RepositoryGroup = memo(function RepositoryGroup({ data, selected }: NodePr
         />
       ))}
     </section>
-  );
-});
-
-const WorkflowEdge = memo(function WorkflowEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  data,
-  selected,
-  markerEnd,
-}: EdgeProps<RelationEdge>) {
-  const { t } = useTranslation();
-  const { relation, result, focused, labelOffset } = data!;
-  const options = { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition };
-  const [automaticPath, automaticX, automaticY] =
-    relation.routing === 'bezier'
-      ? getBezierPath(options)
-      : relation.routing === 'straight'
-        ? getStraightPath(options)
-        : getSmoothStepPath({
-            ...options,
-            borderRadius: relation.routing === 'step' ? 0 : 14,
-            offset: 32,
-          });
-  const route = useEdgeRoute({
-    id,
-    automaticPath,
-    source: { x: sourceX, y: sourceY },
-    target: { x: targetX, y: targetY },
-    waypoints: relation.waypoints,
-    radius: relation.routing === 'step' || relation.routing === 'straight' ? 0 : 12,
-    editing: data!.editing,
-    onRoute: data!.onRoute,
-  });
-  const edgePath = route.path;
-  const labelX = route.custom ? route.label.x : automaticX;
-  const labelY = route.custom ? route.label.y : automaticY;
-  const status =
-    relation.kind === 'integration'
-      ? result?.state === 'integrated'
-        ? t('relation.included')
-        : result?.state === 'pending'
-          ? t('relation.pending', { count: result.pending ?? 0 })
-          : t('relation.unknown')
-      : t('relation.flow');
-  return (
-    <>
-      <BaseEdge
-        className="workflow-edge-path"
-        id={id}
-        path={edgePath}
-        markerEnd={markerEnd}
-        style={
-          {
-            '--relation-stroke':
-              selected || focused
-                ? 'var(--accent)'
-                : relation.kind === 'integration'
-                  ? 'var(--edge-integration)'
-                  : 'var(--edge-neutral)',
-            '--relation-width': selected ? 2.6 : focused ? 2.2 : 1.5,
-            strokeDasharray: relation.kind === 'integration' ? undefined : '5 5',
-          } as CSSProperties
-        }
-        interactionWidth={22}
-      />
-      <EdgeLabelRenderer>
-        <button
-          className={`edge-label nodrag nopan ${selected ? 'selected' : ''} ${focused ? 'context-related' : ''}`}
-          data-edge-id={id}
-          style={{
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY + labelOffset + (data!.editing ? 24 : 0)}px)`,
-            pointerEvents: 'all',
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            data!.onOpen(id);
-          }}
-          aria-label={`${relation.label || t(`relation.${relation.kind}`)} · ${status}`}
-        >
-          {relation.kind === 'integration' ? <GitMerge size={13} /> : <Link2 size={13} />}
-          <span>{relation.label || t(`relation.${relation.kind}`)}</span>
-          <span className={`edge-status ${result?.state || ''}`}>
-            {result?.state === 'integrated' ? (
-              <Check size={12} />
-            ) : relation.kind === 'integration' && result?.state !== 'pending' ? (
-              <CircleHelp size={12} />
-            ) : null}
-            {status}
-          </span>
-        </button>
-      </EdgeLabelRenderer>
-      {route.controls}
-    </>
   );
 });
 
@@ -402,7 +296,7 @@ const AnnotationNode = memo(function AnnotationNode({ data, selected }: NodeProp
 });
 
 const nodeTypes = { repository: RepositoryNode, group: RepositoryGroup, note: AnnotationNode };
-const edgeTypes = { relation: WorkflowEdge, process: ProcessEdge };
+const edgeTypes = { relation: RepositoryRelationEdge, process: ProcessEdge };
 
 function CanvasContents({
   board,
@@ -455,7 +349,11 @@ function CanvasContents({
   onSelectConnection: (id: string) => void;
   onEditConnection: (id: string) => void;
   onReconnect: (id: string, connection: Connection) => void;
-  onRoute: (id: string, points: RoutePoint[] | undefined) => void;
+  onRoute: (
+    id: string,
+    points: RoutePoint[] | undefined,
+    ports?: { sourcePort: PortSide; targetPort: PortSide },
+  ) => void;
   onEditSelection: () => void;
   onRemoveSelection: () => void;
   onSelectGroup: (id: string) => void;
@@ -513,6 +411,16 @@ function CanvasContents({
     false,
     isBoolean,
   );
+  const [minimapVisible, setMinimapVisible] = useViewState(
+    viewKey(board.id, 'canvas-minimap'),
+    true,
+    isBoolean,
+  );
+  const [hideFlowchart, setHideFlowchart] = useViewState(
+    viewKey(board.id, 'canvas-hide-flowchart'),
+    false,
+    isBoolean,
+  );
   const [focus, setFocus] = useViewState<{ ids: string[]; context: boolean } | null>(
     viewKey(board.id, 'canvas-focus'),
     null,
@@ -554,12 +462,15 @@ function CanvasContents({
     position: localPositions[n.id] || n.position,
   }));
   const positionedBoard = { ...board, nodes: positioned, notes: positionedNotes };
+  const hasFlowchart = positionedNotes.some((note) => note.kind && note.kind !== 'note') ||
+    Boolean(board.connections?.length);
+  const visibleConnections = hideFlowchart ? [] : (board.connections || []);
   const allGroups = board.groups || [];
   const focusedIds = focus ? selectedNodeIds(board, focus.ids) : [];
   const focusIds =
     focus && focusedIds.length
       ? focus.context
-        ? flowContext([...board.edges, ...(board.connections || [])], focusedIds).nodeIds
+        ? flowContext([...board.edges, ...visibleConnections], focusedIds).nodeIds
         : new Set(focusedIds)
       : null;
   if (
@@ -574,7 +485,7 @@ function CanvasContents({
     : selectedRepo
       ? board.nodes.filter((n) => n.repoId === selectedRepo).map((n) => n.id)
       : groups.find((g) => g.id === selectedGroup)?.nodeIds || [];
-  const context = flowContext([...board.edges, ...(board.connections || [])], seeds);
+  const context = flowContext([...board.edges, ...visibleConnections], seeds);
   const viewBoard = {
     ...board,
     groups,
@@ -582,7 +493,24 @@ function CanvasContents({
       (e) => !focusIds || (focusIds.has(e.source) && focusIds.has(e.target)),
     ),
   };
-  const visible = visibleRelations(viewBoard);
+  const displayBox = (id: string) => {
+    const group = groups.find((g) => g.id === id);
+    if (group) return { ...groupBounds(group, positioned, dimensions), width: 300, height: 100 };
+    return {
+      ...(positioned.find((n) => n.id === id)?.position || { x: 0, y: 0 }),
+      ...(dimensions[id] || REPOSITORY_SIZE),
+    };
+  };
+  const visible = visibleRelations(viewBoard).map((edge) => ({
+    ...edge,
+    relation: {
+      ...edge.relation,
+      ...relationPorts(edge.relation, displayBox(edge.source), displayBox(edge.target)),
+    },
+  }));
+  const portVersion = visible
+    .map(({ relation }) => `${relation.id}:${relation.sourcePort}:${relation.targetPort}`)
+    .join(',');
   const nodes: CanvasNode[] = [
     ...groups.map((group): GroupNode => {
       const bounds = groupBounds(group, positioned, dimensions);
@@ -604,7 +532,7 @@ function CanvasContents({
                 offset: 25 + (50 * (index + 1)) / (edges.length + 1),
               }),
             );
-            const flowEdges = (board.connections || []).filter(
+            const flowEdges = visibleConnections.filter(
               (e) =>
                 group.nodeIds.includes(e[type]) &&
                 !group.nodeIds.includes(e[type === 'source' ? 'target' : 'source']) &&
@@ -624,7 +552,10 @@ function CanvasContents({
         }
       const states = board.nodes
         .filter((n) => group.nodeIds.includes(n.id))
-        .map((n) => snapshot?.repositories[n.repoId]);
+        .map((n) => {
+          const state = snapshot?.repositories[n.repoId];
+          return state && !cardUsesWorktree(n.ref, state) ? { ...state, changed: 0 } : state;
+        });
       return {
         id: group.id,
         type: 'group',
@@ -653,7 +584,8 @@ function CanvasContents({
     ...positioned
       .filter((n) => !collapsed.has(n.id) && (!focusIds || focusIds.has(n.id)))
       .map((node): RepoNode => {
-        const repo = repositories.find((r) => r.id === node.repoId)!;
+        const registered = repositories.find((r) => r.id === node.repoId)!;
+        const repo = node.displayName ? { ...registered, name: node.displayName } : registered;
         return {
           id: node.id,
           type: 'repository',
@@ -661,12 +593,15 @@ function CanvasContents({
           measured: dimensions[node.id],
           zIndex: 2,
           domAttributes: { 'aria-roledescription': t('canvas.nodeRole') },
-          ariaLabel: t('repository.details', { name: repo.name }),
+          ariaLabel: t('repository.details', {
+            name: node.ref ? `${repo.name} · ${cardRefLabel(node.ref)}` : repo.name,
+          }),
           selected: selectedIds.includes(node.id),
           className: seeds.length && context.nodeIds.has(node.id) ? 'context-related' : undefined,
           data: {
             repo,
             state: snapshot?.repositories[node.repoId],
+            ref: node.ref,
             onOpen: onSelectRepo,
             boardId: board.id,
             onState: onRepositoryState,
@@ -676,6 +611,7 @@ function CanvasContents({
         };
       }),
     ...positionedNotes
+      .filter((note) => !hideFlowchart || !note.kind || note.kind === 'note')
       .filter((n) => !focusIds || focusIds.has(n.id))
       .map((note): NoteNode => ({
         id: note.id,
@@ -686,7 +622,7 @@ function CanvasContents({
         selected: selectedIds.includes(note.id),
         connectable:
           (!!note.kind && note.kind !== 'note') ||
-          !!board.connections?.some((c) => c.source === note.id || c.target === note.id),
+          visibleConnections.some((c) => c.source === note.id || c.target === note.id),
         domAttributes: {
           'aria-roledescription': t(
             note.kind && note.kind !== 'note' ? 'flowchart.role' : 'note.role',
@@ -695,7 +631,7 @@ function CanvasContents({
         ariaLabel: note.title,
         data: {
           note,
-          connected: !!board.connections?.some((c) => c.source === note.id || c.target === note.id),
+          connected: visibleConnections.some((c) => c.source === note.id || c.target === note.id),
           onOpen: onSelectNote,
         },
       })),
@@ -712,12 +648,6 @@ function CanvasContents({
   }
   const edges: CanvasEdge[] = visible.map(({ relation, source, target }): RelationEdge => {
     const focused = seeds.length > 0 && context.edgeIds.has(relation.id);
-    const color =
-      relation.id === selectedEdge || focused
-        ? 'var(--accent)'
-        : relation.kind === 'integration'
-          ? 'var(--edge-integration)'
-          : 'var(--edge-neutral)';
     const siblings = parallel.get(
       JSON.stringify([
         source,
@@ -748,7 +678,6 @@ function CanvasContents({
       }),
       className: focused ? 'context-related' : undefined,
       selected: relation.id === selectedEdge,
-      markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
       data: {
         editing:
           routeEditing === relation.id &&
@@ -757,7 +686,14 @@ function CanvasContents({
           !board.layoutLocked &&
           source === relation.source &&
           target === relation.target,
-        onRoute,
+        onRoute: (id, points) =>
+          onRoute(
+            id,
+            points,
+            points?.length
+              ? { sourcePort: relation.sourcePort!, targetPort: relation.targetPort! }
+              : undefined,
+          ),
         relation,
         result: snapshot?.relations[relation.id],
         focused,
@@ -766,7 +702,7 @@ function CanvasContents({
       },
     };
   });
-  for (const connection of board.connections || []) {
+  for (const connection of visibleConnections) {
     const sourceGroup = groups.find((g) => g.collapsed && g.nodeIds.includes(connection.source));
     const targetGroup = groups.find((g) => g.collapsed && g.nodeIds.includes(connection.target));
     const source = sourceGroup?.id || connection.source;
@@ -830,6 +766,7 @@ function CanvasContents({
     board.groups,
     board.edges,
     board.connections,
+    portVersion,
     focus,
     updateNodeInternals,
   ]);
@@ -1061,15 +998,25 @@ function CanvasContents({
             };
           const state = node.data.state;
           const conflicts = state?.files.filter((f) => f.conflicted).length || 0;
+          const reference = node.data.ref;
+          const showWorktree = cardUsesWorktree(reference, state);
+          const missing =
+            !!reference &&
+            !!state &&
+            !state.branches.some((branch) => branchRef(branch) === reference);
           const status = state?.error
             ? t('repository.unavailable')
             : !state
               ? t('repository.reading')
-              : conflicts
-                ? t('repository.conflicts', { count: conflicts })
-                : state.changed
-                  ? t('repository.changes', { count: state.changed })
-                  : t('repository.clean');
+              : missing
+                ? t('repositoryCard.refMissing')
+                : !showWorktree
+                  ? ''
+                  : conflicts
+                    ? t('repository.conflicts', { count: conflicts })
+                    : state.changed
+                      ? t('repository.changes', { count: state.changed })
+                      : t('repository.clean');
           const sync = [
             state?.ahead ? t('repository.aheadCount', { value: state.ahead }) : '',
             state?.behind ? t('repository.behindCount', { value: state.behind }) : '',
@@ -1080,14 +1027,20 @@ function CanvasContents({
             ...base,
             kind: 'repository',
             title: node.data.repo.name,
-            subtitle:
-              !state || state.error
+            subtitle: reference
+              ? cardRefLabel(reference)
+              : !state || state.error
                 ? ''
                 : state.detached
                   ? t('repository.detached')
                   : state.branch || t('repository.unknownBranch'),
-            lines: [status, ...(sync ? [sync] : [])],
-            tone: state?.error || conflicts ? 'danger' : state?.changed ? 'warning' : 'success',
+            lines: [status, ...(showWorktree ? [sync] : [])].filter(Boolean),
+            tone:
+              state?.error || missing || (showWorktree && conflicts)
+                ? 'danger'
+                : showWorktree && state?.changed
+                  ? 'warning'
+                  : 'success',
           };
         }),
         edges: [],
@@ -1124,23 +1077,20 @@ function CanvasContents({
         if (!('relation' in edge.data)) continue;
         const { relation, result } = edge.data;
         const box = path.getBBox();
-        const matrix = new DOMMatrixReadOnly(getComputedStyle(label).transform);
+        const labelBox = label.getBoundingClientRect();
+        const labelPosition = screenToFlowPosition(
+          { x: labelBox.x + labelBox.width / 2, y: labelBox.y + labelBox.height / 2 },
+          { snapToGrid: false },
+        );
         scene.edges.push({
           id: edge.id,
           path: path.getAttribute('d') || '',
           bounds: { x: box.x, y: box.y, width: box.width, height: box.height },
-          position: { x: matrix.e + label.offsetWidth / 2, y: matrix.f + label.offsetHeight / 2 },
+          position: labelPosition,
           width: label.offsetWidth,
           label: relation.label || t(`relation.${relation.kind}`),
           kind: relation.kind,
-          status:
-            relation.kind !== 'integration'
-              ? t('relation.flow')
-              : result?.state === 'integrated'
-                ? t('relation.included')
-                : result?.state === 'pending'
-                  ? t('relation.pending', { count: result.pending ?? 0 })
-                  : t('relation.unknown'),
+          status: relationStatus(t, relation, result),
           tone:
             result?.state === 'integrated'
               ? 'success'
@@ -1167,7 +1117,7 @@ function CanvasContents({
 
   return (
     <div
-      className={`canvas-shell ${tool === 'pan' ? 'is-pan-tool' : ''} ${board.layoutLocked ? 'is-layout-locked' : ''}`}
+      className={`canvas-shell reveal-node-handles ${tool === 'pan' ? 'is-pan-tool' : ''} ${board.layoutLocked ? 'is-layout-locked' : ''}`}
       ref={shellRef}
       onKeyDownCapture={(event) => {
         if (event.key === 'Escape' && drag.current) {
@@ -1215,7 +1165,7 @@ function CanvasContents({
           event.preventDefault();
           event.stopPropagation();
           if (group) onSelectGroup(group.id);
-          else if (node) onSelectRepo(node.repoId);
+          else if (node) onSelectRepo(node.id);
           else if (note) onSelectNote(note.id);
           return;
         }
@@ -1286,8 +1236,7 @@ function CanvasContents({
         }}
         onNodeClick={(event, node) => {
           if (event.shiftKey || event.ctrlKey || event.metaKey) return;
-          if (node.type === 'group' || node.type === 'note') onSelection([node.id]);
-          else onSelectRepo(node.data.repo.id);
+          onSelection([node.id]);
         }}
         onEdgeClick={(_e, edge) =>
           edge.type === 'process' ? onSelectConnection(edge.id) : onSelectEdge(edge.id)
@@ -1390,17 +1339,6 @@ function CanvasContents({
         }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--dot)" />
-        {nodes.length > 0 && (
-          <MiniMap
-            style={{ width: 125, height: 82 }}
-            pannable
-            zoomable={!zoomLocked}
-            position="bottom-right"
-            nodeColor="var(--minimap-node)"
-            maskColor="var(--minimap-mask)"
-            ariaLabel={t('canvas.minimap')}
-          />
-        )}
       </ReactFlow>
       {snapGuides.length > 0 && (
         <svg className="snap-guides" aria-hidden="true">
@@ -1466,6 +1404,7 @@ function CanvasContents({
           selectedEdge ||
           (selectedIds.length === 1 &&
             (board.groups?.some((group) => group.id === selectedIds[0]) ||
+              (!board.layoutLocked && board.nodes.some((node) => node.id === selectedIds[0])) ||
               board.notes?.some((note) => note.id === selectedIds[0])))
             ? onEditSelection
             : undefined
@@ -1477,7 +1416,9 @@ function CanvasContents({
               ? 'relation.edit'
               : selectedGroup
                 ? 'group.edit'
-                : 'note.details',
+                : board.nodes.some((node) => node.id === selectedIds[0])
+                  ? 'repositoryCard.bindBranch'
+                  : 'note.details',
         )}
         onRemove={onRemoveSelection}
         selectionActions={
@@ -1578,7 +1519,6 @@ function CanvasContents({
               <Plus size={16} />
             </button>
           </Tooltip>
-          <i />
           <Tooltip placement="top" content={t('canvas.fit')}>
             <button
               className="canvas-tool"
@@ -1599,7 +1539,57 @@ function CanvasContents({
               {zoomLocked ? <LockKeyhole size={15} /> : <UnlockKeyhole size={15} />}
             </button>
           </Tooltip>
+          {(hasFlowchart || hideFlowchart) && (
+            <Tooltip placement="right" content={t(hideFlowchart ? 'canvas.showFlowchart' : 'canvas.hideFlowchart')}>
+              <button
+                type="button"
+                className="canvas-tool"
+                aria-label={t('canvas.hideFlowchart')}
+                aria-pressed={hideFlowchart}
+                onClick={() => {
+                  if (!hideFlowchart) {
+                    setFocus(null);
+                    const remaining = selectedIds.filter((id) => !positionedNotes.some(
+                      (note) => note.id === id && note.kind && note.kind !== 'note',
+                    ));
+                    if (remaining.length !== selectedIds.length ||
+                      visibleConnections.some((connection) => connection.id === selectedEdge))
+                      onSelection(remaining);
+                  }
+                  setHideFlowchart(!hideFlowchart);
+                }}
+              >
+                {hideFlowchart ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip placement="right" content={t('canvas.minimap')}>
+            <button
+              type="button"
+              className="canvas-tool"
+              aria-label={t('canvas.minimap')}
+              aria-pressed={minimapVisible}
+              onClick={() => setMinimapVisible((value) => !value)}
+            >
+              <MapIcon size={16} />
+            </button>
+          </Tooltip>
         </div>
+        {minimapVisible && nodes.length > 0 && (
+          <MiniMap
+            className="canvas-minimap"
+            style={{ width: 125, height: 82 }}
+            pannable
+            zoomable={!zoomLocked}
+            position="bottom-left"
+            bgColor="var(--surface)"
+            nodeColor="var(--minimap-node)"
+            maskColor="var(--minimap-mask)"
+            maskStrokeColor="var(--border-strong)"
+            maskStrokeWidth={1}
+            ariaLabel={t('canvas.minimap')}
+          />
+        )}
       </div>
     </div>
   );

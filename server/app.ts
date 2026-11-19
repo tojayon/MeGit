@@ -15,10 +15,14 @@ import {
 import type { GitAction, RepoState, Snapshot } from '../shared/types.js';
 import { listRepositoryImages, readRepositoryImage } from './repository-images.js';
 import { readBranchTree, compareBranches } from './branch-tree.js';
+import { readIntegrationHistory } from './integration-history.js';
+import { isCardRef, relationRefs } from '../shared/card-refs.js';
 import { pickLocal } from './local-picker.js';
 import { realpath } from 'node:fs/promises';
 import { aiRouter } from './ai.js';
 import { readCommitContext } from './ai-commit.js';
+import { checkRemoteRead, githubLoginAvailable, loginRemoteGitHub } from './remote-access.js';
+import { NetworkSettings, testNetworkProxy, withProxyFetch } from './network-proxy.js';
 
 const hashSchema = z.string().regex(/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
 const branchExpectationSchema = z.strictObject({
@@ -37,6 +41,23 @@ const actionSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('commit'), message: z.string().trim().min(1).max(10000) }),
   z.object({ type: z.enum(['fetch', 'pull', 'push']) }),
+  z.strictObject({
+    type: z.literal('addRemote'),
+    name: z.string().min(1).max(240),
+    destination: z.string().min(1).max(4000),
+  }),
+  z.strictObject({
+    type: z.literal('publishBranch'),
+    remote: z.string().min(1).max(240),
+    name: z.string().min(1).max(240),
+    expected: branchExpectationSchema,
+  }),
+  z.strictObject({
+    type: z.literal('setTracking'),
+    targetRef: z.string().min(1).max(520),
+    targetHash: hashSchema,
+    expected: branchExpectationSchema,
+  }),
   z.strictObject({
     type: z.literal('createBranch'),
     name: z.string().min(1).max(240),
@@ -77,6 +98,7 @@ function failedState(error: unknown): RepoState {
 export function createApp(options: { dataDirectory: string }) {
   const app = express();
   const store = new WorkspaceStore(options.dataDirectory);
+  const network = new NetworkSettings(options.dataDirectory);
   const token = randomBytes(32).toString('hex');
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -128,15 +150,27 @@ export function createApp(options: { dataDirectory: string }) {
       options.dataDirectory,
       async (id) => readRepository((await repository(id)).path),
       async (id) => readCommitContext((await repository(id)).path),
+      async () => withProxyFetch(await network.proxy()),
     ),
   );
   app.get('/api/workspace', async (_req, res) => res.json(await store.read()));
-  app.post('/api/local-picker/folder', async (_req, res) => res.json({ path: await pickLocal('folder') }));
+  app.get('/api/network/settings', async (_req, res) => res.json(await network.read()));
+  app.put('/api/network/settings', async (req, res) => res.json(await network.save(req.body)));
+  app.post('/api/network/test', async (req, res) => {
+    const result = z.strictObject({ address: z.string().trim().min(1).max(2048) }).safeParse(req.body);
+    if (!result.success) throw new AppError('proxyInvalid');
+    res.json(await testNetworkProxy(result.data.address));
+  });
+  app.post('/api/local-picker/folder', async (_req, res) =>
+    res.json({ path: await pickLocal('folder') }),
+  );
   app.post('/api/repositories/:id/pick-image', async (req, res) => {
     const repo = await repository(req.params.id);
     const selected = await pickLocal('image', repo.path);
     if (!selected) return res.json({ path: null });
-    const resolved = await realpath(selected).catch(() => { throw new AppError('repositoryImageMissing', 404); });
+    const resolved = await realpath(selected).catch(() => {
+      throw new AppError('repositoryImageMissing', 404);
+    });
     const relative = path.relative(repo.path, resolved).replaceAll('\\', '/');
     await readRepositoryImage(repo.path, relative);
     return res.json({ path: relative });
@@ -193,11 +227,12 @@ export function createApp(options: { dataDirectory: string }) {
         continue;
       }
       try {
+        const { sourceRef, targetRef } = relationRefs(edge, board.nodes);
         result.relations[edge.id] = await inspectIntegration(
           source.path,
           target.path,
-          edge.sourceRef,
-          edge.targetRef,
+          sourceRef,
+          targetRef,
         );
       } catch (error) {
         result.relations[edge.id] = {
@@ -213,6 +248,35 @@ export function createApp(options: { dataDirectory: string }) {
     res.json(result);
   });
 
+  app.get('/api/boards/:boardId/relations/:edgeId/history', async (req, res) => {
+    const query = z
+      .strictObject({
+        offset: z.coerce.number().int().min(0).max(1000000).default(0),
+        sourceHash: hashSchema.optional(),
+        targetHash: hashSchema.optional(),
+      })
+      .safeParse(req.query);
+    if (
+      !query.success ||
+      (query.data.offset > 0 && (!query.data.sourceHash || !query.data.targetHash))
+    )
+      throw new AppError('invalidRef');
+    const workspace = await store.read();
+    const board = workspace.boards.find((item) => item.id === req.params.boardId);
+    if (!board) throw new AppError('boardMissing', 404);
+    const edge = board.edges.find(
+      (item) => item.id === req.params.edgeId && item.kind === 'integration',
+    );
+    if (!edge) throw new AppError('invalidEdge', 404);
+    const sourceId = board.nodes.find((node) => node.id === edge.source)?.repoId;
+    const targetId = board.nodes.find((node) => node.id === edge.target)?.repoId;
+    if (!sourceId || !targetId) throw new AppError('invalidEdge');
+    const [source, target] = await Promise.all([repository(sourceId), repository(targetId)]);
+    const { sourceRef, targetRef } = relationRefs(edge, board.nodes);
+    res.json(
+      await readIntegrationHistory(source.path, target.path, sourceRef, targetRef, query.data),
+    );
+  });
   app.get('/api/repositories/:id/images', async (req, res) => {
     const repo = await repository(req.params.id);
     const query = z
@@ -277,7 +341,9 @@ export function createApp(options: { dataDirectory: string }) {
       .max(100000)
       .safeParse(req.query.skip || 0);
     if (!skip.success) throw new AppError('invalidPage');
-    res.json(await getHistory(repo.path, skip.data));
+    const ref = z.string().refine(isCardRef).optional().safeParse(req.query.ref);
+    if (!ref.success) throw new AppError('invalidRef');
+    res.json(await getHistory(repo.path, skip.data, ref.data));
   });
   app.get('/api/repositories/:id/diff', async (req, res) => {
     const repo = await repository(req.params.id);
@@ -291,12 +357,33 @@ export function createApp(options: { dataDirectory: string }) {
     if (!query.success) throw new AppError('invalidDiff');
     res.json(await getDiff(repo.path, { ...query.data, staged: query.data.staged === 'true' }));
   });
+  app.get('/api/repositories/:id/remote-access', async (req, res) => {
+    const repo = await repository(req.params.id);
+    const parsed = z.string().min(1).max(240).safeParse(req.query.name);
+    if (!parsed.success) throw new AppError('remoteName');
+    res.json(await githubLoginAvailable(repo.path, parsed.data));
+  });
+  app.post('/api/repositories/:id/remote-access', async (req, res) => {
+    const repo = await repository(req.params.id);
+    const parsed = z.strictObject({
+      name: z.string().min(1).max(240),
+      action: z.enum(['read', 'githubLogin']),
+    }).safeParse(req.body);
+    if (!parsed.success) throw new AppError('invalidAction');
+    const { name, action } = parsed.data;
+    const proxy = await network.proxy();
+    res.json(await (action === 'read' ? checkRemoteRead(repo.path, name, proxy) : loginRemoteGitHub(repo.path, name, proxy)));
+  });
   app.post('/api/repositories/:id/actions', async (req, res) => {
     const repo = await repository(req.params.id);
     const parsed = actionSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError('invalidAction');
+    const worktreeRef = z.string().refine(isCardRef).optional().safeParse(req.query.worktreeRef);
+    if (!worktreeRef.success) throw new AppError('invalidRef');
+    const action = parsed.data as GitAction;
+    const proxy = ['fetch', 'pull', 'push', 'publishBranch'].includes(action.type) ? await network.proxy() : undefined;
     res.json({
-      message: await performAction(repo.path, parsed.data as GitAction),
+      message: await performAction(repo.path, action, worktreeRef.data, proxy),
       state: await readRepository(repo.path),
     });
   });

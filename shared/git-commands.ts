@@ -9,6 +9,10 @@ export const gitExecutionOptions = [
   'core.quotepath=false',
 ];
 export const diffOptions = ['--no-ext-diff', '--no-textconv', '--no-color', '--unified=3'];
+export function httpRemoteHasCredentials(address: string) {
+  return /^https?:\/\/[^/\\?#]*@/i.test(address);
+}
+
 export const commitLogFormat = '--format=%H%x1f%P%x1f%h%x1f%an%x1f%aI%x1f%D%x1f%s';
 export const statusArguments = [
   'status',
@@ -41,9 +45,17 @@ export function createBranchArguments(
     : ['branch', tracking, '--', action.name, source];
 }
 
+export function pushBranchArguments(remote: string, ref: string, source: string, oldHash: string) {
+  return [
+    '-c', `remote.${remote}.mirror=false`, 'push', '--porcelain', '--no-follow-tags',
+    '--recurse-submodules=no', '--no-set-upstream', `--force-with-lease=${ref}:${oldHash}`,
+    '--', remote, `${source}:${ref}`,
+  ];
+}
+
 export function actionArguments(
   action: GitAction,
-  state: Pick<RepoState, 'head' | 'files' | 'pushTarget'> | undefined,
+  state: Pick<RepoState, 'head' | 'files' | 'pushTarget' | 'upstreamHead'> | undefined,
 ): string[] | null {
   if (!state) return null;
   switch (action.type) {
@@ -85,11 +97,21 @@ export function actionArguments(
       return action.message.trim() ? ['commit', '-m', action.message.trim()] : null;
     case 'fetch':
       return ['fetch', '--all', '--prune', '--no-recurse-submodules'];
+    case 'addRemote':
+      return ['remote', 'add', '--', action.name, action.destination];
+    case 'publishBranch':
+      return action.expected.head
+        ? pushBranchArguments(action.remote, `refs/heads/${action.name}`, action.expected.head, '')
+        : null;
+    case 'setTracking':
+      return ['-c', 'branch.autoSetupRebase=never', 'branch', `--set-upstream-to=${action.targetRef}`, '--', action.expected.branch];
     case 'pull':
-      return ['pull', '--ff-only', '--no-recurse-submodules'];
-    case 'push':
       return state.pushTarget
-        ? ['push', '--porcelain', '--', state.pushTarget.remote, `HEAD:${state.pushTarget.ref}`]
+        ? ['pull', '--ff-only', '--no-rebase', '--no-squash', '--no-autostash', '--no-recurse-submodules', '--no-tags', '--', state.pushTarget.remote, state.pushTarget.ref]
+        : null;
+    case 'push':
+      return state.pushTarget && state.head && state.upstreamHead
+        ? pushBranchArguments(state.pushTarget.remote, state.pushTarget.ref, state.head, state.upstreamHead)
         : null;
   }
 }
@@ -118,11 +140,10 @@ export function fileDiffArguments(file: ChangedFile, staged: boolean): string[] 
   ];
 }
 
-export function historyArguments(skip = 0): string[] {
+export function historyArguments(skip = 0, ref?: string): string[] {
   return [
     'log',
-    '--all',
-    'HEAD',
+    ...(ref ? [ref] : ['--all', 'HEAD']),
     '--topo-order',
     '--max-count=40',
     `--skip=${Math.max(0, Math.min(100_000, Math.floor(skip)))}`,

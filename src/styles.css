@@ -228,8 +228,8 @@ code {
   flex-shrink: 0;
 }
 .brand-mark {
-  width: 34px;
-  height: 34px;
+  width: var(--navigation-symbol-size);
+  height: var(--navigation-symbol-size);
 }
 .brand-logo {
   display: block;
@@ -245,7 +245,11 @@ code {
   height: var(--navigation-symbol-size);
 }
 .workspace-logo {
-  width: var(--navigation-logo-width);
+  width: 100%;
+}
+.brand-link .workspace-logo-symbol,
+.brand-mark .workspace-logo {
+  display: none;
 }
 .navigation-action {
   border: 0;
@@ -254,11 +258,16 @@ code {
   border-radius: 6px;
   width: 100%;
   height: 40px;
-  padding: 0 10px;
+  padding: 0 var(--navigation-action-inset);
   display: flex;
   align-items: center;
   gap: 10px;
   text-align: left;
+}
+.navigation-action > svg {
+  flex: 0 0 var(--navigation-icon-size);
+  width: var(--navigation-icon-size);
+  height: var(--navigation-icon-size);
 }
 .navigation-action:hover {
   background: var(--hover);
@@ -315,30 +324,41 @@ code {
   flex-direction: column;
   background: var(--rail);
   border-right: 1px solid var(--border);
-  padding: 0 12px;
+  padding-inline: var(--navigation-gutter);
+  padding-block-end: var(--navigation-bottom-inset);
   position: relative;
   z-index: 2;
 }
 .navigation-brand {
-  height: var(--header-height);
+  position: relative;
+  height: var(--navigation-brand-height);
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-inline: 4px;
+  margin-inline: calc(-1 * var(--navigation-gutter));
+  padding-inline: var(--navigation-gutter);
+  border-block-end: 1px solid var(--border);
 }
 .navigation-brand-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  flex-shrink: 0;
+  margin-inline-start: var(--space-1);
 }
 .navigation-brand-identity {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: flex-end;
   gap: var(--space-1);
+}
+.navigation-brand .brand-link {
+  flex: 1;
   min-width: 0;
 }
+.workspace-navigation[data-collapsed='true'] .navigation-brand-identity {
+  justify-content: center;
+}
 .navigation-version {
+  flex-shrink: 0;
   padding: 1px var(--space-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-small);
@@ -352,15 +372,6 @@ code {
 }
 .workspace-navigation[data-collapsed='true'] {
   width: var(--ribbon-width);
-  padding: 0 8px 12px;
-}
-.workspace-navigation[data-collapsed='true'] .navigation-brand {
-  justify-content: center;
-  padding: 0;
-}
-.workspace-navigation[data-collapsed='true'] .navigation-action {
-  padding: 0;
-  justify-content: center;
 }
 .local-pill {
   color: var(--muted);
@@ -679,9 +690,6 @@ code {
 .workflow-panel[hidden] {
   display: none;
 }
-.workflow-panel > .inspector-heading {
-  background: var(--surface);
-}
 .workflow-description {
   white-space: pre-wrap;
 }
@@ -708,7 +716,6 @@ code {
   min-width: 0;
   min-height: 0;
 }
-.canvas-navigation-control,
 .workspace-action-rail {
   position: absolute;
   top: var(--space-3);
@@ -720,21 +727,63 @@ code {
   background: var(--surface);
   box-shadow: 0 2px 6px var(--shadow-color);
 }
-.canvas-navigation-control {
-  left: var(--space-3);
+.navigation-edge {
+  flex-shrink: 0;
+  padding: var(--space-1);
+  background: var(--rail);
+  border-inline-end: 1px solid var(--border);
+}
+.navigation-collapse-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.navigation-collapse-control::before {
+  content: '';
+  flex: 1;
+  border-block-start: 1px solid var(--border-strong);
+}
+.workspace-navigation[data-collapsed='true'] .navigation-collapse-control {
+  width: 100%;
+}
+.navigation-collapse-control .navigation-toggle {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.navigation-collapse-control .navigation-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .workspace-action-rail {
   right: var(--space-3);
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
-.canvas-navigation-control .navigation-toggle,
+.workspace-action-rail .icon-button:not(.primary) {
+  background: transparent;
+  border-color: transparent;
+}
+.workspace-action-rail .icon-button:not(.primary):hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-action-rail:not(:hover):not(:focus-within) > :not(:first-child),
+  .canvas-bottom:not(:hover):not(:focus-within) > .canvas-tools {
+    opacity: 0;
+  }
+}
+.navigation-toggle,
 .workspace-action-rail .icon-button {
   width: var(--canvas-control-size);
   height: var(--canvas-control-size);
 }
-.canvas-navigation-control .navigation-toggle > svg,
+.navigation-edge .navigation-toggle > svg,
 .workspace-action-rail .icon-button > svg,
 .canvas-editbar .canvas-tool > svg {
   width: 18px;
@@ -763,6 +812,7 @@ code {
   white-space: nowrap;
 }
 .canvas-shell {
+  --canvas: var(--whiteboard-surface);
   position: relative;
   flex: 1;
   min-width: 0;
@@ -845,6 +895,9 @@ code {
   --xy-node-background-color-default: transparent;
   --xy-handle-border-color-default: var(--canvas);
   --xy-edge-stroke-default: var(--edge-neutral);
+}
+.canvas-shell .react-flow {
+  --xy-background-color: var(--canvas);
 }
 .react-flow__node:focus,
 .react-flow__node:focus-visible {
@@ -963,42 +1016,84 @@ code {
   gap: var(--space-1);
   padding: var(--space-2);
   border-top: 1px solid var(--border);
+  background: var(--card-toolbar-bg);
   cursor: default;
+}
+.repository-card-actions:last-child {
+  border-end-start-radius: inherit;
+  border-end-end-radius: inherit;
+}
+.repository-card-actions > .tooltip-anchor > .icon-button:disabled {
+  background: var(--card-toolbar-disabled);
+  color: var(--card-toolbar-text);
+  opacity: 1;
+}
+.repository-card-actions > .tooltip-anchor > .icon-button:focus-visible {
+  outline-color: var(--card-toolbar-accent);
 }
 .repository-card-message {
   display: flex;
   flex: 1;
   min-width: 0;
+  min-height: calc(var(--repository-card-input) + 2px);
   align-items: center;
-  background: var(--canvas);
-  border: 1px solid var(--border);
+  background: var(--card-input-bg);
+  border: 1px solid var(--card-input-muted);
   border-radius: var(--radius-control);
 }
 .repository-card-message:focus-within {
-  border-color: var(--focus);
-  outline: 1px solid var(--focus);
+  border-color: var(--card-input-accent);
+  outline: 1px solid var(--card-toolbar-accent);
 }
-.repository-card-message input {
-  width: 100%;
+.repository-card-message textarea {
+  flex: 1;
+  width: 0;
   min-width: 0;
-  height: var(--repository-card-input);
+  height: 1lh;
   border: 0;
   outline: 0;
+  resize: none;
+  overflow: hidden;
   background: transparent;
-  padding: 0 var(--space-2);
+  color: var(--card-input-text);
+  padding: 0 var(--space-1);
   font-size: var(--text-caption);
   box-shadow: none;
+}
+.repository-card-message textarea::placeholder {
+  color: var(--card-input-muted);
+  opacity: 1;
 }
 .repository-card-message .icon-button {
   border: 0;
   background: transparent;
+  color: var(--card-input-accent);
+}
+.repository-card-message .icon-button:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--card-input-hover);
+  color: var(--card-input-accent);
+}
+.repository-card-message .icon-button:focus-visible {
+  outline-color: var(--card-input-accent);
 }
 .repository-card-message .icon-button[aria-disabled='true'] {
-  opacity: 0.5;
+  color: var(--card-input-muted);
+  opacity: 1;
   cursor: not-allowed;
 }
-.repository-card-commit {
-  color: var(--accent);
+.repository-card-actions .repository-card-stage:not(:disabled) {
+  background: var(--card-stage-bg);
+  color: var(--card-stage-text);
+}
+.repository-card-actions .repository-card-stage:hover:not(:disabled) {
+  background: var(--card-stage-hover);
+}
+.repository-card-actions .repository-card-commit:not(:disabled) {
+  background: var(--card-toolbar-accent);
+  color: var(--card-toolbar-bg);
+}
+.repository-card-actions .repository-card-commit:hover:not(:disabled) {
+  background: var(--card-commit-hover);
 }
 .repository-card-notice {
   margin: 0;
@@ -1007,8 +1102,8 @@ code {
   overflow-wrap: anywhere;
 }
 @media (pointer: coarse) {
-  .repository-card-message input {
-    height: var(--control-touch);
+  .repository-card-message {
+    min-height: calc(var(--control-touch) + 2px);
   }
 }
 .node-heading {
@@ -1325,6 +1420,13 @@ code {
 .repository-node .react-flow__handle-right {
   right: -5px;
 }
+@media (hover: hover) and (pointer: fine) {
+  .reveal-node-handles
+    .react-flow__node:not(:hover, :focus-visible, :has(:focus-visible))
+    .react-flow__handle:not(.connectingfrom, .connectingto, .is-edge-selected) {
+    opacity: 0;
+  }
+}
 .edge-label {
   position: absolute;
   display: flex;
@@ -1431,12 +1533,21 @@ code {
 }
 .canvas-bottom {
   position: absolute;
-  bottom: 22px;
-  left: 24px;
+  bottom: var(--space-2);
+  left: var(--space-2);
   display: flex;
-  gap: 15px;
-  align-items: center;
+  gap: var(--space-2);
+  align-items: flex-end;
   pointer-events: none;
+}
+.canvas-bottom > .canvas-tools {
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
 }
 .canvas-tools {
   display: flex;
@@ -1470,14 +1581,14 @@ code {
 }
 .canvas-editbar {
   position: absolute;
-  left: calc(var(--space-3) + var(--canvas-control-extent) + var(--space-2));
+  left: var(--space-3);
   top: var(--space-3);
   z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  max-width: calc(100% - (var(--space-3) + var(--canvas-control-extent) + var(--space-2)) * 2);
+  max-width: calc(100% - var(--space-3) * 2 - var(--canvas-control-size) - var(--space-2));
   pointer-events: none;
 }
 .canvas-editbar > * {
@@ -1763,16 +1874,8 @@ code {
   outline-offset: 4px;
 }
 @media (max-width: 760px) {
-  .canvas-editbar {
-    left: var(--space-3);
-    top: calc(var(--space-3) + var(--canvas-control-extent) + var(--space-2));
-    max-width: calc(100% - var(--space-3) * 2 - var(--canvas-control-extent) - var(--space-2));
-  }
   .canvas-menu-items {
     max-width: min(218px, calc(100vw - 24px));
-  }
-  .canvas-shell .react-flow__minimap {
-    display: none;
   }
 }
 .canvas-tools .canvas-zoom-label {
@@ -1792,13 +1895,16 @@ code {
   color: var(--muted);
   font-size: 11px;
 }
-.react-flow__minimap {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  box-shadow: none;
-  right: 7px;
-  bottom: 7px;
+.canvas-bottom > .canvas-minimap {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  box-sizing: content-box;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  box-shadow: 0 2px 6px var(--shadow-color);
+  pointer-events: auto;
 }
 .workspace-statusbar {
   height: var(--statusbar-height);
@@ -1810,8 +1916,12 @@ code {
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 11px;
-  background: var(--surface);
   flex-shrink: 0;
+}
+.workflow-panel > .inspector-heading,
+.dock-card > .inspector > .inspector-heading,
+.workspace-statusbar {
+  background: var(--rail);
 }
 .workspace-statusbar > span {
   display: inline-flex;
@@ -1913,6 +2023,145 @@ code {
 }
 .info-popover-body {
   padding: var(--space-4);
+}
+.info-popover.remote-management:popover-open {
+  display: flex;
+  flex-direction: column;
+  width: min(var(--remote-management-width), calc(100vw - var(--space-4)));
+  overflow: hidden;
+}
+.remote-management > header,
+.remote-management-footer {
+  flex: none;
+  background: var(--surface);
+}
+.remote-management .info-popover-title,
+.remote-management-card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.remote-management .info-popover-title {
+  flex-wrap: wrap;
+}
+.remote-management-title-icon {
+  color: var(--accent);
+  flex: none;
+}
+.remote-management h3 {
+  font-size: var(--text-heading);
+}
+.remote-management-count,
+.remote-management-status {
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-size: var(--text-caption);
+  padding: var(--space-1) var(--space-2);
+}
+.remote-management .info-popover-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+.remote-management-list {
+  display: grid;
+  align-content: start;
+  min-height: 0;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  list-style: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.remote-management-list:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.remote-management-card {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  padding: var(--space-3);
+}
+.remote-management-card-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--control-compact);
+  height: var(--control-compact);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.remote-management-card h4 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+.remote-management-status {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-1);
+}
+.remote-management-status.checking {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.remote-management-status.readable {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.remote-management-status.failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.remote-management-feedback {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.remote-management-feedback.error-message {
+  color: var(--danger);
+}
+.remote-management-card-actions,
+.remote-management-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.remote-management-footer {
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+}
+.remote-management-footer > .button.primary {
+  margin-inline-start: auto;
+}
+.remote-management-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  overflow: auto;
+  padding: var(--space-8) var(--space-4);
+  color: var(--muted);
+}
+.remote-management-empty p {
+  margin: 0;
 }
 .repository-information {
   display: grid;
@@ -2133,33 +2382,6 @@ code {
 .file-row .icon-button {
   color: var(--muted);
 }
-.clean-workspace {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 48px 15px;
-  color: var(--muted);
-}
-.clean-workspace > div {
-  display: grid;
-  place-items: center;
-  width: 43px;
-  height: 43px;
-  border-radius: 50%;
-  background: var(--green-soft);
-  color: var(--green);
-  margin-bottom: 16px;
-}
-.clean-workspace strong {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-}
-.clean-workspace p {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--muted);
-}
 .commit-form {
   margin: var(--space-6) var(--space-5);
   display: flex;
@@ -2179,6 +2401,94 @@ code {
 }
 .commit-composer .field {
   margin: 0;
+}
+.remote-path-input {
+  width: 100%;
+  min-width: 0;
+}
+.commit-composer-compact {
+  container: commit-composer / inline-size;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  gap: var(--space-2);
+}
+.commit-compact-summary,
+.commit-compact-counts,
+.commit-compact-row,
+.commit-compact-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.commit-compact-summary {
+  justify-content: space-between;
+  white-space: nowrap;
+}
+.commit-compact-summary .commit-stage-actions {
+  flex: none;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+.button.branch-detail-action {
+  min-width: var(--control-compact);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding-inline: var(--space-2);
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+.button.branch-detail-action:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+@container commit-composer (width < 385px) {
+  .commit-compact-summary .branch-detail-action {
+    width: var(--control-compact);
+    padding-inline: 0;
+  }
+  .commit-compact-summary .branch-detail-action .button-label {
+    display: none;
+  }
+}
+.commit-compact-row > .tooltip-anchor {
+  flex: none;
+}
+.commit-compact-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.commit-compact-field {
+  flex: 1 0 min(100%, calc(4 * var(--control-compact)));
+  min-width: 0;
+  height: var(--control-compact);
+  gap: 0;
+  padding-inline: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+}
+.commit-compact-field:focus-within {
+  outline: 2px solid var(--focus);
+}
+.commit-form .commit-compact-field textarea {
+  flex: 1;
+  width: 0;
+  height: 1lh;
+  min-height: 0;
+  padding: 0 var(--space-1);
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: none;
+}
+.commit-expanded-editor textarea {
+  display: block;
+  width: 100%;
+  resize: none;
 }
 .commit-stage-actions {
   display: flex;
@@ -2428,8 +2738,7 @@ code {
   min-width: 0;
   min-height: 0;
   max-width: 66.6666666667vw;
-  background: var(--surface);
-  border-left: 1px solid var(--border);
+  background: var(--inspector-dock-surface);
   z-index: 8;
 }
 .dock-panels {
@@ -2457,6 +2766,7 @@ code {
   min-width: 0;
   position: relative;
   inset: auto;
+  background: transparent;
   border-left: 0;
   box-shadow: none;
 }
@@ -2895,16 +3205,20 @@ code {
   font-size: 13px;
   font-weight: 500;
 }
+.integration-result-help {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+.integration-result.pending {
+  background: var(--orange-soft);
+  border-color: var(--orange-border);
+}
 .integration-result.integrated {
   background: var(--green-soft);
   border-color: var(--green-border);
 }
 .integration-result.integrated > div {
   color: var(--green);
-}
-.integration-result.pending {
-  background: var(--orange-soft);
-  border-color: var(--orange-border);
 }
 .integration-result.pending > div {
   color: var(--orange);
@@ -2970,6 +3284,167 @@ code {
 .dialog-header h2 {
   font-size: var(--text-heading);
   font-weight: var(--weight-strong);
+}
+.dialog-title-context,
+.worktree-dialog-context {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dialog-title-context > h2,
+.dialog-title-context + .dialog-header-actions {
+  flex: none;
+}
+.worktree-dialog-context {
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.worktree-dialog-branch {
+  color: var(--accent);
+}
+.worktree-detail-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  height: var(--worktree-dialog-height);
+}
+.worktree-detail-dialog > .dialog-header {
+  flex: none;
+}
+.repository-tools-dialog.worktree-detail-dialog > .dialog-body {
+  flex: 1;
+  min-height: 0;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  container: worktree-dialog / inline-size;
+}
+.worktree-detail-dialog .commit-composer {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+}
+.worktree-detail-dialog .commit-compact-row {
+  flex: none;
+  order: 1;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+.worktree-file-panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  border-block: 1px solid var(--border);
+}
+.worktree-file-panes > .repo-sync-note {
+  grid-column: 1 / -1;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.worktree-file-panes .file-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding-block: var(--space-2);
+}
+.worktree-file-panes .file-group + .file-group {
+  padding-inline-start: var(--space-3);
+  border-inline-start: 1px solid var(--border);
+}
+.worktree-file-panes .file-group > header {
+  flex: none;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.worktree-file-panes .file-group > header > .tooltip-anchor {
+  flex: none;
+}
+.worktree-file-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.worktree-file-list:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.worktree-file-empty {
+  margin: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.worktree-dialog-sync {
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) minmax(max-content, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.worktree-dialog-sync:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.worktree-dialog-sync > * {
+  margin: 0;
+}
+.worktree-dialog-sync > .repo-sync-note {
+  grid-column: 2;
+  max-width: 100%;
+  justify-self: center;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+.worktree-dialog-sync > .repo-actions {
+  grid-column: 3;
+  justify-self: end;
+}
+.worktree-dialog-sync .remote-state,
+.worktree-dialog-sync .repo-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.worktree-dialog-sync .repo-actions .button {
+  width: auto;
+}
+@container worktree-dialog (width < 485px) {
+  .worktree-dialog-sync {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+  }
+  .worktree-dialog-sync .repo-actions .button {
+    width: var(--control-compact);
+    padding-inline: 0;
+  }
+  .worktree-dialog-sync .repo-actions .button-label {
+    display: none;
+  }
+}
+@container commit-composer (width < 500px) {
+  .worktree-file-panes {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 0;
+  }
+  .worktree-file-panes .file-group + .file-group {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--border);
+  }
 }
 .dialog-body {
   padding: var(--space-6);
@@ -3105,9 +3580,31 @@ code {
   margin-left: auto;
   font-size: 12px;
 }
+.repository-index-layout {
+  display: grid;
+  grid-template-columns: min(var(--settings-nav-width), 30%) minmax(0, 1fr);
+  min-height: var(--settings-min-height);
+}
+.settings-navigation.repository-index-navigation {
+  flex-direction: column;
+  border-block-end: 0;
+  border-inline-end: 1px solid var(--border);
+  padding-inline: var(--space-2);
+}
+.repository-index-navigation svg {
+  flex: none;
+}
+.repository-index-content {
+  min-width: 0;
+  align-self: start;
+  margin: var(--space-4);
+}
 .repository-index-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--repository-index-card-width)), 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--repository-index-card-width)), 1fr)
+  );
   gap: var(--space-4);
 }
 .repository-index-card {
@@ -3127,8 +3624,30 @@ code {
   gap: var(--space-2);
 }
 .repository-index-text {
+  flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.repository-index-identity .repository-avatar {
+  width: var(--repository-card-avatar);
+  height: var(--repository-card-avatar);
+}
+.repository-index-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.repository-index-title h3 {
+  min-width: 0;
+}
+.repository-index-title .tooltip-anchor {
+  flex: none;
+}
+.repository-index-title .repository-index-board-action,
+.repository-index-title .repository-index-board-action:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
 }
 .repository-index-text h3,
 .repository-index-text p {
@@ -3136,6 +3655,7 @@ code {
 }
 .repository-index-text h3 {
   font-size: var(--text-heading);
+  font-weight: var(--weight-bold);
 }
 .repository-index-text p {
   font-size: var(--text-caption);
@@ -3363,10 +3883,6 @@ code {
   .canvas-hint {
     display: none;
   }
-  .canvas-bottom {
-    left: 18px;
-    bottom: 18px;
-  }
 }
 @media (max-width: 1000px) {
   .inspector {
@@ -3474,14 +3990,6 @@ code {
   }
   .dialog-body {
     padding: 21px;
-  }
-  .canvas-bottom {
-    left: 14px;
-    bottom: 14px;
-  }
-  .react-flow__minimap {
-    right: 0;
-    bottom: 0;
   }
   .empty-canvas h1 {
     font-size: 22px;
@@ -3656,7 +4164,7 @@ code {
   height: 420px;
   min-width: 0;
   border: 1px solid var(--border);
-  background: var(--canvas);
+  background: var(--whiteboard-surface);
 }
 .design-dock-stage .inspector-dock {
   position: relative;
@@ -3788,13 +4296,8 @@ code {
 .file-group .text-button,
 .file-row .icon-button,
 .field-caption,
-.registered-repos .repo-shortcut,
-.clean-workspace strong,
-.clean-workspace p {
+.registered-repos .repo-shortcut {
   color: var(--muted);
-}
-.clean-workspace {
-  padding-top: 42px;
 }
 .diff-view pre {
   color: var(--text-secondary);
@@ -3822,6 +4325,9 @@ code {
 }
 .empty-note {
   color: var(--muted);
+}
+.canvas-shell :is(.empty-canvas p, .empty-note, .canvas-tools .canvas-zoom-label) {
+  color: var(--text-secondary);
 }
 .toolbar-actions .refresh-button {
   color: var(--muted);
@@ -4119,15 +4625,297 @@ code {
 .result-details summary:hover {
   color: var(--text);
 }
-.react-flow .workflow-edge-path {
+.workflow-edge-track {
   --relation-stroke: var(--edge-neutral);
-  --relation-width: 1.5;
-  stroke: var(--relation-stroke);
-  stroke-width: var(--relation-width);
+  --relation-ink: var(--relation-stroke);
+  --relation-core: var(--relation-line-core);
+  --relation-gap: calc(var(--relation-core) + 2 * var(--relation-line-gap));
 }
-.react-flow__edge:focus-visible .workflow-edge-path {
-  stroke: var(--focus);
-  stroke-width: 3;
+.workflow-edge-track[data-emphasis='related'] {
+  --relation-core: calc(var(--relation-line-core) + 0.5px);
+}
+.workflow-edge-track[data-emphasis='selected'],
+.react-flow__edge:focus-visible .workflow-edge-track {
+  --relation-core: calc(var(--relation-line-core) + 1px);
+}
+.react-flow__edge:focus-visible .workflow-edge-track {
+  --relation-ink: var(--focus);
+}
+.react-flow .workflow-edge-path {
+  stroke: var(--relation-ink);
+  stroke-width: var(--relation-core);
+  stroke-linejoin: round;
+}
+.workflow-edge-rails,
+.workflow-edge-gap {
+  fill: none;
+  pointer-events: none;
+  stroke-linejoin: round;
+}
+.workflow-edge-rails {
+  stroke: var(--relation-ink);
+  stroke-width: calc(var(--relation-gap) + 2 * var(--relation-line-rail));
+}
+.workflow-edge-gap {
+  stroke: var(--canvas);
+  stroke-width: var(--relation-gap);
+}
+.workflow-edge-track[data-detail='compact'] .workflow-edge-path {
+  vector-effect: non-scaling-stroke;
+  stroke-width: var(--relation-line-compact);
+}
+.workflow-edge-track[data-detail='compact'][data-emphasis='selected'] .workflow-edge-path,
+.react-flow__edge:focus-visible .workflow-edge-track[data-detail='compact'] .workflow-edge-path {
+  stroke-width: calc(var(--relation-line-compact) + 0.5px);
+}
+.workflow-edge-track[data-detail='compact'] :is(.workflow-edge-rails, .workflow-edge-gap) {
+  display: none;
+}
+.repository-relation-position {
+  position: absolute;
+}
+.relation-inspector {
+  container-type: inline-size;
+}
+.relation-repository-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  margin-block: var(--space-3) var(--space-5);
+}
+.relation-repository-pair > svg {
+  justify-self: center;
+  transform: rotate(90deg);
+  color: var(--muted);
+}
+.relation-repository-endpoint {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.repository-node.relation-repository-card {
+  width: 100%;
+  cursor: default;
+  box-shadow: none;
+  margin-top: var(--space-1);
+  flex: 1;
+}
+.relation-repository-card .repository-card-heading {
+  padding: var(--space-3);
+}
+.relation-repository-card h3 {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.relation-ref {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: var(--space-1) 0;
+  font: inherit;
+  min-width: 0;
+  text-align: left;
+}
+.relation-ref > span {
+  overflow-wrap: anywhere;
+}
+.integration-comparison {
+  margin-top: var(--space-5);
+}
+.integration-history-map {
+  position: relative;
+  margin-block: var(--space-3);
+}
+.comparison-map-labels {
+  position: relative;
+  min-height: var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.comparison-map-labels > span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.integration-history-wires {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.integration-history-wires path {
+  stroke: var(--edge-neutral);
+  stroke-width: 1.5;
+}
+.integration-map-point {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.integration-map-commit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--accent);
+  min-height: var(--control-small);
+  font: inherit;
+}
+.integration-map-point.source .integration-map-commit {
+  color: var(--orange);
+}
+.integration-map-point.common .integration-map-commit {
+  color: var(--green);
+}
+.integration-map-commit code {
+  font-size: var(--text-caption);
+}
+.integration-map-commit[aria-expanded='true'] {
+  outline: 2px solid var(--accent);
+}
+.integration-map-commit:hover {
+  background: var(--hover);
+}
+.basis-highlight .integration-map-commit {
+  outline: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+.basis-commit-role {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: var(--space-1);
+  color: var(--text);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .integration-map-commit {
+    min-height: var(--control-touch);
+  }
+}
+.comparison-heading,
+.comparison-caption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.comparison-heading {
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+.comparison-heading h3 {
+  margin: 0;
+  font-size: var(--text-body);
+}
+.comparison-caption {
+  color: var(--muted);
+  font-size: var(--text-caption);
+}
+.comparison-commit-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  line-height: var(--leading-body);
+}
+.comparison-commit-info strong,
+.comparison-commit-info code {
+  overflow-wrap: anywhere;
+}
+.comparison-commit-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--muted);
+}
+.relation-history-error {
+  margin-top: var(--space-3);
+  color: var(--danger);
+}
+.relation-history-error .button {
+  margin-top: var(--space-2);
+}
+.relation-panel-example {
+  min-height: 500px;
+}
+.relation-panel-example > .relation-inspector {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  max-height: 700px;
+  border: 1px solid var(--border);
+}
+@container (min-width: 540px) {
+  .relation-repository-pair {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .relation-repository-pair > svg {
+    transform: none;
+    align-self: center;
+  }
+}
+@media (pointer: coarse) {
+  .relation-ref {
+    min-height: var(--control-touch);
+  }
+}
+.repository-node.relation-example-node {
+  width: var(--relation-bridge-example-node-width);
+}
+.edge-label.repository-relation-label {
+  position: relative;
+  border-radius: var(--relation-bridge-radius);
+  padding: var(--space-1) var(--space-2);
+  min-height: var(--control-small);
+  max-width: var(--relation-bridge-max-width);
+  font-size: var(--text-caption);
+  line-height: var(--leading-compact);
+  color: var(--text);
+  background: var(--relation-label-bg, var(--surface-raised));
+  box-shadow: none;
+}
+.repository-relation-label > span {
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.repository-relation-label > svg {
+  flex-shrink: 0;
+  color: var(--relation-label-icon, var(--muted));
+}
+.repository-relation-label:is([data-state='integrated'], [data-state='refsInSync']) {
+  --relation-label-bg: var(--green-soft);
+  --relation-label-icon: var(--green);
+}
+.repository-relation-label:is([data-state='pending'], [data-state='targetBehind']) {
+  --relation-label-bg: var(--orange-soft);
+  --relation-label-icon: var(--orange);
+}
+.repository-relation-label[data-state='targetAhead'] {
+  --relation-label-bg: color-mix(in srgb, var(--edge-integration) 18%, var(--surface));
+  --relation-label-icon: var(--edge-integration);
+}
+.repository-relation-label[data-state='diverged'] {
+  --relation-label-bg: var(--danger-soft);
+  --relation-label-icon: var(--danger);
+}
+.repository-relation-label:is([data-state='dependency'], [data-state='delivery']) {
+  --relation-label-bg: color-mix(in srgb, var(--edge-neutral) 18%, var(--surface));
+  --relation-label-icon: var(--edge-neutral);
+}
+@media (pointer: coarse) {
+  .edge-label.repository-relation-label {
+    min-height: var(--control-touch);
+  }
 }
 @media (max-width: 760px) {
   .workspace-header {
@@ -4149,9 +4937,6 @@ code {
   .workspace-header .board-title h1 {
     font-size: 14px;
   }
-}
-.react-flow__minimap {
-  background: var(--surface);
 }
 .edge-status.integrated {
   color: var(--green);

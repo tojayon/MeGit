@@ -17,12 +17,14 @@ const emit = () => listeners.forEach((listener) => listener());
 
 export function useRepositoryActions({
   repo,
+  worktreeRef,
   viewKey,
   onState,
   onRefresh,
   onNotice,
 }: {
   repo: Repository;
+  worktreeRef?: string;
   viewKey?: string;
   onState: (state: RepoState) => void;
   onRefresh: () => Promise<void>;
@@ -31,7 +33,7 @@ export function useRepositoryActions({
   const [message, setMessage] = useViewState(viewKey && `${viewKey}.draft`, '', isText);
   const identity = JSON.stringify([repo.id, repo.path]);
   const generation = useRef<AbortController | null>(null);
-  useEffect(() => () => generation.current?.abort(), [identity, viewKey]);
+  useEffect(() => () => generation.current?.abort(), [identity, viewKey, worktreeRef]);
   const busy = useSyncExternalStore(subscribe, () => running.get(identity) || '');
   async function generateCommit(): Promise<boolean> {
     if (running.has(identity)) return false;
@@ -58,11 +60,21 @@ export function useRepositoryActions({
     running.set(identity, operation.type);
     emit();
     try {
-      const result = await api.action(repo.id, operation);
+      const protectedAction = ['stage', 'unstage', 'commit', 'pull', 'push', 'publishBranch', 'setTracking'].includes(
+        operation.type,
+      );
+      const result = await api.action(
+        repo.id,
+        operation,
+        protectedAction ? worktreeRef : undefined,
+      );
       onState(result.state);
       if (operation.type === 'commit') setMessage('');
       await onRefresh();
-      onNotice({ key: `actions.${operation.type}`, values: { name: repo.name } });
+      const target = operation.type === 'publishBranch' ? `${operation.remote}/${operation.name}`
+        : operation.type === 'setTracking' ? operation.targetRef.slice('refs/remotes/'.length)
+          : operation.type === 'addRemote' ? operation.name : '';
+      onNotice({ key: `actions.${operation.type}`, values: { name: repo.name, target } });
       return true;
     } finally {
       running.delete(identity);

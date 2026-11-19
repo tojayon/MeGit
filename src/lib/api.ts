@@ -5,7 +5,9 @@ import type {
   DiffQuery,
   DiffResult,
   GitAction,
+  IntegrationHistory,
   RepoState,
+  RemoteReadStatus,
   RepositoryImage,
   RepositoryImages,
   Snapshot,
@@ -53,6 +55,29 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
   return data as T;
 }
 export const api = {
+  remoteAccessOptions: (repoId: string, name: string, signal: AbortSignal) =>
+    request<{ githubLogin: boolean }>(
+      `/repositories/${encodeURIComponent(repoId)}/remote-access?${new URLSearchParams({ name })}`,
+      { signal },
+    ),
+  checkRemoteRead: (repoId: string, name: string) =>
+    request<{ status: RemoteReadStatus }>(`/repositories/${encodeURIComponent(repoId)}/remote-access`, {
+      method: 'POST', body: JSON.stringify({ name, action: 'read' }),
+    }),
+  loginRemoteGitHub: (repoId: string, name: string) =>
+    request<{ completed: true }>(`/repositories/${encodeURIComponent(repoId)}/remote-access`, {
+      method: 'POST', body: JSON.stringify({ name, action: 'githubLogin' }),
+    }),
+  integrationHistory: (
+    boardId: string,
+    edgeId: string,
+    options: { offset?: number; sourceHash?: string; targetHash?: string } = {},
+    signal?: AbortSignal,
+  ) =>
+    request<IntegrationHistory>(
+      `/boards/${encodeURIComponent(boardId)}/relations/${encodeURIComponent(edgeId)}/history?${new URLSearchParams(Object.entries(options).map(([key, value]) => [key, String(value)]))}`,
+      { signal },
+    ),
   generateCommit: (repositoryId: string, signal: AbortSignal) =>
     request<{ kind: 'commit'; text: string }>('/ai/assist', {
       method: 'POST',
@@ -103,8 +128,10 @@ export const api = {
     }),
   snapshot: (boardId: string) =>
     request<Snapshot>(`/snapshot?boardId=${encodeURIComponent(boardId)}`),
-  history: (repoId: string, skip = 0) =>
-    request<Commit[]>(`/repositories/${encodeURIComponent(repoId)}/history?skip=${skip}`),
+  history: (repoId: string, skip = 0, ref?: string) =>
+    request<Commit[]>(
+      `/repositories/${encodeURIComponent(repoId)}/history?${new URLSearchParams({ skip: String(skip), ...(ref ? { ref } : {}) })}`,
+    ),
   diff: (repoId: string, query: DiffQuery) => {
     const params = new URLSearchParams();
     if (query.path) params.set('path', query.path);
@@ -112,9 +139,9 @@ export const api = {
     if (query.staged !== undefined) params.set('staged', String(query.staged));
     return request<DiffResult>(`/repositories/${encodeURIComponent(repoId)}/diff?${params}`);
   },
-  action: (repoId: string, action: GitAction) =>
+  action: (repoId: string, action: GitAction, worktreeRef?: string) =>
     request<{ message: string; state: RepoState }>(
-      `/repositories/${encodeURIComponent(repoId)}/actions`,
+      `/repositories/${encodeURIComponent(repoId)}/actions${worktreeRef ? `?${new URLSearchParams({ worktreeRef })}` : ''}`,
       { method: 'POST', body: JSON.stringify(action) },
     ),
 };

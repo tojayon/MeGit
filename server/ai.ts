@@ -127,7 +127,8 @@ export async function completeAi(
     const content: unknown = JSON.parse(body + decoder.decode()).choices?.[0]?.message?.content;
     if (typeof content !== 'string' || !content.trim()) throw new Error();
     return content.trim();
-  } catch {
+  } catch (error) {
+    if (error instanceof AppError && (error.code === 'proxyConnection' || error.code === 'proxyTimeout')) throw error;
     throw new AppError('aiUnavailable', 502);
   }
 }
@@ -136,6 +137,7 @@ export function aiRouter(
   directory: string,
   readState: (id: string) => Promise<RepoState>,
   readCommit?: (id: string) => ReturnType<typeof readCommitContext>,
+  getTransport: () => Promise<typeof fetch> = async () => fetch,
 ) {
   const router = Router();
   const filename = path.join(directory, 'ai-settings.json');
@@ -199,7 +201,7 @@ export function aiRouter(
     }
   });
   router.post('/test', async (_req, res) => {
-    await completeAi(await configForRequest(), [{ role: 'user', content: 'Reply with OK only.' }]);
+    await completeAi(await configForRequest(), [{ role: 'user', content: 'Reply with OK only.' }], await getTransport());
     res.json({ ok: true });
   });
   router.post('/assist', async (req, res) => {
@@ -207,6 +209,7 @@ export function aiRouter(
     if (!task.success) throw new AppError('aiInvalid');
     const { kind, language } = task.data;
     const config = await configForRequest();
+    const transport = await getTransport();
     const outputLanguage = language === 'en' ? 'English' : 'Simplified Chinese';
     if (task.data.kind === 'commit') {
       if (!readCommit) throw new AppError('aiInvalid');
@@ -233,7 +236,7 @@ export function aiRouter(
               content: JSON.stringify({ patch: context.patch, truncated: context.truncated }),
             },
           ],
-          fetch,
+          transport,
           cancellation.signal,
         );
         const text = commitMessage(output);
@@ -263,7 +266,7 @@ export function aiRouter(
           content: `Explain this read-only Git status in ${outputLanguage}. Null counts are unknown. Do not invent remote or file details. Return concise plain text.`,
         },
         { role: 'user', content: JSON.stringify(status) },
-      ]);
+      ], transport);
       return res.json({ kind, text });
     }
     const text = await completeAi(config, [
@@ -272,7 +275,7 @@ export function aiRouter(
         content: `Draft a flowchart in ${outputLanguage}. Return only JSON: {"nodes":[{"title":"…","kind":"start|process|decision|end"}],"edges":[{"source":0,"target":1,"label":""}]}. Use zero-based node indices, 1–12 nodes and at most 24 edges. Titles and labels max 80 characters.`,
       },
       { role: 'user', content: task.data.prompt },
-    ]);
+    ], transport);
     const diagram = z
       .string()
       .transform((value, context) => {

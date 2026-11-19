@@ -63,8 +63,8 @@ describe('Git command preview contracts', () => {
     expect(actionArguments({ type: 'push' }, state)).toBeNull();
     const destination = { remote: 'team', ref: 'refs/heads/release/different-name' };
     expect(
-      actionArguments({ type: 'push' }, { ...state, pushTarget: destination })?.slice(-2),
-    ).toEqual(['team', 'HEAD:refs/heads/release/different-name']);
+      actionArguments({ type: 'push' }, { ...state, pushTarget: destination, upstreamHead: 'b'.repeat(40) })?.slice(-2),
+    ).toEqual(['team', `${state.head}:refs/heads/release/different-name`]);
   });
   it('untracked file viewing does not invent a Git diff command; rename diff includes original path', () => {
     expect(fileDiffArguments({ ...file, untracked: true }, false)).toBeNull();

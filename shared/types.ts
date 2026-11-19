@@ -21,6 +21,8 @@ export interface RepositoryImages {
 export interface FlowNode {
   id: string;
   repoId: string;
+  ref?: string;
+  displayName?: string;
   position: { x: number; y: number };
 }
 export interface FlowNote {
@@ -46,8 +48,8 @@ export interface FlowEdge {
   target: string;
   kind: RelationKind;
   label: string;
-  sourceRef: string;
-  targetRef: string;
+  sourceRef?: string;
+  targetRef?: string;
   routing?: EdgeRouting;
   waypoints?: { x: number; y: number }[];
   sourcePort?: PortSide;
@@ -98,7 +100,9 @@ export interface RepoState {
   head: string | null;
   detached: boolean;
   upstream: string | null;
+  trackingConfigured?: boolean;
   pushTarget?: { remote: string; ref: string } | null;
+  upstreamHead?: string | null;
   ahead: number | null;
   behind: number | null;
   changed: number;
@@ -122,6 +126,8 @@ export interface Commit {
   date: string;
   refs: string;
 }
+export type RemoteDestination = { kind: 'web' | 'local'; value: string };
+
 export interface TreeBranch extends Branch {
   ref: string;
   parents: string[];
@@ -133,6 +139,7 @@ export interface TreeBranch extends Branch {
   ahead: number | null;
   behind: number | null;
   worktreePath?: string;
+  remoteDestination?: RemoteDestination;
 }
 export interface BranchTreeData {
   baseRef: string | null;
@@ -187,8 +194,29 @@ export type BranchAction =
       targetHash: string;
       expected: BranchExpectation;
     };
+export type ProxySettings = { enabled: boolean; address: string };
+
+export type RemoteReadStatus =
+  | 'readable'
+  | 'proxyConnection'
+  | 'proxyTimeout'
+  | 'proxyUnsupported'
+  | 'remoteNotConfigured'
+  | 'remoteDestinationCredentials'
+  | 'remoteReadAuth'
+  | 'remoteReadNetwork'
+  | 'remoteReadLocal'
+  | 'remoteReadUnknown'
+  | 'gitTimeout'
+  | 'gitMissing';
+
+export type RemoteAction =
+  | { type: 'addRemote'; name: string; destination: string }
+  | { type: 'publishBranch'; remote: string; name: string; expected: BranchExpectation }
+  | { type: 'setTracking'; targetRef: string; targetHash: string; expected: BranchExpectation };
 export type GitAction =
   | BranchAction
+  | RemoteAction
   | { type: 'stage' | 'unstage'; paths: string[] }
   | { type: 'commit'; message: string }
   | { type: 'fetch' | 'pull' | 'push' };
@@ -197,6 +225,7 @@ export interface IntegrationState {
   sourceHead: string | null;
   targetHead: string | null;
   pending: number | null;
+  divergence?: { targetAhead: number; targetBehind: number };
   message: string;
   messageCode?: IntegrationMessage;
   errorInfo?: ErrorInfo;
@@ -205,4 +234,16 @@ export interface Snapshot {
   repositories: Record<string, RepoState>;
   relations: Record<string, IntegrationState>;
   checkedAt: string;
+}
+export interface IntegrationHistory {
+  comparison: IntegrationState;
+  sourceTip: Commit | null;
+  targetTip: Commit | null;
+  commonBases: Commit[];
+  includedAt: Commit | null;
+  shallow: boolean;
+  // Development descending from the common bases to each tip, excluding shared
+  // history and older side histories. These totals are not the pending count.
+  sourceOnly: { commits: Commit[]; total: number | null; hasMore: boolean };
+  targetOnly: { commits: Commit[]; total: number | null; hasMore: boolean };
 }

@@ -359,7 +359,7 @@ test('聚焦过滤后折叠组端口与连线贴合，锁定缩放不影响重�
     await git(f.root, 'clone', f.repo, added);
     await page.getByRole('button', { name: '添加仓库', exact: true }).click();
     await page.getByLabel('仓库路径').fill(added);
-    await page.getByLabel('显示名称').fill('新加入的仓库');
+    await page.getByLabel('卡片显示名称').fill('新加入的仓库');
     await page.getByRole('button', { name: '添加到白板', exact: true }).click();
     await expect(
       page.getByTestId('repository-node').filter({ hasText: '新加入的仓库' }),

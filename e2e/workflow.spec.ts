@@ -20,7 +20,7 @@ test('流程白板连接真实仓库，保存布局，查看历史与暂存提�
     const addRepo = async (repoPath: string, name: string) => {
       await page.getByRole('button', { name: '添加仓库', exact: true }).first().click();
       await page.getByLabel('仓库路径').fill(repoPath);
-      await page.getByLabel('显示名称').fill(name);
+      await page.getByLabel('卡片显示名称').fill(name);
       await page.getByRole('button', { name: '添加到白板' }).click();
       await expect(page.getByTestId('repository-node').filter({ hasText: name })).toBeVisible();
     };
@@ -125,7 +125,7 @@ test('获取远端后刷新已打开的历史，并支持多个白板和键盘�
     await page.goto('/');
     await page.getByRole('button', { name: '添加仓库', exact: true }).first().click();
     await page.getByLabel('仓库路径').fill(f.repo);
-    await page.getByLabel('显示名称').fill('接口项目');
+    await page.getByLabel('卡片显示名称').fill('接口项目');
     await page.getByRole('button', { name: '添加到白板' }).click();
     await page.getByRole('button', { name: '查看接口项目' }).click();
     await openRepositoryTools(page, 'history');

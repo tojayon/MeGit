@@ -6,6 +6,7 @@ import type { Workspace } from '../shared/types.js';
 import { AppError } from './errors.js';
 import { resolveRepository } from './git.js';
 import { isSafeRef } from '../shared/refs.js';
+import { isCardRef } from '../shared/card-refs.js';
 import { isRepositoryImagePath } from '../shared/repository-images.js';
 import { readRepositoryImage } from './repository-images.js';
 
@@ -37,7 +38,17 @@ export const workspaceSchema = z.object({
         id,
         name: z.string().trim().min(1).max(100),
         description: z.string().max(500),
-        nodes: z.array(z.object({ id, repoId: id, position: point })).max(200),
+        nodes: z
+          .array(
+            z.object({
+              id,
+              repoId: id,
+              position: point,
+              ref: z.string().refine(isCardRef).optional(),
+              displayName: z.string().trim().max(120).transform((name) => name || undefined).optional(),
+            }),
+          )
+          .max(200),
         notes: z
           .array(
             z.object({
@@ -74,8 +85,8 @@ export const workspaceSchema = z.object({
               target: id,
               kind: z.enum(['integration', 'dependency', 'delivery']),
               label: z.string().max(100),
-              sourceRef: ref,
-              targetRef: ref,
+              sourceRef: ref.optional(),
+              targetRef: ref.optional(),
               routing: z.enum(['smoothstep', 'step', 'bezier', 'straight']).optional(),
               waypoints: z.array(point).max(20).optional(),
               sourcePort: port.optional(),
@@ -118,7 +129,7 @@ function validate(data: unknown): Workspace {
     if (
       !unique([...board.nodes, ...(board.notes || [])].map((n) => n.id)) ||
       !unique(board.edges.map((e) => e.id)) ||
-      !unique(board.nodes.map((n) => n.repoId))
+      !unique(board.nodes.map((n) => JSON.stringify([n.repoId, n.ref ?? 'HEAD'])))
     )
       throw new AppError('duplicateNode');
     const nodes = new Set(board.nodes.map((n) => n.id));

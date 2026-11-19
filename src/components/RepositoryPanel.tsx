@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
-  Check,
   ChevronRight,
   CircleAlert,
   Download,
@@ -29,7 +28,8 @@ import { api, timeAgo } from '../lib/api';
 import { Dialog } from './Dialogs';
 import { formatError, type NoticeMessage } from '../lib/messages';
 import { BranchTreePanel } from './BranchTreePanel';
-import { CommitComposer } from './CommitComposer';
+import { cardRefLabel, cardUsesWorktree } from '../../shared/card-refs';
+import { CommitComposer, CommitStageButton } from './CommitComposer';
 import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { PanelHeader } from './PanelHeader';
@@ -234,137 +234,130 @@ function FileGroup({
   busy,
   onAction,
   onDiff,
+  scrollKey,
+  emptyLabel,
 }: {
   files: ChangedFile[];
   state: RepoState;
   isStaged: boolean;
-  busy: boolean;
+  busy: string;
   onAction: (action: GitAction) => Promise<void>;
   onDiff: (diff: DiffSelection) => void;
+  scrollKey?: string;
+  emptyLabel: string;
 }) {
   const { t } = useTranslation();
+  const scroll = useRef<HTMLDivElement>(null);
+  const label = t(isStaged ? 'repository.staged' : 'repository.modified');
+  useScrollMemory(scroll, scrollKey);
+  const rows = files.map((file) => (
+    <div className="file-row" key={file.path}>
+      <Tooltip
+        detailed
+        content={
+          <GitHelp
+            topic={file.conflicted ? 'conflict' : file.untracked ? 'untracked' : 'fileStatus'}
+          />
+        }
+      >
+        <span
+          tabIndex={0}
+          aria-label={t(
+            `gitHelp.topics.${file.conflicted ? 'conflict' : file.untracked ? 'untracked' : 'fileStatus'}.title`,
+          )}
+          className={`file-status ${file.untracked ? 'untracked' : file.conflicted ? 'conflict' : ''}`}
+        >
+          {file.untracked ? 'U' : isStaged ? file.indexStatus : file.worktreeStatus}
+        </span>
+      </Tooltip>
+      <Tooltip
+        className="file-name-tip"
+        detailed
+        content={
+          <>
+            <strong>{file.path}</strong>
+            <GitHelp
+              topic={isStaged ? 'stagedDiff' : 'workingDiff'}
+              preview={{
+                when: 'read',
+                commands: [fileDiffArguments(file, isStaged)],
+                empty: 'untracked',
+              }}
+            />
+          </>
+        }
+      >
+        <button
+          type="button"
+          className="file-name"
+          onClick={() => onDiff({ title: file.path, query: { path: file.path, staged: isStaged } })}
+        >
+          {file.path}
+          <ChevronRight size={13} />
+        </button>
+      </Tooltip>
+      <IconButton
+        size="small"
+        help={
+          <GitHelp
+            topic={isStaged ? 'unstage' : 'stage'}
+            preview={{
+              commands: [
+                actionArguments(
+                  { type: isStaged ? 'unstage' : 'stage', paths: [file.path] },
+                  state,
+                ),
+              ],
+            }}
+          />
+        }
+        label={t('repository.fileAction', {
+          action: isStaged ? t('repository.unstage') : t('repository.stage'),
+          path: file.path,
+        })}
+        disabled={!!busy}
+        onClick={() => void onAction({ type: isStaged ? 'unstage' : 'stage', paths: [file.path] })}
+      >
+        {isStaged ? <Minus size={15} /> : <Plus size={15} />}
+      </IconButton>
+    </div>
+  ));
   return (
     <section className="file-group">
       <header>
         <h3>
-          {isStaged ? t('repository.staged') : t('repository.modified')}
+          {label}
           <span>{files.length}</span>
           <HelpTip
             topic={isStaged ? 'staged' : 'unstaged'}
             related={[isStaged ? 'unstage' : 'stage']}
           />
         </h3>
-        <Tooltip
-          detailed
-          content={
-            <GitHelp
-              topic={isStaged ? 'unstage' : 'stage'}
-              preview={{
-                commands: [
-                  actionArguments(
-                    { type: isStaged ? 'unstage' : 'stage', paths: files.map((file) => file.path) },
-                    state,
-                  ),
-                ],
-              }}
-            />
-          }
-        >
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() =>
-              void onAction({
-                type: isStaged ? 'unstage' : 'stage',
-                paths: files.map((file) => file.path),
-              })
-            }
-          >
-            {isStaged ? t('repository.unstageAll') : t('repository.stageAll')}
-          </button>
-        </Tooltip>
+        <CommitStageButton
+          type={isStaged ? 'unstage' : 'stage'}
+          paths={files.map((file) => file.path)}
+          state={state}
+          busy={busy}
+          compact
+          onAction={onAction}
+        />
       </header>
-      {files.map((file) => (
-        <div className="file-row" key={file.path}>
-          <Tooltip
-            detailed
-            content={
-              <GitHelp
-                topic={file.conflicted ? 'conflict' : file.untracked ? 'untracked' : 'fileStatus'}
-              />
-            }
-          >
-            <span
-              tabIndex={0}
-              aria-label={t(
-                `gitHelp.topics.${file.conflicted ? 'conflict' : file.untracked ? 'untracked' : 'fileStatus'}.title`,
-              )}
-              className={`file-status ${file.untracked ? 'untracked' : file.conflicted ? 'conflict' : ''}`}
-            >
-              {file.untracked ? 'U' : isStaged ? file.indexStatus : file.worktreeStatus}
-            </span>
-          </Tooltip>
-          <Tooltip
-            className="file-name-tip"
-            detailed
-            content={
-              <>
-                <strong>{file.path}</strong>
-                <GitHelp
-                  topic={isStaged ? 'stagedDiff' : 'workingDiff'}
-                  preview={{
-                    when: 'read',
-                    commands: [fileDiffArguments(file, isStaged)],
-                    empty: 'untracked',
-                  }}
-                />
-              </>
-            }
-          >
-            <button
-              className="file-name"
-              onClick={() =>
-                onDiff({ title: file.path, query: { path: file.path, staged: isStaged } })
-              }
-            >
-              {file.path}
-              <ChevronRight size={13} />
-            </button>
-          </Tooltip>
-          <IconButton
-            size="small"
-            help={
-              <GitHelp
-                topic={isStaged ? 'unstage' : 'stage'}
-                preview={{
-                  commands: [
-                    actionArguments(
-                      { type: isStaged ? 'unstage' : 'stage', paths: [file.path] },
-                      state,
-                    ),
-                  ],
-                }}
-              />
-            }
-            label={t('repository.fileAction', {
-              action: isStaged ? t('repository.unstage') : t('repository.stage'),
-              path: file.path,
-            })}
-            disabled={busy}
-            onClick={() =>
-              void onAction({ type: isStaged ? 'unstage' : 'stage', paths: [file.path] })
-            }
-          >
-            {isStaged ? <Minus size={15} /> : <Plus size={15} />}
-          </IconButton>
-        </div>
-      ))}
+      <div
+        ref={scroll}
+        className="worktree-file-list"
+        role="region"
+        aria-label={label}
+        tabIndex={0}
+      >
+        {rows.length ? rows : <p className="worktree-file-empty">{emptyLabel}</p>}
+      </div>
     </section>
   );
 }
 
 function RepositoryToolsPanel({
   repo,
+  cardRef,
   viewKey,
   onReady,
   state,
@@ -374,8 +367,10 @@ function RepositoryToolsPanel({
   busy,
   handleAction,
   onCommitAction,
+  onGenerateCommit,
 }: {
   repo: Repository;
+  cardRef?: string;
   viewKey?: string;
   onReady?: (tab: 'worktree' | 'history', ready: boolean) => void;
   state?: RepoState;
@@ -385,6 +380,7 @@ function RepositoryToolsPanel({
   busy: string;
   handleAction: (action: GitAction) => Promise<void>;
   onCommitAction: (action: GitAction) => Promise<boolean>;
+  onGenerateCommit: () => Promise<boolean>;
 }) {
   const { t } = useTranslation();
   const [commits, setCommits] = useState<Commit[]>([]);
@@ -411,10 +407,10 @@ function RepositoryToolsPanel({
       }
     });
     (async () => {
-      const data = await api.history(repo.id);
+      const data = await api.history(repo.id, 0, cardRef);
       let last = data.length;
       while (active && data.length < historyCount && last === 40) {
-        const more = await api.history(repo.id, data.length);
+        const more = await api.history(repo.id, data.length, cardRef);
         last = more.length;
         data.push(...more);
       }
@@ -435,43 +431,55 @@ function RepositoryToolsPanel({
     return () => {
       active = false;
     };
-  }, [repo.id, state?.head, refFingerprint, tab, historyCount]);
+  }, [repo.id, cardRef, state?.head, refFingerprint, tab, historyCount]);
 
   const staged = state?.files.filter((f) => !f.untracked && f.indexStatus !== '.') || [];
   const unstaged = state?.files.filter((f) => f.untracked || f.worktreeStatus !== '.') || [];
-  return (
+  const branchName = state
+    ? state.detached
+      ? t('repository.detached')
+      : state.branch || t('repository.unknownBranch')
+    : t('common.loading');
+  const isWorktree = tab === 'worktree';
+  const syncNote = state && (
+    <p className="repo-sync-note">
+      {state.detached
+        ? t('repository.detached')
+        : !state.remotes.length
+          ? t('repository.noRemotes')
+          : state.trackingConfigured && !state.pushTarget
+            ? t('repository.upstreamUnavailable')
+            : !state.upstream
+              ? t('repository.noUpstream')
+              : isWorktree
+                ? t('branchTree.upstream', { name: state.upstream })
+                : t('repository.cache')}
+    </p>
+  );
+  const sync = (
     <>
-      <div className="repo-ref">
-        <GitBranch size={15} />
-        <strong>
-          {state
-            ? state.detached
-              ? t('repository.detached')
-              : state.branch || t('repository.unknownBranch')
-            : t('common.loading')}
-        </strong>
-        <HelpTip topic="branch" />
-      </div>
-      {tab === 'worktree' && (
-        <CommitComposer
-          state={state}
-          message={message}
-          onMessage={setMessage}
-          busy={busy}
-          onAction={onCommitAction}
-        />
-      )}
       <div className="remote-state">
-        <span>
-          <ArrowUp size={14} />
-          {t('repository.aheadCount', { value: state?.ahead ?? '—' })}
-        </span>
-        <span>
-          <ArrowDown size={14} />
-          {t('repository.behindCount', { value: state?.behind ?? '—' })}
-        </span>
+        {isWorktree ? (
+          <>
+            <span>{t('branchTree.aheadCount', { value: state?.ahead ?? '—' })}</span>
+            <span aria-hidden="true">|</span>
+            <span>{t('branchTree.behindCount', { value: state?.behind ?? '—' })}</span>
+          </>
+        ) : (
+          <>
+            <span>
+              <ArrowUp size={14} />
+              {t('repository.aheadCount', { value: state?.ahead ?? '—' })}
+            </span>
+            <span>
+              <ArrowDown size={14} />
+              {t('repository.behindCount', { value: state?.behind ?? '—' })}
+            </span>
+          </>
+        )}
         <HelpTip topic="sync" related={['fetch', 'pull', 'push']} />
       </div>
+      {isWorktree && syncNote}
       <div className="repo-actions">
         <Tooltip
           detailed
@@ -483,6 +491,9 @@ function RepositoryToolsPanel({
           }
         >
           <Button
+            size={isWorktree ? 'compact' : 'default'}
+            className={isWorktree ? 'branch-detail-action' : undefined}
+            aria-label={t('repository.fetch')}
             busy={busy === 'fetch'}
             icon={<RefreshCw size={15} />}
             disabled={!!busy || !state?.remotes.length}
@@ -501,9 +512,12 @@ function RepositoryToolsPanel({
           }
         >
           <Button
+            size={isWorktree ? 'compact' : 'default'}
+            className={isWorktree ? 'branch-detail-action' : undefined}
+            aria-label={t('repository.pull')}
             busy={busy === 'pull'}
             icon={<Download size={15} />}
-            disabled={!!busy || !state?.upstream || state.detached}
+            disabled={!!busy || !state?.pushTarget || state.detached || !!state.operation}
             onClick={() => void handleAction({ type: 'pull' })}
           >
             {t('repository.pull')}
@@ -519,174 +533,191 @@ function RepositoryToolsPanel({
           }
         >
           <Button
+            size={isWorktree ? 'compact' : 'default'}
+            className={isWorktree ? 'branch-detail-action' : undefined}
+            aria-label={t('repository.push')}
             busy={busy === 'push'}
             icon={<Upload size={15} />}
-            disabled={!!busy || !state?.upstream || state.detached}
+            disabled={!!busy || !state?.pushTarget || state.detached || !!state.operation}
             onClick={() => void handleAction({ type: 'push' })}
           >
             {t('repository.push')}
           </Button>
         </Tooltip>
       </div>
-      {state && (
-        <p className="repo-sync-note">
-          {state.detached
-            ? t('repository.detached')
-            : !state.remotes.length
-              ? t('repository.noRemotes')
-              : !state.upstream
-                ? t('repository.noUpstream')
-                : t('repository.cache')}
-        </p>
-      )}
-      <div
-        className="panel-content"
-        role="region"
-        aria-label={t(tab === 'worktree' ? 'repository.worktree' : 'repository.history')}
-      >
-        {tab === 'worktree' && (
-          <>
-            {state?.changed === 0 ? (
-              <div className="clean-workspace">
-                <div>
-                  <Check size={23} />
-                </div>
-                <strong>{t('repository.clean')}</strong>
-              </div>
+      {!isWorktree && syncNote}
+    </>
+  );
+  const diffDialog = diff && (
+    <DiffDialog
+      repo={repo}
+      viewKey={viewKey && `${viewKey}.diff.${JSON.stringify(diff.query)}`}
+      selection={diff}
+      onClose={() => setDiff(null)}
+    />
+  );
+  if (isWorktree) {
+    return (
+      <>
+        <section className="worktree-dialog-sync" aria-label={t('repository.remoteSection')} tabIndex={0}>
+          {sync}
+        </section>
+        <CommitComposer
+          state={state}
+          message={message}
+          onMessage={setMessage}
+          busy={busy}
+          onAction={onCommitAction}
+          onGenerate={onGenerateCommit}
+        >
+          <div className="worktree-file-panes">
+            {!state || state.error ? (
+              <p className="repo-sync-note" role="status">
+                {state?.error
+                  ? formatError(state.errorInfo || { code: 'unknown', details: state.error })
+                  : t('repository.reading')}
+              </p>
             ) : (
               <>
-                {unstaged.length > 0 && (
-                  <FileGroup
-                    files={unstaged}
-                    state={state!}
-                    isStaged={false}
-                    busy={!!busy}
-                    onAction={handleAction}
-                    onDiff={setDiff}
-                  />
-                )}
-                {staged.length > 0 && (
-                  <FileGroup
-                    files={staged}
-                    state={state!}
-                    isStaged
-                    busy={!!busy}
-                    onAction={handleAction}
-                    onDiff={setDiff}
-                  />
-                )}
+                <FileGroup
+                  files={unstaged}
+                  state={state}
+                  isStaged={false}
+                  busy={busy}
+                  onAction={handleAction}
+                  onDiff={setDiff}
+                  scrollKey={viewKey && `${viewKey}.unstaged.scroll`}
+                  emptyLabel={t(state.changed ? 'repository.noModifiedFiles' : 'repository.clean')}
+                />
+                <FileGroup
+                  files={staged}
+                  state={state}
+                  isStaged
+                  busy={busy}
+                  onAction={handleAction}
+                  onDiff={setDiff}
+                  scrollKey={viewKey && `${viewKey}.staged.scroll`}
+                  emptyLabel={t('repository.noStagedFiles')}
+                />
               </>
             )}
-          </>
+          </div>
+        </CommitComposer>
+        {diffDialog}
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="repo-ref">
+        <GitBranch size={15} />
+        <strong>{branchName}</strong>
+        <HelpTip topic="branch" />
+      </div>
+      {sync}
+      <div className="panel-content" role="region" aria-label={t('repository.history')}>
+        {!!historyError && (
+          <p className="error-message" role="alert">
+            {formatError(historyError)}
+          </p>
         )}
-        {tab === 'history' && (
+        {historyLoading ? (
+          <div className="loading-region">
+            <LoaderCircle className="spin" size={19} />
+            {t('repository.readingCommits')}
+          </div>
+        ) : commits.length ? (
           <>
-            {!!historyError && (
-              <p className="error-message" role="alert">
-                {formatError(historyError)}
-              </p>
-            )}
-            {historyLoading ? (
-              <div className="loading-region">
-                <LoaderCircle className="spin" size={19} />
-                {t('repository.readingCommits')}
-              </div>
-            ) : commits.length ? (
-              <>
-                <div className="commit-list">
-                  <CommitGraph commits={commits} />
-                  <div>
-                    {commits.map((commit) => (
-                      <Tooltip
-                        key={commit.hash}
-                        detailed
-                        className="commit-row-tooltip"
-                        content={
-                          <>
-                            <CommitEvent commit={commit} />
-                            <GitHelp
-                              topic="commitDiff"
-                              preview={{
-                                when: 'read',
-                                commands: [commitDiffArguments(commit.hash)],
-                              }}
-                            />
-                          </>
-                        }
-                      >
-                        <button
-                          className="commit-row"
-                          onClick={() =>
-                            setDiff({ title: commit.subject, query: { commit: commit.hash } })
-                          }
-                        >
-                          <strong>{commit.subject}</strong>
-                          <span>
-                            <code>{commit.shortHash}</code>
-                            <span>{commit.author}</span>
-                            <time>{timeAgo(commit.date)}</time>
-                          </span>
-                          {commit.refs && <small title={commit.refs}>{commit.refs}</small>}
-                        </button>
-                      </Tooltip>
-                    ))}
-                  </div>
-                </div>
-                {hasMore && (
+            <div className="commit-list">
+              <CommitGraph commits={commits} />
+              <div>
+                {commits.map((commit) => (
                   <Tooltip
+                    key={commit.hash}
                     detailed
+                    className="commit-row-tooltip"
                     content={
-                      <GitHelp
-                        topic="history"
-                        preview={{ when: 'read', commands: [historyArguments(commits.length)] }}
-                      />
+                      <>
+                        <CommitEvent commit={commit} />
+                        <GitHelp
+                          topic="commitDiff"
+                          preview={{
+                            when: 'read',
+                            commands: [commitDiffArguments(commit.hash)],
+                          }}
+                        />
+                      </>
                     }
                   >
                     <button
-                      className="button load-more"
-                      onClick={async () => {
-                        try {
-                          const more = await api.history(repo.id, commits.length);
-                          setCommits([...commits, ...more]);
-                          if (viewKey)
-                            viewStorage.write(
-                              `${viewKey}.count`,
-                              Math.min(600, commits.length + more.length),
-                            );
-                          setHasMore(more.length === 40);
-                        } catch (err) {
-                          setHistoryError(err);
-                        }
-                      }}
+                      className="commit-row"
+                      onClick={() =>
+                        setDiff({ title: commit.subject, query: { commit: commit.hash } })
+                      }
                     >
-                      {t('repository.more')}
+                      <strong>{commit.subject}</strong>
+                      <span>
+                        <code>{commit.shortHash}</code>
+                        <span>{commit.author}</span>
+                        <time>{timeAgo(commit.date)}</time>
+                      </span>
+                      {commit.refs && <small title={commit.refs}>{commit.refs}</small>}
                     </button>
                   </Tooltip>
-                )}
-              </>
-            ) : (
-              <div className="panel-empty">
-                <GitCommitHorizontal size={25} />
-                <p>{t('repository.emptyHistory')}</p>
+                ))}
               </div>
+            </div>
+            {hasMore && (
+              <Tooltip
+                detailed
+                content={
+                  <GitHelp
+                    topic="history"
+                    preview={{
+                      when: 'read',
+                      commands: [historyArguments(commits.length, cardRef)],
+                    }}
+                  />
+                }
+              >
+                <button
+                  className="button load-more"
+                  onClick={async () => {
+                    try {
+                      const more = await api.history(repo.id, commits.length, cardRef);
+                      setCommits([...commits, ...more]);
+                      if (viewKey)
+                        viewStorage.write(
+                          `${viewKey}.count`,
+                          Math.min(600, commits.length + more.length),
+                        );
+                      setHasMore(more.length === 40);
+                    } catch (err) {
+                      setHistoryError(err);
+                    }
+                  }}
+                >
+                  {t('repository.more')}
+                </button>
+              </Tooltip>
             )}
           </>
+        ) : (
+          <div className="panel-empty">
+            <GitCommitHorizontal size={25} />
+            <p>{t('repository.emptyHistory')}</p>
+          </div>
         )}
       </div>
-      {diff && (
-        <DiffDialog
-          repo={repo}
-          viewKey={viewKey && `${viewKey}.diff.${JSON.stringify(diff.query)}`}
-          selection={diff}
-          onClose={() => setDiff(null)}
-        />
-      )}
+      {diffDialog}
     </>
   );
 }
 
 export function RepositoryPanel({
   repo,
+  cardRef,
+  actionViewKey,
   viewKey,
   state,
   onClose,
@@ -697,6 +728,8 @@ export function RepositoryPanel({
   avatarDisabled,
 }: {
   repo: Repository;
+  cardRef?: string;
+  actionViewKey?: string;
   viewKey?: string;
   state?: RepoState;
   onClose: () => void;
@@ -707,9 +740,11 @@ export function RepositoryPanel({
   avatarDisabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const { message, setMessage, busy, executeAction } = useRepositoryActions({
+  const showWorktree = cardUsesWorktree(cardRef, state);
+  const { message, setMessage, busy, executeAction, generateCommit } = useRepositoryActions({
     repo,
-    viewKey,
+    worktreeRef: cardRef,
+    viewKey: actionViewKey ?? viewKey,
     onState,
     onRefresh,
     onNotice,
@@ -748,7 +783,7 @@ export function RepositoryPanel({
       aria-label={t('repository.details', { name: repo.name })}
     >
       <PanelHeader
-        title={repo.name}
+        title={cardRef ? `${repo.name} · ${cardRefLabel(cardRef)}` : repo.name}
         icon={<RepositoryAvatar repo={repo} size="large" />}
         iconAction={
           onAvatar
@@ -779,6 +814,8 @@ export function RepositoryPanel({
         </div>
       ) : (
         <BranchTreePanel
+          cardRef={cardRef}
+          showWorktree={showWorktree}
           viewKey={viewKey}
           repo={repo}
           state={state}
@@ -786,26 +823,41 @@ export function RepositoryPanel({
           onAction={executeAction}
           commitMessage={message}
           onCommitMessage={setMessage}
+          onGenerateCommit={generateCommit}
           commitVisible={view !== 'worktree'}
           onRefresh={onRefresh}
           onTools={openTools}
           onCommit={(commit) => setDiff({ title: commit.subject, query: { commit: commit.hash } })}
         />
       )}
-      {view && (
+      {view && (view !== 'worktree' || showWorktree) && (
         <Dialog
           key={view}
           viewKey={viewKey && `${viewKey}.${view}`}
           restoreReady={readyView?.tab === view && readyView.ready}
           title={t(view === 'worktree' ? 'repository.worktree' : 'repository.history')}
+          titleIcon={
+            view === 'worktree' ? <RepositoryAvatar repo={repo} size="small" /> : undefined
+          }
+          titleDetail={
+            view === 'worktree' ? (
+              <div className="worktree-dialog-context">
+                <span>{repo.name}</span>
+                {state?.branch && !state.detached && (
+                  <span className="worktree-dialog-branch">{state.branch}</span>
+                )}
+              </div>
+            ) : undefined
+          }
           wide
           busy={!!busy}
           onClose={() => setView(null)}
-          className="repository-tools-dialog"
+          className={`repository-tools-dialog${view === 'worktree' ? ' worktree-detail-dialog' : ''}`}
           headerActions={<HelpTip topic={view === 'worktree' ? 'worktree' : 'history'} />}
         >
           <div className="dialog-body">
             <RepositoryToolsPanel
+              cardRef={cardRef}
               viewKey={viewKey && `${viewKey}.${view}`}
               onReady={onViewReady}
               repo={repo}
@@ -816,6 +868,7 @@ export function RepositoryPanel({
               busy={busy}
               handleAction={handleAction}
               onCommitAction={executeAction}
+              onGenerateCommit={generateCommit}
             />
           </div>
         </Dialog>

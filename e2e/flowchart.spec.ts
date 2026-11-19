@@ -412,7 +412,11 @@ test('流程线随仓库分组折叠投影，聚焦上下游保留连接，步�
     const current = await (await request.get('/api/workspace', { headers })).json();
     current.repositories = [{ id: 'r', name: '示例仓库', path: f.repo }];
     const board = current.boards[0];
-    board.nodes = [{ id: 'repo', repoId: 'r', position: { x: 500, y: 450 } }];
+    board.nodes = [
+      { id: 'repo', repoId: 'r', position: { x: 500, y: 450 } },
+      { id: 'main-card', repoId: 'r', ref: 'refs/heads/main', position: { x: 790, y: 450 } },
+    ];
+    board.edges = [{ id: 'repo-relation', source: 'repo', target: 'main-card', kind: 'integration', label: '' }];
     board.groups = [{ id: 'group', name: '服务仓库', nodeIds: ['repo'], collapsed: true }];
     board.connections.push({
       id: 'repo-flow',
@@ -425,6 +429,29 @@ test('流程线随仓库分组折叠投影，聚焦上下游保留连接，步�
     expect((await request.put('/api/workspace', { headers, data: current })).ok()).toBe(true);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto('/');
+    await expect(page.locator('.process-edge-path')).toHaveCount(4);
+    const flowVisibility = page.getByRole('button', { name: '隐藏流程图', exact: true });
+    await flowVisibility.click();
+    await expect(flowVisibility).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('flow-step')).toHaveCount(0);
+    await expect(page.locator('.process-edge-path')).toHaveCount(0);
+    await expect(page.locator('.react-flow__node[data-id="group"]')).toBeVisible();
+    await expect(page.locator('[data-edge-id="repo-relation"]')).toBeVisible();
+    expect((await store.read()).connections).toHaveLength(4);
+    const minimap = page.getByRole('button', { name: '流程缩略图', exact: true });
+    await minimap.click();
+    await page.getByRole('button', { name: '锁定缩放', exact: true }).click();
+    await page.reload();
+    await expect(flowVisibility).toHaveAttribute('aria-pressed', 'true');
+    await expect(minimap).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: '解锁缩放', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('flow-step')).toHaveCount(0);
+    await expect(page.locator('.process-edge-path')).toHaveCount(0);
+    await expect(page.locator('[data-edge-id="repo-relation"]')).toBeVisible();
+    await flowVisibility.click();
+    await expect(page.getByTestId('flow-step')).toHaveCount(3);
+    await page.reload();
+    await expect(flowVisibility).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('.process-edge-path')).toHaveCount(4);
     await expect(
       page.locator(

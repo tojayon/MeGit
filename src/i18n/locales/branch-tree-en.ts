@@ -59,6 +59,8 @@ const resource = {
     unknown: 'Incomplete history; a shared starting point cannot yet be determined',
   },
   selection: 'Branch details',
+  aheadCount: 'To push {{value}}',
+  behindCount: 'To pull {{value}}',
   closeSelection: 'Close branch details',
   information: 'Branch information',
   reference: 'Full reference',

@@ -1,6 +1,7 @@
 import type { BranchComparison, BranchTreeData, Commit, TreeBranch } from '../shared/types.js';
 import { AppError } from './errors.js';
 import { runGit } from './git.js';
+import { remoteDestination } from './remote-destination.js';
 import { comparisonArguments, treeHistoryArguments } from '../shared/git-commands.js';
 
 const logFormat = '--format=%H%x1f%P%x1f%h%x1f%an%x1f%aI%x1f%D%x1f%s';
@@ -16,6 +17,8 @@ const refFormat =
     '%(subject)',
     '%(authorname)',
     '%(authordate:iso-strict)',
+    '%(upstream:remotename)',
+    '%(upstream:remoteref)',
   ].join('%00') + '%00';
 
 function parseLog(raw: string): Commit[] {
@@ -39,19 +42,28 @@ function parseLog(raw: string): Commit[] {
 }
 
 async function references(repo: string) {
-  const [refs, worktrees, headResult, currentResult, shallowResult] = await Promise.all([
-    runGit(repo, [
-      'for-each-ref',
-      '--sort=-committerdate',
-      '--format=' + refFormat,
-      'refs/heads',
-      'refs/remotes',
-    ]),
-    runGit(repo, ['worktree', 'list', '--porcelain', '-z']),
-    runGit(repo, ['rev-parse', '--verify', '--quiet', 'HEAD'], false, true),
-    runGit(repo, ['symbolic-ref', '-q', 'HEAD'], false, true),
-    runGit(repo, ['rev-parse', '--is-shallow-repository']),
-  ]);
+  const [refs, worktrees, headResult, currentResult, shallowResult, remoteConfig] =
+    await Promise.all([
+      runGit(repo, [
+        'for-each-ref',
+        '--sort=-committerdate',
+        '--format=' + refFormat,
+        'refs/heads',
+        'refs/remotes',
+      ]),
+      runGit(repo, ['worktree', 'list', '--porcelain', '-z']),
+      runGit(repo, ['rev-parse', '--verify', '--quiet', 'HEAD'], false, true),
+      runGit(repo, ['symbolic-ref', '-q', 'HEAD'], false, true),
+      runGit(repo, ['rev-parse', '--is-shallow-repository']),
+      runGit(repo, ['config', '--null', '--get-regexp', '^remote\\..*\\.url$'], false, true),
+    ]);
+  const remotes = new Map<string, string>();
+  for (const entry of remoteConfig.stdout.split('\0')) {
+    const separator = entry.indexOf('\n');
+    const name = entry.slice(7, separator - 4);
+    if (separator > 0 && !remotes.has(name)) remotes.set(name, entry.slice(separator + 1));
+  }
+  const remoteNames = [...remotes.keys()].sort((first, second) => second.length - first.length);
   const directories = new Map<string, string>();
   let directory = '';
   for (const field of worktrees.stdout.split('\0')) {
@@ -62,8 +74,20 @@ async function references(repo: string) {
   let defaultRemote: string | undefined;
   const branches: TreeBranch[] = [];
   for (const row of refs.stdout.split('\0\n').filter(Boolean)) {
-    const [ref, current, hash, parent, symref, upstream, tracking, subject, author, date] =
-      row.split('\0');
+    const [
+      ref,
+      current,
+      hash,
+      parent,
+      symref,
+      upstream,
+      tracking,
+      subject,
+      author,
+      date,
+      upstreamRemote,
+      upstreamRef,
+    ] = row.split('\0');
     if (symref) {
       if (ref.endsWith('/HEAD') && !defaultRemote) defaultRemote = symref;
       continue;
@@ -73,6 +97,16 @@ async function references(repo: string) {
     const ahead = tracking?.match(/ahead (\d+)/);
     const behind = tracking?.match(/behind (\d+)/);
     const gone = tracking === '[gone]';
+    const remoteRef = ref.slice(13);
+    const destinationRemote = remote
+      ? remoteNames.find((name) => remoteRef.startsWith(`${name}/`))
+      : upstreamRemote;
+    const destinationBranch = remote
+      ? remoteRef.slice((destinationRemote?.length ?? 0) + 1)
+      : upstreamRef?.startsWith('refs/heads/')
+        ? upstreamRef.slice(11)
+        : '';
+    const address = destinationRemote ? remotes.get(destinationRemote) : undefined;
     branches.push({
       ref,
       name: ref.slice(remote ? 13 : 11),
@@ -87,6 +121,8 @@ async function references(repo: string) {
       date,
       upstream: upstream || null,
       upstreamGone: gone,
+      remoteDestination:
+        address && !gone ? remoteDestination(repo, address, destinationBranch) : undefined,
       ahead: upstream && !gone ? Number(ahead?.[1] || 0) : null,
       behind: upstream && !gone ? Number(behind?.[1] || 0) : null,
     });

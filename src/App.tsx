@@ -10,8 +10,6 @@ import {
   LoaderCircle,
   Menu,
   MoreHorizontal,
-  PanelLeftClose,
-  PanelLeftOpen,
   Pencil,
   Plus,
   RefreshCw,
@@ -27,6 +25,7 @@ import type {
   FlowConnection,
   PortSide,
   Repository,
+  RepoState,
   Snapshot,
 } from '../shared/types';
 import { FlowConnectionDialog } from './components/FlowConnectionDialog';
@@ -36,6 +35,8 @@ import { createRefreshQueue } from './lib/refresh-queue';
 import { FlowCanvas } from './components/FlowCanvas';
 import { AddRepositoryDialog, Dialog, RelationDialog, TextDialog } from './components/Dialogs';
 import { RepositoryPanel } from './components/RepositoryPanel';
+import { CardRefDialog } from './components/CardRefDialog';
+import { relationRefs } from '../shared/card-refs';
 import { RelationPanel } from './components/RelationPanel';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -73,6 +74,7 @@ import { isBoolean, isNullableText, isStrings, viewKey } from './lib/view-storag
 
 type Modal =
   | 'add'
+  | 'card-ref'
   | 'relation'
   | 'new-board'
   | 'rename-board'
@@ -159,7 +161,7 @@ export default function App() {
   useEffect(() => {
     if (!board) return;
     const valid = [
-      ...board.nodes.map((node) => `repository:${node.repoId}`),
+      ...board.nodes.map((node) => `repository:${node.id}`),
       ...board.edges.map((edge) => `relation:${edge.id}`),
     ];
     queueMicrotask(() => setDock((previous) => reconcileInspectors(previous, board.id, valid)));
@@ -248,16 +250,20 @@ export default function App() {
   }, [board?.id, workspace?.revision, saveStatus, refresh]);
 
   const openRepo = useCallback(
-    (id: string, targetBoardId?: string) => {
-      setClosedBoardId(null);
-      setSelectedRepo(id);
-      setSelectedEdge(null);
-      setSelectedGroup(null);
-      openDetails('repository', id, targetBoardId);
+    (id: string, targetBoardId?: string, byNode = false) => {
       const targetBoard = targetBoardId
         ? workspace?.boards.find((b) => b.id === targetBoardId)
         : board;
-      const node = targetBoard?.nodes.find((n) => n.repoId === id);
+      const node = byNode
+        ? targetBoard?.nodes.find((n) => n.id === id)
+        : (targetBoard?.nodes.find((n) => n.repoId === id && !n.ref) ??
+          targetBoard?.nodes.find((n) => n.repoId === id));
+      if (!node) return;
+      setClosedBoardId(null);
+      setSelectedRepo(node.repoId);
+      setSelectedEdge(null);
+      setSelectedGroup(null);
+      openDetails('repository', node.id, targetBoardId);
       setSelectedIds(node ? [node.id] : []);
       const group = targetBoard?.groups?.find(
         (g) => g.collapsed && node && g.nodeIds.includes(node.id),
@@ -391,20 +397,24 @@ export default function App() {
     setModal('group');
   }
 
-  function addRepository(repo: Repository) {
+  const [newCard, setNewCard] = useState<{ repo: Repository; state: RepoState; displayName?: string } | null>(null);
+
+  function addRepository(repo: Repository, ref?: string, displayName?: string) {
     if (!board) return;
-    if (board.nodes.some((n) => n.repoId === repo.id)) {
+    if (board.nodes.some((n) => n.repoId === repo.id && n.ref === ref)) {
       notify({ key: 'board.duplicate' });
       return;
     }
     const nodeId = crypto.randomUUID();
     update((draft) => {
-      if (!draft.repositories.some((r) => r.id === repo.id)) draft.repositories.push(repo);
+      if (!draft.repositories.some((item) => item.id === repo.id)) draft.repositories.push(repo);
       const current = draft.boards.find((b) => b.id === board.id)!;
       const n = current.nodes.length;
       current.nodes.push({
         id: nodeId,
         repoId: repo.id,
+        ref,
+        displayName,
         position: { x: 100 + (n % 3) * 480, y: 110 + Math.floor(n / 3) * 300 + (n % 2) * 60 },
       });
       delete current.viewport;
@@ -413,7 +423,7 @@ export default function App() {
     setSelectedRepo(repo.id);
     setSelectedEdge(null);
     setSelectedGroup(null);
-    openDetails('repository', repo.id);
+    openDetails('repository', nodeId);
   }
 
   if (!workspace || !board)
@@ -453,6 +463,8 @@ export default function App() {
 
   const contextGroup = board.groups?.find((group) => group.id === selectedGroup);
   const contextNote = board.notes?.find((note) => selectedIds.includes(note.id));
+  const contextCard =
+    selectedIds.length === 1 ? board.nodes.find((node) => node.id === selectedIds[0]) : undefined;
   const contextEdge = board.edges.find((edge) => edge.id === selectedEdge);
   function removeSelection() {
     const ids = new Set(selectedIds);
@@ -473,29 +485,7 @@ export default function App() {
 
   const boardClosed = closedBoardId === board.id;
   const navigationControl = (
-    <div className="canvas-navigation-control">
-      <span className="desktop-only">
-        <Tooltip
-          content={t(preferences.navigationCollapsed ? 'nav.expand' : 'nav.collapse')}
-          placement="right"
-        >
-          <button
-            className="icon-button navigation-toggle"
-            aria-label={t(preferences.navigationCollapsed ? 'nav.expand' : 'nav.collapse')}
-            aria-expanded={!preferences.navigationCollapsed}
-            aria-controls="workspace-navigation"
-            onClick={() =>
-              updatePreferences({ navigationCollapsed: !preferences.navigationCollapsed })
-            }
-          >
-            {preferences.navigationCollapsed ? (
-              <PanelLeftOpen size={18} />
-            ) : (
-              <PanelLeftClose size={18} />
-            )}
-          </button>
-        </Tooltip>
-      </span>
+    <div className="navigation-edge mobile-only" inert={sidebar || undefined}>
       <button
         className="icon-button navigation-toggle mobile-only"
         aria-label={t('nav.open')}
@@ -510,13 +500,14 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {navigationControl}
       <WorkspaceNavigation
         viewKey={viewKey(board.id, 'navigation')}
         workspace={workspace}
         board={board}
         repositories={boardRepos}
         snapshot={snapshot}
-        selectedRepo={selectedRepo}
+        selectedRepo={selectedIds.length === 1 ? selectedIds[0] : null}
         selectedGroup={selectedGroup}
         onSelectGroup={openGroup}
         mobileOpen={sidebar}
@@ -531,7 +522,7 @@ export default function App() {
             draft.activeBoardId = id;
           });
         }}
-        onSelectRepo={openRepo}
+        onSelectRepo={(id) => openRepo(id, undefined, true)}
         onCanvas={() => {
           setClosedBoardId(null);
           setModal(null);
@@ -597,7 +588,6 @@ export default function App() {
               }}
             />
             <div className="workspace-canvas">
-              {!boardClosed && navigationControl}
               <div className="workspace-action-rail" role="group" aria-label={t('board.actions')}>
                 <Tooltip content={t('board.add')}>
                   <button
@@ -729,7 +719,7 @@ export default function App() {
                       : previous,
                   );
                 }}
-                onSelectRepo={openRepo}
+                onSelectRepo={(id) => openRepo(id, undefined, true)}
                 onSelectEdge={openEdge}
                 onSelectConnection={(id) => {
                   setSelectedIds([]);
@@ -749,6 +739,7 @@ export default function App() {
                   if (contextEdge) openRelation(contextEdge);
                   else if (contextGroup) openGroup(contextGroup.id);
                   else if (contextNote) openNote(contextNote.id);
+                  else if (contextCard) setModal('card-ref');
                   else if (selectedEdge && board.connections?.some((c) => c.id === selectedEdge)) {
                     setConnectionDraft(board.connections.find((c) => c.id === selectedEdge));
                     setModal('flow-connection');
@@ -816,11 +807,12 @@ export default function App() {
                   setModal('group');
                 }}
                 onConnect={connect}
-                onRoute={(id, points) =>
+                onRoute={(id, points, ports) =>
                   update((draft) => {
                     const current = draft.boards.find((b) => b.id === board.id)!;
                     const next = editedRoute(current, id, points);
                     if (!next) return;
+                    if ('kind' in next && points?.length && ports) Object.assign(next, ports);
                     if ('kind' in next)
                       current.edges = current.edges.map((e) => (e.id === id ? next : e));
                     else
@@ -859,7 +851,6 @@ export default function App() {
           </section>
           {boardClosed && (
             <div className="workflow-panel-closed">
-              {navigationControl}
               <div className="workflow-panel-reopen">
                 <p>{t('board.panelClosed')}</p>
                 <Button
@@ -892,18 +883,31 @@ export default function App() {
               onClose={(key) => setDock((previous) => closeInspector(previous, key))}
             >
               {(item, close) => {
-                const activeRepo =
-                  item.kind === 'repository' && board.nodes.some((n) => n.repoId === item.id)
-                    ? workspace.repositories.find((r) => r.id === item.id)
+                const repositoryForCard = (cardId: string) => {
+                  const card = board.nodes.find((node) => node.id === cardId);
+                  const repo = workspace.repositories.find((entry) => entry.id === card?.repoId);
+                  return repo && card?.displayName ? { ...repo, name: card.displayName } : repo;
+                };
+                const activeCard =
+                  item.kind === 'repository'
+                    ? board.nodes.find((node) => node.id === item.id)
                     : undefined;
+                const activeRepo = activeCard && repositoryForCard(activeCard.id);
                 const activeEdge =
                   item.kind === 'relation' ? board.edges.find((e) => e.id === item.id) : undefined;
                 return (
                   <>
-                    {activeRepo && (
+                    {activeRepo && activeCard && (
                       <RepositoryPanel
-                        viewKey={viewKey(board.id, activeRepo.id, activeRepo.path)}
-                        key={activeRepo.id}
+                        viewKey={viewKey(
+                          board.id,
+                          activeCard.id,
+                          activeCard.ref || 'HEAD',
+                          activeRepo.path,
+                        )}
+                        key={`${activeCard.id}:${activeCard.ref || 'HEAD'}`}
+                        cardRef={activeCard.ref}
+                        actionViewKey={viewKey(board.id, activeRepo.id, activeRepo.path)}
                         repo={activeRepo}
                         state={snapshot?.repositories[activeRepo.id]}
                         onClose={close}
@@ -931,16 +935,11 @@ export default function App() {
                     )}
                     {activeEdge && (
                       <RelationPanel
+                        boardId={board.id}
                         viewKey={viewKey(board.id, activeEdge.id, 'relation')}
-                        edge={activeEdge}
-                        source={workspace.repositories.find(
-                          (r) =>
-                            r.id === board.nodes.find((n) => n.id === activeEdge.source)?.repoId,
-                        )}
-                        target={workspace.repositories.find(
-                          (r) =>
-                            r.id === board.nodes.find((n) => n.id === activeEdge.target)?.repoId,
-                        )}
+                        edge={{ ...activeEdge, ...relationRefs(activeEdge, board.nodes) }}
+                        source={repositoryForCard(activeEdge.source)}
+                        target={repositoryForCard(activeEdge.target)}
                         result={snapshot?.relations[activeEdge.id]}
                         onClose={close}
                       />
@@ -1063,7 +1062,7 @@ export default function App() {
           onClose={() => setModal(null)}
           onRepo={(id) => {
             setModal(null);
-            openRepo(id);
+            openRepo(id, undefined, true);
           }}
           onToggle={() => toggleGroup(contextGroup.id)}
           onEdit={() => {
@@ -1132,6 +1131,53 @@ export default function App() {
         <AddRepositoryDialog
           existing={workspace.repositories}
           onAdd={addRepository}
+          onChooseCard={(repo, state, displayName) => {
+            if (board.nodes.some((node) => node.repoId === repo.id)) setNewCard({ repo, state, displayName });
+            else addRepository(repo, undefined, displayName);
+          }}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {newCard && (
+        <CardRefDialog
+          state={newCard.state}
+          initialName={newCard.displayName}
+          used={
+            new Set(
+              board.nodes
+                .filter((node) => node.repoId === newCard.repo.id)
+                .map((node) => node.ref ?? ''),
+            )
+          }
+          onSave={(ref, displayName) => {
+            addRepository(newCard.repo, ref, displayName);
+            setNewCard(null);
+          }}
+          onClose={() => setNewCard(null)}
+        />
+      )}
+      {modal === 'card-ref' && contextCard && (
+        <CardRefDialog
+          state={snapshot?.repositories[contextCard.repoId]}
+          initial={contextCard.ref}
+          initialName={contextCard.displayName}
+          used={
+            new Set(
+              board.nodes
+                .filter((node) => node.id !== contextCard.id && node.repoId === contextCard.repoId)
+                .map((node) => node.ref ?? ''),
+            )
+          }
+          onSave={(ref, displayName) => {
+            update((draft) => {
+              const card = draft.boards
+                .find((item) => item.id === board.id)!
+                .nodes.find((node) => node.id === contextCard.id)!;
+              card.ref = ref;
+              card.displayName = displayName;
+            });
+            setModal(null);
+          }}
           onClose={() => setModal(null)}
         />
       )}
@@ -1247,28 +1293,44 @@ export default function App() {
           readOnly={saveStatus === 'failed'}
           canAddToBoard={!board.layoutLocked && board.nodes.length < 200}
           onClose={() => setModal(null)}
-          onRegister={(repo) => update((draft) => {
-            if (!draft.repositories.some((item) => item.path.toLowerCase() === repo.path.toLowerCase())) draft.repositories.push(repo);
-          })}
-          onEdit={(changes) => update((draft) => {
-            const repo = draft.repositories.find((item) => item.id === changes.id);
-            if (!repo) return;
-            repo.name = changes.name;
-            if (changes.archived) repo.archived = true;
-            else delete repo.archived;
-            if (changes.logoPath) repo.logoPath = changes.logoPath;
-            else delete repo.logoPath;
-          })}
-          onRemove={(id) => update((draft) => {
-            for (const item of draft.boards) {
-              for (const node of item.nodes.filter((node) => node.repoId === id)) removeNode(item, node.id);
-            }
-            draft.repositories = draft.repositories.filter((item) => item.id !== id);
-          })}
+          onRegister={(repo) =>
+            update((draft) => {
+              if (
+                !draft.repositories.some(
+                  (item) => item.path.toLowerCase() === repo.path.toLowerCase(),
+                )
+              )
+                draft.repositories.push(repo);
+            })
+          }
+          onEdit={(changes) =>
+            update((draft) => {
+              const repo = draft.repositories.find((item) => item.id === changes.id);
+              if (!repo) return;
+              repo.name = changes.name;
+              if (changes.archived) repo.archived = true;
+              else delete repo.archived;
+              if (changes.logoPath) repo.logoPath = changes.logoPath;
+              else delete repo.logoPath;
+            })
+          }
+          onRemove={(id) =>
+            update((draft) => {
+              for (const item of draft.boards) {
+                for (const node of item.nodes.filter((node) => node.repoId === id))
+                  removeNode(item, node.id);
+              }
+              draft.repositories = draft.repositories.filter((item) => item.id !== id);
+            })
+          }
           onOpen={(repo) => {
-            const found = [board, ...workspace.boards].find((item) => item.nodes.some((node) => node.repoId === repo.id));
+            const found = [board, ...workspace.boards].find((item) =>
+              item.nodes.some((node) => node.repoId === repo.id),
+            );
             if (found) {
-              update((draft) => { draft.activeBoardId = found.id; });
+              update((draft) => {
+                draft.activeBoardId = found.id;
+              });
               openRepo(repo.id, found.id);
             } else {
               if (board.layoutLocked) return;

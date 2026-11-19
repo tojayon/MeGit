@@ -5,27 +5,8 @@ import packageInfo from '../package.json' with { type: 'json' };
 const { version } = packageInfo;
 
 async function expectControlsAligned(page: Page) {
-  const frame = (await page.locator('.canvas-navigation-control').boundingBox())!;
-  const rail = (await page.locator('.workspace-action-rail').boundingBox())!;
-  const toggle = (await page.locator('.navigation-toggle:visible').boundingBox())!;
-  const action = (await page.locator('.workspace-action-rail .icon-button').first().boundingBox())!;
-  expect(frame.y).toBeCloseTo(rail.y, 1);
-  expect(frame.width).toBeCloseTo(rail.width, 1);
-  expect(frame.height).toBeCloseTo(frame.width, 1);
-  expect(toggle.y).toBeCloseTo(action.y, 1);
-  expect(toggle.width).toBeCloseTo(action.width, 1);
-  expect(toggle.height).toBeCloseTo(action.height, 1);
-  const editbar = (await page.locator('.canvas-editbar').boundingBox())!;
-  const editButton = (await page
-    .locator('.canvas-editbar > .canvas-tools .canvas-tool')
-    .first()
-    .boundingBox())!;
-  expect(editButton.width).toBeCloseTo(toggle.width, 1);
-  expect(editButton.height).toBeCloseTo(toggle.height, 1);
-  if (editbar.y === frame.y) expect(editButton.y).toBeCloseTo(toggle.y, 1);
-  expect(editbar.x >= frame.x + frame.width + 7 || editbar.y >= frame.y + frame.height + 7).toBe(
-    true,
-  );
+  await expect(page.locator('.navigation-toggle:visible')).toHaveCount(1);
+  await expect(page.locator('.workspace-canvas .navigation-toggle')).toHaveCount(0);
 }
 
 test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折叠选择', async ({ page }) => {
@@ -36,31 +17,28 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   const logo = navigation.getByRole('link', { name: 'MeGit 首页' });
   await expect(navigation).toHaveAttribute('data-collapsed', 'false');
   await expect(navigation).toHaveCSS('width', '212px');
-  await expect(navigation.locator('.workspace-logo')).toHaveCSS('width', '84px');
+  await expect(navigation.locator('.workspace-logo')).toBeVisible();
   await expect(logo).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const brandHeader = navigation.locator('.navigation-brand');
   await expect(navigation.locator('.sidebar-footer')).toHaveCount(0);
   await expect(navigation.getByText('本地服务', { exact: true })).toHaveCount(0);
   const badge = brandHeader.getByLabel(`版本 ${version}`, { exact: true });
   await expect(badge).toHaveText(`v${version}`);
-  const expandedSymbol = (await logo.locator('image').boundingBox())!;
-  const help = brandHeader.getByRole('button', { name: '使用帮助', exact: true });
-  await expect(help).toHaveCount(1);
-  await expect(
-    navigation.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true }),
-  ).toHaveCount(0);
-  await expect(brandHeader).toHaveCSS('height', '44px');
   const logoBox = (await logo.boundingBox())!;
-  const helpBox = (await help.boundingBox())!;
-  const brandHeaderBox = (await brandHeader.boundingBox())!;
   const badgeBox = (await badge.boundingBox())!;
-  expect(badgeBox.x).toBeGreaterThanOrEqual(logoBox.x + logoBox.width);
-  expect(badgeBox.y).toBeGreaterThan(logoBox.y);
-  expect(badgeBox.y + badgeBox.height).toBeCloseTo(logoBox.y + logoBox.height, 0);
-  expect(helpBox.x).toBeGreaterThan(logoBox.x + logoBox.width);
-  expect(brandHeaderBox.x + brandHeaderBox.width - helpBox.x - helpBox.width).toBeLessThanOrEqual(
-    5,
-  );
+  const brandBox = (await brandHeader.boundingBox())!;
+  const sidebarBox = (await navigation.boundingBox())!;
+  expect(brandBox.x).toBe(sidebarBox.x);
+  expect(brandBox.width).toBeCloseTo(sidebarBox.width - 1, 1);
+  await expect(brandHeader).toHaveCSS('border-bottom-width', '1px');
+  await expect(brandHeader).toHaveCSS('height', '64px');
+  expect(logoBox.width).toBeGreaterThan(84);
+  expect(badgeBox.x).toBeGreaterThan(logoBox.x + logoBox.width);
+  expect(badgeBox.y + badgeBox.height).toBeCloseTo(logoBox.y + logoBox.height, 1);
+  expect(badgeBox.x + badgeBox.width).toBeCloseTo(brandBox.x + brandBox.width - 8, 1);
+  const help = navigation.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true });
+  await expect(help).toHaveCount(1);
+  await expect(brandHeader.getByRole('button', { name: '使用帮助', exact: true })).toHaveCount(0);
   await help.focus();
   await expect(page.getByRole('tooltip', { name: '使用帮助', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -93,27 +71,45 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
     animations: 'disabled',
   });
 
-  await expect(navigation.getByRole('button', { name: '收起流程导航', exact: true })).toHaveCount(
-    0,
-  );
-  const collapse = canvas.getByRole('button', { name: '收起流程导航', exact: true });
+  const collapse = navigation.getByRole('button', { name: '收起流程导航', exact: true });
   await expect(collapse).toHaveAttribute('aria-expanded', 'true');
+  const preferences = navigation.getByRole('button', { name: '偏好设置', exact: true });
+  expect((await collapse.boundingBox())!.y).toBeLessThan((await preferences.boundingBox())!.y);
+  await expect(collapse).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const sharedIcons = navigation.locator(
+    '.navigation-primary .navigation-action > svg, .navigation-bottom .navigation-action > svg',
+  );
+  await expect(sharedIcons).toHaveCount(5);
+  const iconPositions = () =>
+    sharedIcons.evaluateAll((icons) =>
+      icons.map((icon) => {
+        const { x, y, width, height } = icon.getBoundingClientRect();
+        return { x, y, width, height };
+      }),
+    );
+  const expandedIcons = await iconPositions();
   await expectControlsAligned(page);
-  const toggleBox = (await canvas.locator('.canvas-navigation-control').boundingBox())!;
-  expect(toggleBox.x - (await canvas.boundingBox())!.x).toBeCloseTo(12, 0);
-  expect(toggleBox.y - canvasBox.y).toBeCloseTo(12, 0);
   await collapse.focus();
   await page.keyboard.press('Enter');
   await expect(navigation).toHaveAttribute('data-collapsed', 'true');
   await expect(navigation).toHaveCSS('width', '56px');
+  await expect.poll(iconPositions).toEqual(expandedIcons);
   await expect(navigation.locator('.brand-mark')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(navigation.locator('.workspace-logo')).toHaveCount(0);
-  const collapsedSymbol = (await logo.locator('image').boundingBox())!;
-  expect(collapsedSymbol.width).toBeCloseTo(expandedSymbol.width, 1);
-  expect(collapsedSymbol.height).toBeCloseTo(expandedSymbol.height, 1);
+  await expect(navigation.locator('.workspace-logo')).toBeHidden();
+  await expect(navigation.locator('.workspace-logo')).toHaveCount(1);
+  await expect(brandHeader).toHaveCSS('height', '64px');
+  const collapsedSymbol = (await logo.locator('.workspace-logo-symbol image').boundingBox())!;
+  expect(collapsedSymbol.width).toBeCloseTo(34, 1);
+  expect(collapsedSymbol.height).toBeCloseTo(collapsedSymbol.width, 1);
   await expectControlsAligned(page);
-  await expect(canvas.getByRole('button', { name: '展开流程导航' })).toBeFocused();
-  expect((await canvas.locator('.canvas-navigation-control').boundingBox())!.x).toBeCloseTo(68, 0);
+  const expand = navigation.getByRole('button', { name: '展开流程导航' });
+  await expect(expand).toBeFocused();
+  await page.locator('.workflow-panel [data-panel-close]').click();
+  await expect(page.locator('.workflow-panel')).toBeHidden();
+  await expand.click();
+  await expect.poll(iconPositions).toEqual(expandedIcons);
+  await collapse.click();
+  await page.locator('[data-workflow-reopen]').click();
   expect((await page.locator('.main-workspace').boundingBox())?.x).toBe(56);
   await page.screenshot({
     path: '.megit/verification/navigation/dark-collapsed.png',
@@ -142,10 +138,10 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
     path: '.megit/verification/navigation/light-collapsed-en.png',
     animations: 'disabled',
   });
-  await canvas.getByRole('button', { name: 'Expand workflow navigation' }).click();
+  await navigation.getByRole('button', { name: 'Expand workflow navigation' }).click();
   await expect(navigation).toHaveAttribute('data-collapsed', 'false');
-  await expect(navigation.locator('.workspace-logo')).toHaveCSS('width', '84px');
-  await expect(brandHeader.getByRole('button', { name: 'Help', exact: true })).toBeVisible();
+  await expect(navigation.locator('.workspace-logo')).toBeVisible();
+  await expect(navigation.locator('.navigation-bottom').getByRole('button', { name: 'Help', exact: true })).toBeVisible();
   await expect(navigation.getByRole('button', { name: 'Help', exact: true })).toHaveCount(1);
   await expect(brandHeader.getByLabel(`Version ${version}`, { exact: true })).toHaveText(
     `v${version}`,
@@ -203,16 +199,13 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
   await page.keyboard.press('Tab');
   await expect(navigation.getByRole('link', { name: 'MeGit 首页' })).toBeFocused();
   await page.keyboard.press('Tab');
-  const help = navigation
-    .locator('.navigation-brand')
-    .getByRole('button', { name: '使用帮助', exact: true });
-  await expect(help).toBeFocused();
+  await expect(close).toBeFocused();
+  const help = navigation.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true });
+  await help.focus();
   await expect(page.getByRole('tooltip', { name: '使用帮助', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(navigation).not.toHaveAttribute('inert', '');
   await expect(page.getByRole('tooltip', { name: '使用帮助', exact: true })).toHaveCount(0);
-  await page.keyboard.press('Tab');
-  await expect(close).toBeFocused();
   await page.screenshot({
     path: '.megit/verification/navigation/mobile-dark.png',
     animations: 'disabled',
@@ -272,12 +265,7 @@ test('画布两侧控件在桌面、折叠和触控窄屏保持同一尺寸与�
       await expect(
         page.locator('.navigation-brand').getByLabel(`版本 ${version}`, { exact: true }),
       ).toBeVisible();
-      const badgeBox = (await page.locator('.navigation-version').boundingBox())!;
-      const helpBox = (await page
-        .locator('.navigation-brand')
-        .getByRole('button', { name: '使用帮助', exact: true })
-        .boundingBox())!;
-      expect(helpBox.x - badgeBox.x - badgeBox.width).toBeGreaterThanOrEqual(4);
+      await expect(page.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true })).toBeVisible();
       await page.getByRole('button', { name: '关闭流程导航', exact: true }).click();
       await page.setViewportSize({ width: 320, height: 700 });
       await expectControlsAligned(page);

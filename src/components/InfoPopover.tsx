@@ -14,10 +14,22 @@ export function InfoPopover({
   label,
   help,
   children,
+  triggerContent,
+  triggerLabel,
+  triggerClassName,
+  panelClassName,
+  titleIcon,
+  titleDetail,
 }: {
   label: string;
   help?: ReactNode;
   children: ReactNode;
+  triggerContent?: ReactNode;
+  triggerLabel?: string;
+  triggerClassName?: string;
+  panelClassName?: string;
+  titleIcon?: ReactNode;
+  titleDetail?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -64,7 +76,12 @@ export function InfoPopover({
         setOpen(false);
     };
     const scroll = (event: Event) => {
-      if (!(event.target instanceof Node) || !panel.current?.contains(event.target)) dismiss();
+      const target = event.target;
+      if (event.type === 'wheel') {
+        if (!(target instanceof Node) || !panel.current?.contains(target)) dismiss();
+      } else if (target instanceof Node && target.contains(trigger.current)) {
+        dismiss();
+      }
     };
     const hide = () => {
       if (document.hidden) dismiss();
@@ -105,8 +122,8 @@ export function InfoPopover({
         <button
           ref={trigger}
           type="button"
-          className="icon-button"
-          aria-label={label}
+          className={triggerClassName ?? 'icon-button'}
+          aria-label={triggerLabel ?? label}
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? id : undefined}
@@ -118,7 +135,7 @@ export function InfoPopover({
             }
           }}
         >
-          <Info size={17} aria-hidden="true" />
+          {triggerContent ?? <Info size={17} aria-hidden="true" />}
         </button>
       </Tooltip>
       {open && (
@@ -129,10 +146,18 @@ export function InfoPopover({
           role="dialog"
           aria-labelledby={`${id}-title`}
           tabIndex={-1}
-          className="info-popover"
+          className={panelClassName ? `info-popover ${panelClassName}` : 'info-popover'}
         >
           <header>
-            <h3 id={`${id}-title`}>{label}</h3>
+            {titleIcon || titleDetail ? (
+              <div className="info-popover-title">
+                {titleIcon}
+                <h3 id={`${id}-title`}>{label}</h3>
+                {titleDetail}
+              </div>
+            ) : (
+              <h3 id={`${id}-title`}>{label}</h3>
+            )}
             <IconButton label={t('common.close', { name: label })} onClick={() => close(true)}>
               <X size={16} />
             </IconButton>

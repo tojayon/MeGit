@@ -161,7 +161,11 @@ export function RepositoryPortsExample() {
           {t('routing.resetRoute')}
         </Button>
       </div>
-      <div ref={container} style={{ height: 'var(--repository-ports-example-height)' }}>
+      <div
+        ref={container}
+        className="reveal-node-handles"
+        style={{ height: 'var(--repository-ports-example-height)' }}
+      >
         <ReactFlow
           width={width || undefined}
           minZoom={0.2}

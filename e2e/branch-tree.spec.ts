@@ -111,7 +111,8 @@ test('外部切换后旧分支详情不能向新分支同步，延迟刷新后�
     await page.goto('/');
     await page.getByRole('button', { name: '查看分支树演示', exact: true }).click();
     await page.getByRole('button', { name: '查看分支 main', exact: true }).click();
-    await expect(page.locator('.branch-tree-selection')).toContainText('正在此分支开发');
+    const worktree = page.locator('.branch-tree-selection').getByRole('group', { name: '工作区' });
+    await expect(worktree).toBeVisible();
     const pending = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -125,7 +126,7 @@ test('外部切换后旧分支详情不能向新分支同步，延迟刷新后�
     await page.getByRole('button', { name: '刷新本地状态', exact: true }).click();
     await expect(page.getByTestId('repository-node')).toContainText('alias');
     await expect.poll(() => held).toBe(true);
-    await expect(page.locator('.branch-tree-selection')).not.toContainText('正在此分支开发');
+    await expect(worktree).toHaveCount(0);
     const push = page
       .locator('.branch-tree-selection')
       .getByRole('button', { name: '推送', exact: true });

@@ -14,6 +14,33 @@ const colors = {
   danger: 'CanvasText',
 };
 describe('干净的白板导出', () => {
+  it('仓库状态桥与执行箭头保持不同端点，保留关系原名且导出状态胶囊', () => {
+    const edge = {
+      id: 'relation',
+      path: 'M 0 0 L 200 0',
+      bounds: { x: 0, y: 0, width: 200, height: 0 },
+      position: { x: 100, y: 0 },
+      width: 100,
+      label: '公共更新整合',
+      status: '已整合',
+      kind: 'integration',
+    };
+    const svg = boardSvg(
+      {
+        title: 'Bridge',
+        nodes: [],
+        edges: [edge, { ...edge, id: 'flow', kind: 'process', label: '执行', status: '' }],
+      },
+      colors,
+    );
+    expect(svg).toContain(
+      'marker-start="url(#export-bridge-source)" marker-end="url(#export-bridge-target)"',
+    );
+    expect(svg).toContain('marker-end="url(#export-arrow)"');
+    expect(svg).toContain('<title>公共更新整合</title>');
+    expect(svg).toContain('rx="14"');
+    expect(svg).toContain('已整合');
+  });
   it('只包含显示投影，输出可移植矢量并转义用户内容，裁切覆盖负坐标与连线', () => {
     const scene: ExportScene = {
       title: 'Board <one>',
