@@ -44,6 +44,7 @@ import { RepositoryPortsExample } from './RepositoryPortsExample';
 import { RelationBridgeExample } from './RelationBridgeExample';
 import { RelationPanelExample } from './RelationPanelExample';
 import { CommitComposer } from './CommitComposer';
+import { RepositorySyncButtons } from './RepositorySyncButtons';
 import { RepositoryCardExample } from './RepositoryCardExample';
 import { AssistantExample } from './AssistantExample';
 import { AssistantGuidanceExample } from './AssistantGuidanceExample';
@@ -135,6 +136,7 @@ function CommitComposerExample() {
 function RemoteManagementExample() {
   const { t } = useTranslation();
   const [checked, setChecked] = useState(false);
+  const [ahead, setAhead] = useState(1);
   return (
     <section className="design-card design-remote-management-example">
       <h2>{t('repository.manageRemotes')}</h2>
@@ -158,6 +160,33 @@ function RemoteManagementExample() {
           onCheck={() => {}}
         />
       </RemoteManagement>
+      <div className="repo-actions" role="group" aria-label={t('repository.remoteSection')}>
+        <RepositorySyncButtons
+          repositoryName="MeGit"
+          state={{
+            branch: 'main',
+            head: sampleCommitId('main-v2'),
+            detached: false,
+            upstream: 'origin/main',
+            upstreamHead: sampleCommitId(ahead ? 'main-v1' : 'main-v2'),
+            pushTarget: { remote: 'origin', ref: 'refs/heads/main' },
+            ahead,
+            behind: 0,
+            changed: 0,
+            staged: 0,
+            files: [],
+            branches: [],
+            remotes: ['origin'],
+            fetchedAt: null,
+            checkedAt: '',
+          }}
+          compact
+          onAction={async ({ type }) => {
+            if (type === 'push') setAhead(0);
+            return true;
+          }}
+        />
+      </div>
     </section>
   );
 }

@@ -39,6 +39,31 @@ async function setup() {
 }
 
 describe('本机 API 边界与端到端 Git 数据', () => {
+  it('直接同步要求已确认的分支与上游，拒绝失效的确认', async () => {
+    const { repo, root, base, headers } = await setup();
+    const remote = path.join(root, 'remote.git');
+    await git(root, 'init', '--bare', remote);
+    await git(repo, 'remote', 'add', 'origin', remote);
+    await git(repo, 'push', '-u', 'origin', 'main');
+    const upstreamHead = await git(remote, 'rev-parse', 'refs/heads/main');
+    const head = await commitFile(repo, 'outgoing.txt');
+    const workspace: Workspace = await fetch(`${base}/api/workspace`, { headers }).then((res) => res.json());
+    workspace.repositories = [{ id: 'sync-repo', name: 'A', path: repo }];
+    expect((await fetch(`${base}/api/workspace`, {
+      method: 'PUT', headers, body: JSON.stringify(workspace),
+    })).ok).toBe(true);
+    const send = (body: unknown) => fetch(`${base}/api/repositories/sync-repo/actions`, {
+      method: 'POST', headers, body: JSON.stringify(body),
+    });
+    const expected = { branch: 'main', head, remote: 'origin', ref: 'refs/heads/main', upstreamHead };
+    expect((await send({ type: 'pull' })).status).toBe(400);
+    expect((await send({ type: 'push', expected: { ...expected, head: upstreamHead } })).status).toBe(409);
+    expect((await send({ type: 'push', expected: { ...expected, ref: 'refs/heads/other' } })).status).toBe(409);
+    expect(await git(remote, 'rev-parse', 'refs/heads/main')).toBe(upstreamHead);
+    expect((await send({ type: 'push', expected })).ok).toBe(true);
+    expect(await git(remote, 'rev-parse', 'refs/heads/main')).toBe(head);
+  });
+
   it.each(['integrate', 'push', 'pull'] as const)('执行已确认的连线操作 %s', async (type) => {
     const { repo, root, base, headers } = await setup();
     const other = path.join(root, 'other repo');

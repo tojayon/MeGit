@@ -67,7 +67,7 @@ export function RelationActionConfirmation({ shortcut, busy = false, disabled, e
       <footer className="dialog-footer">
         <Button onClick={onClose} disabled={busy} data-dialog-initial-focus="true">{t('common.cancel')}</Button>
         <Button
-          variant="primary"
+          variant={type === 'integrate' || shortcut.recommended ? 'primary' : 'default'}
           className="relation-sync-button"
           data-action={type}
           icon={<RelationActionIcon action={type} size={16} />}

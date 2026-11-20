@@ -35,6 +35,28 @@ test('待推送默认亮蓝色，确认按钮显示同款图标；同步后不�
     await expect(pushSlot).toHaveCSS('opacity', '1');
     await expect(pullSlot).toHaveCSS('opacity', '0');
     await expect(push).toHaveCSS('background-color', 'rgb(0, 169, 243)');
+    const tools = page.getByRole('group', { name: '白板工具', exact: true });
+    const pan = tools.getByRole('button', { name: '平移', exact: true });
+    const extraTools = tools.locator('.canvas-hover-tools');
+    await pan.click();
+    const anchor = (await bridge.boundingBox())!;
+    await page.mouse.move(anchor.x + anchor.width / 2, anchor.y - 40);
+    await page.mouse.down();
+    try {
+      await expect(page.locator('.react-flow__pane')).toHaveClass(/\bdragging\b/);
+      await page.mouse.move(anchor.x + anchor.width / 2, anchor.y + anchor.height / 2);
+      await expect(pullSlot).toHaveCSS('opacity', '0');
+      await expect(pushSlot).toHaveCSS('opacity', '1');
+      await expect(push).toHaveCSS('background-color', 'rgb(0, 169, 243)');
+      const switchBox = (await pan.boundingBox())!;
+      await page.mouse.move(switchBox.x + switchBox.width / 2, switchBox.y + switchBox.height / 2);
+      await expect(extraTools).toHaveCSS('opacity', '0');
+    } finally {
+      await page.mouse.up();
+    }
+    await expect(extraTools).toHaveCSS('opacity', '1');
+    await tools.getByRole('button', { name: '选择', exact: true }).click();
+    await page.getByRole('button', { name: '适应白板', exact: true }).click();
     await bridge.focus();
     await expect(pullSlot).toHaveCSS('opacity', '1');
     await expect(pull).toBeDisabled();
@@ -104,14 +126,15 @@ test('待拉取默认亮绿色，明亮英文触屏可操作且确认按钮显�
     const pullSlot = page.locator('.repository-relation-shortcut[data-action="pull"]');
     const pushSlot = page.locator('.repository-relation-shortcut[data-action="push"]');
     await expect(pullSlot).toHaveCSS('opacity', '1');
-    await expect(pull).toHaveCSS('background-color', 'rgb(54, 84, 12)');
+    await expect(pull).toHaveCSS('background-color', 'rgb(170, 224, 98)');
+    await expect(pull).toHaveCSS('color', 'rgb(0, 13, 31)');
     await expect(pull.locator('svg.lucide-download')).toBeVisible();
     await expect(pushSlot).toHaveCSS('opacity', '1');
     await expect(push).toBeDisabled();
     await pull.tap({ timeout: 5000 });
     const confirm = page.getByRole('dialog', { name: 'Pull' }).getByRole('button', { name: 'Pull', exact: true });
     await expect(confirm.locator('svg.lucide-download')).toBeVisible();
-    await expect(confirm).toHaveCSS('background-color', 'rgb(54, 84, 12)');
+    await expect(confirm).toHaveCSS('background-color', 'rgb(170, 224, 98)');
     expect(await git(repo, 'rev-parse', 'HEAD')).toBe(initial);
     await confirm.tap();
     await expect(confirm).toBeHidden();

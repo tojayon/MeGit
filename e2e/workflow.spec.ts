@@ -138,6 +138,9 @@ test('获取远端后刷新已打开的历史，并支持多个白板和键盘�
     await expect(page.getByRole('button', { name: /远端新增的功能/ })).toBeVisible();
     await expect(page.getByText('1 待拉取', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '拉取', exact: true }).click();
+    const pull = page.getByRole('dialog', { name: '拉取', exact: true });
+    await expect(pull).toContainText(/origin\/main → .*main/);
+    await pull.getByRole('button', { name: '拉取', exact: true }).click();
     await expect(page.getByText('0 待拉取', { exact: true })).toBeVisible();
     if (await page.getByRole('dialog', { name: '提交历史', exact: true }).count())
       await page.getByRole('button', { name: '关闭提交历史', exact: true }).click();

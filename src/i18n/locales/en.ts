@@ -408,7 +408,7 @@ const en = {
     exporting: 'Exporting',
     exportFailed: 'Export failed. Try again or focus on a smaller area.',
     selectHelp:
-      'Drag empty space to select. Shift or Ctrl click to select multiple items. Arrow keys move nodes.',
+      'Left-drag from empty space to box-select. Shift- or Ctrl-click to select multiple items. Arrow keys move nodes.',
   },
   note: {
     add: 'Add note',
@@ -1017,6 +1017,7 @@ const en = {
     branchExists: 'A branch with this name already exists. Choose another name.',
     branchNoCommits: 'This repository has no commits. Make an initial commit first.',
     branchStateChanged: 'The current branch or commit changed. Refresh and confirm again.',
+    syncTargetChanged: 'The upstream branch or its local record changed. Refresh and confirm again.',
     branchTargetChanged: 'The target branch or starting point changed. Refresh and confirm again.',
     branchStartPoint:
       'Choose a commit on the map, an existing local branch, a remote branch or the current commit as a starting point.',

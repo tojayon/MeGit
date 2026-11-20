@@ -22,7 +22,7 @@
 - **Workflow canvas** — Group repositories, map dependencies and release steps, and export boards as SVG or PNG.
 - **Integration checks** — See which source commits are missing from a target. Open the connection to inspect the comparison.
 - **Connection shortcuts** — Pending push (blue, right) and pull (green, left) are visible without hovering when they can run. If a direction has no pending commits, its shortcut appears in gray on hover or keyboard focus and cannot be activated. Pull status reflects the last fetch. For two local repositories, edit the connection and enable fast-forward integration to move source commits into the checked-out target. Every action shows its direction and requires confirmation; the connection remains a comparison entry point.
-- **Git workbench** — Compare with the trunk or view the latest commit’s diff using the buttons beside each branch label. Stage changes, commit, and manage branches and remotes in the same workbench.
+- **Git workbench** — Compare with the trunk or view the latest commit’s diff using the buttons beside each branch label. Stage changes, commit, and manage branches and remotes in the same workbench. Pull highlights in green when there are incoming commits, and Push highlights in blue when there are outgoing commits. Both show the sync direction and require confirmation. Fetch runs directly.
 - **Optional AI assistant** — Ask about selected repositories, draft commit messages, and review proposed actions before applying them.
 
 ## Quick start

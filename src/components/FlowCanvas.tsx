@@ -572,6 +572,7 @@ function CanvasContents({
         style: {
           width: group.collapsed ? 300 : bounds.width,
           height: group.collapsed ? 100 : bounds.height,
+          ...(!group.collapsed && { pointerEvents: 'none' }),
         },
         measured: dimensions[group.id],
         zIndex: 0,
@@ -806,10 +807,13 @@ function CanvasContents({
     (changes: NodeChange<CanvasNode>[]) => {
       const selections = changes.filter((change) => change.type === 'select');
       if (selections.length) {
+        const boxSelecting = flowStore.getState().userSelectionRect !== null;
         const ids = new Set(selectedIds);
         for (const change of selections) {
-          if (change.type !== 'select') continue;
-          if (change.selected) ids.add(change.id);
+          const expandedGroup =
+            boxSelecting &&
+            board.groups?.some((group) => group.id === change.id && !group.collapsed);
+          if (change.selected && !expandedGroup) ids.add(change.id);
           else ids.delete(change.id);
         }
         onSelection([...ids]);
@@ -849,7 +853,16 @@ function CanvasContents({
           return next;
         });
     },
-    [board.nodes, board.notes, board.layoutLocked, onSelection, selectedIds, setPositions],
+    [
+      board.nodes,
+      board.notes,
+      board.groups,
+      board.layoutLocked,
+      flowStore,
+      onSelection,
+      selectedIds,
+      setPositions,
+    ],
   );
 
   const previewDrag = useCallback(
@@ -1215,7 +1228,10 @@ function CanvasContents({
         edgeTypes={edgeTypes}
         onNodesChange={handleChanges}
         onEdgesChange={(changes) => {
-          const selected = changes.find((change) => change.type === 'select' && change.selected);
+          const boxSelecting = flowStore.getState().userSelectionRect !== null;
+          const selected = changes.find(
+            (change) => change.type === 'select' && change.selected && !boxSelecting,
+          );
           if (selected?.type === 'select') {
             if (board.connections?.some((connection) => connection.id === selected.id))
               onSelectConnection(selected.id);
@@ -1304,6 +1320,7 @@ function CanvasContents({
           onViewport(viewport);
         }}
         onPaneClick={onClear}
+        onSelectionStart={onClear}
         defaultViewport={board.viewport}
         fitView={!board.viewport}
         fitViewOptions={{ padding: 0.22, maxZoom: 1 }}
@@ -1315,6 +1332,7 @@ function CanvasContents({
         autoPanOnNodeDrag={!dragBlocked}
         nodesConnectable={tool === 'select' && !board.layoutLocked}
         selectionOnDrag={tool === 'select'}
+        paneClickDistance={3}
         selectionMode={SelectionMode.Partial}
         selectionKeyCode={null}
         multiSelectionKeyCode={['Shift', 'Control', 'Meta']}

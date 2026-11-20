@@ -551,6 +551,13 @@ export async function performAction(
   return queueAction(repo, async () => {
       await guard?.before();
       const state = await readRepository(repo, !!guard);
+      if ((action.type === 'pull' || action.type === 'push') && action.expected) {
+        const { branch, head, remote, ref, upstreamHead } = action.expected;
+        if (state.detached || state.branch !== branch || state.head !== head)
+          throw new AppError('branchStateChanged', 409);
+        if (state.pushTarget?.remote !== remote || state.pushTarget.ref !== ref || state.upstreamHead !== upstreamHead)
+          throw new AppError('syncTargetChanged', 409);
+      }
       if (guard?.relation) {
         const relation = guard.relation;
         const fromLocal = relation.sourceRef.startsWith('refs/heads/');

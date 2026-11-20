@@ -317,6 +317,61 @@ test('多选排列、独立白板历史、聚焦与 SVG / PNG 导出，双主题
   expect(errors).toEqual([]);
 });
 
+test('选择模式从分组留白拖框，选中仓库卡片而不打开关系详情', async ({ page, request }) => {
+  const repo = await fixture();
+  try {
+    await commitFile(repo.repo);
+    const paths = [repo.repo];
+    for (const name of ['frontend', 'service']) {
+      const target = path.join(repo.root, name);
+      await git(repo.root, 'clone', repo.repo, target);
+      paths.push(target);
+    }
+    await seed(request, paths);
+    await page.setViewportSize({ width: 1700, height: 1100 });
+    await page.goto('/');
+    await expect(page.getByTestId('repository-node')).toHaveCount(3);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+    const pane = page.locator('.react-flow__pane');
+    const first = (await node(page, 'a').boundingBox())!;
+    const second = (await node(page, 'b').boundingBox())!;
+    const group = (await node(page, 'g').boundingBox())!;
+    const end = { x: second.x + second.width - 12, y: second.y + 30 };
+
+    await page.mouse.move(group.x - 10, first.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 10 });
+    await expect(page.locator('.canvas-shell .selection-count')).toHaveText('已选 2 项');
+    await page.mouse.up();
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
+    await expect(page.locator('.inspector-dock')).toHaveCount(0);
+
+    await page.mouse.click(group.x - 10, first.y + 10);
+    await page.mouse.move(first.x - 8, first.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 10 });
+    await expect(pane.locator('.react-flow__selection')).toBeVisible();
+    await page.mouse.up();
+    await expect(node(page, 'a')).toHaveClass(/\bselected\b/);
+    await expect(node(page, 'b')).toHaveClass(/\bselected\b/);
+    await expect(node(page, 'c')).not.toHaveClass(/\bselected\b/);
+    await expect(node(page, 'g')).not.toHaveClass(/\bselected\b/);
+    await expect(pane).toHaveCSS('cursor', 'default');
+
+    await page.getByRole('button', { name: '平移', exact: true }).click();
+    await expect(pane).toHaveCSS('cursor', 'grab');
+    await page.mouse.move(group.x - 10, first.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(group.x + 50, first.y + 55, { steps: 5 });
+    await expect(pane).toHaveCSS('cursor', 'grabbing');
+    await expect(pane.locator('.react-flow__selection')).toHaveCount(0);
+    await page.mouse.up();
+    await expect.poll(async () => (await node(page, 'a').boundingBox())!.x).toBeGreaterThan(first.x);
+  } finally {
+    await repo.cleanup();
+  }
+});
+
 test('真实框选后直接使用方向键与选择框拖动，布局持久化且可撤销', async ({ page, request }) => {
   await seed(request);
   await page.setViewportSize({ width: 1520, height: 980 });

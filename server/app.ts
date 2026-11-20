@@ -52,7 +52,17 @@ const actionSchema = z.discriminatedUnion('type', [
     paths: z.array(z.string().min(1).max(4000)).min(1).max(2000),
   }),
   z.object({ type: z.literal('commit'), message: z.string().trim().min(1).max(10000) }),
-  z.object({ type: z.enum(['fetch', 'pull', 'push']) }),
+  z.object({ type: z.literal('fetch') }),
+  z.strictObject({
+    type: z.enum(['pull', 'push']),
+    expected: z.strictObject({
+      branch: z.string().min(1),
+      head: hashSchema,
+      remote: z.string().min(1),
+      ref: z.string().min(1),
+      upstreamHead: hashSchema,
+    }),
+  }),
   z.strictObject({
     type: z.literal('addRemote'),
     name: z.string().min(1).max(240),

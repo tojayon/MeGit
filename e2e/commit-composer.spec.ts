@@ -16,6 +16,71 @@ async function setup(request: APIRequestContext, page: Page, repo: string) {
   await page.getByRole('button', { name: '查看分支 main', exact: true }).click();
 }
 
+test('分支详情和工作区只高亮待同步方向，推送先确认', async ({ page, request }) => {
+  const f = await fixture();
+  try {
+    const initial = await commitFile(f.repo);
+    const remote = path.join(f.root, 'remote.git');
+    await git(f.root, 'init', '--bare', remote);
+    await git(f.repo, 'remote', 'add', 'origin', remote);
+    await git(f.repo, 'push', '-u', 'origin', 'main');
+    const next = await commitFile(f.repo, 'local.txt', 'ready\n');
+    await setup(request, page, f.repo);
+    let calls = 0;
+    page.on('request', (outgoing) => {
+      if (outgoing.method() === 'POST' && outgoing.url().includes('/commit-repo/actions')) calls++;
+    });
+    const confirm = page.getByRole('dialog', { name: '推送', exact: true });
+    const push = page.locator('.branch-tree-selection').getByRole('button', { name: '推送', exact: true });
+    await expect(push).toHaveCSS('background-color', 'rgb(0, 169, 243)');
+    await push.press('Enter');
+    await expect(confirm).toContainText('提交中心 · main → 提交中心 · origin/main');
+    await expect(confirm.getByRole('button', { name: '取消', exact: true })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(confirm).toHaveCount(0);
+    await expect(push).toBeFocused();
+    expect(calls).toBe(0);
+    expect(await git(remote, 'rev-parse', 'refs/heads/main')).toBe(initial);
+
+    await page.getByRole('button', { name: '查看工作区改动', exact: true }).click();
+    const worktree = page.getByRole('dialog', { name: '工作区', exact: true });
+    const worktreePush = worktree.getByRole('button', { name: '推送', exact: true });
+    await expect(worktreePush).toHaveCSS('background-color', 'rgb(0, 169, 243)');
+    await worktreePush.click();
+    await expect(confirm).toBeVisible();
+    expect(calls).toBe(0);
+    await confirm.getByRole('button', { name: '推送', exact: true }).click();
+    await expect(confirm).toHaveCount(0);
+    await expect(worktree).toBeVisible();
+    await expect(worktreePush).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    expect(calls).toBe(1);
+    expect(await git(remote, 'rev-parse', 'refs/heads/main')).toBe(next);
+
+    const peer = path.join(f.root, 'peer');
+    await git(f.root, 'clone', '--branch', 'main', remote, peer);
+    await git(peer, 'config', 'user.name', 'MeGit Test');
+    await git(peer, 'config', 'user.email', 'test@example.invalid');
+    await git(peer, 'config', 'core.hooksPath', path.join(f.root, 'no-hooks'));
+    const upstream = await commitFile(peer, 'upstream.txt', 'ready to pull\n');
+    await git(peer, 'push');
+    await worktree.getByRole('button', { name: '获取', exact: true }).click();
+    const worktreePull = worktree.getByRole('button', { name: '拉取', exact: true });
+    await expect(worktreePull).toHaveCSS('background-color', 'rgb(170, 224, 98)');
+    await expect(worktreePush).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await worktreePull.click();
+    const pullConfirm = page.getByRole('dialog', { name: '拉取', exact: true });
+    const pullAction = pullConfirm.getByRole('button', { name: '拉取', exact: true });
+    await expect(pullAction).toHaveCSS('background-color', 'rgb(170, 224, 98)');
+    expect(await git(f.repo, 'rev-parse', 'HEAD')).toBe(next);
+    await pullAction.click();
+    await expect(pullConfirm).toHaveCount(0);
+    await expect(worktreePull).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    expect(await git(f.repo, 'rev-parse', 'HEAD')).toBe(upstream);
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test('HEAD 卡片直接暂存、取消暂存和提交；草稿与工作区共用且失败保留', async ({ page, request }) => {
   const f = await fixture();
   try {
@@ -140,7 +205,10 @@ test('明亮英文窄屏可在 HEAD 提交，命令提示跟随说明，工作�
     await expect(dialog.getByLabel('Commit message', { exact: true })).toBeInViewport();
     const sync = dialog.getByRole('region', { name: 'Branch sync', exact: true });
     await expect(sync.getByRole('button', { name: 'Fetch', exact: true })).toBeInViewport();
-    await expect(sync.getByRole('button', { name: 'Pull', exact: true })).toBeInViewport();
+    const pull = sync.getByRole('button', { name: 'Pull', exact: true });
+    await expect(pull).toBeInViewport();
+    await expect(pull).toBeDisabled();
+    await expect(pull).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     const push = sync.getByRole('button', { name: 'Push', exact: true });
     await expect(push).toBeInViewport({ ratio: 1 });
     const syncBox = (await sync.boundingBox())!;
@@ -158,7 +226,9 @@ test('明亮英文窄屏可在 HEAD 提交，命令提示跟随说明，工作�
     await page.screenshot({
       path: '.megit/verification/commit-composer/worktree-light-en-mobile.png',
     });
-    await dialog.getByRole('button', { name: 'Commit 1 file', exact: true }).click();
+    const worktreeCommit = dialog.getByRole('button', { name: 'Commit 1 file', exact: true });
+    await expect(worktreeCommit).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+    await worktreeCommit.click();
     await expect
       .poll(async () => git(f.repo, 'log', '-1', '--format=%s'))
       .toBe('Save narrow screen change');
@@ -187,6 +257,11 @@ test('工作区双栏独立滚动并恢复，提交栏固定在底部', async ({
       ),
     );
     await setup(request, page, f.repo);
+    const branchDetail = page.locator('.branch-tree-selection');
+    await expect(branchDetail.getByRole('button', { name: '拉取', exact: true })).toHaveCSS(
+      'background-color',
+      'rgba(0, 0, 0, 0)',
+    );
     await page.getByRole('button', { name: '查看工作区改动', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '工作区', exact: true });
     const message = dialog.getByLabel('提交说明', { exact: true });
@@ -199,6 +274,9 @@ test('工作区双栏独立滚动并恢复，提交栏固定在底部', async ({
     const fetchButton = sync.getByRole('button', { name: '获取', exact: true });
     const pullButton = sync.getByRole('button', { name: '拉取', exact: true });
     const pushButton = sync.getByRole('button', { name: '推送', exact: true });
+    await expect(pullButton).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(fetchButton).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(pushButton).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     for (const button of [fetchButton, pullButton, pushButton]) {
       await expect(button).toBeInViewport();
       await expect(button).toBeEnabled();
@@ -220,6 +298,11 @@ test('工作区双栏独立滚动并恢复，提交栏固定在底部', async ({
     const stagedHeader = dialog.locator('.file-group > header').filter({ hasText: '已暂存' });
     const stageAll = modifiedHeader.getByRole('button', { name: '全部暂存', exact: true });
     const unstageAll = stagedHeader.getByRole('button', { name: '全部取消', exact: true });
+    await expect(stageAll).toHaveCSS('background-color', 'rgb(74, 116, 17)');
+    await expect(unstageAll).toHaveCSS('background-color', 'rgb(255, 155, 167)');
+    const commit = dialog.getByRole('button', { name: '提交 40 个文件', exact: true });
+    await expect(commit).toBeDisabled();
+    await expect(commit).toHaveCSS('background-color', 'rgb(36, 40, 46)');
     for (const [header, button] of [[modifiedHeader, stageAll], [stagedHeader, unstageAll]]) {
       await expect(button).toBeEnabled();
       const headerBox = (await header.boundingBox())!;
@@ -234,6 +317,8 @@ test('工作区双栏独立滚动并恢复，提交栏固定在底部', async ({
     await expect(editor).toHaveCount(0);
     await expect(message).toBeInViewport();
     await message.fill('先写这次的目标');
+    await expect(commit).toBeEnabled();
+    await expect(commit).toHaveCSS('background-color', 'rgb(0, 169, 243)');
     const modified = dialog.getByRole('region', { name: '工作区修改', exact: true });
     const staged = dialog.getByRole('region', { name: '已暂存', exact: true });
     const modifiedBox = (await modified.boundingBox())!;
@@ -262,6 +347,8 @@ test('工作区双栏独立滚动并恢复，提交栏固定在底部', async ({
     await expect(dialog.getByRole('button', { name: '提交 0 个文件', exact: true })).toBeDisabled();
     await stageAll.click();
     await expect(dialog.getByRole('button', { name: '提交 80 个文件', exact: true })).toBeEnabled();
+    await expect(stageAll).toBeDisabled();
+    await expect(stageAll).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   } finally {
     await f.cleanup();
   }

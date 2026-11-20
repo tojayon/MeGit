@@ -216,12 +216,17 @@ export type RemoteAction =
   | { type: 'addRemote'; name: string; destination: string }
   | { type: 'publishBranch'; remote: string; name: string; expected: BranchExpectation }
   | { type: 'setTracking'; targetRef: string; targetHash: string; expected: BranchExpectation };
+export type SyncAction = {
+  type: 'pull' | 'push';
+  expected?: { branch: string; head: string; remote: string; ref: string; upstreamHead: string };
+};
 export type GitAction =
   | BranchAction
   | RemoteAction
   | { type: 'stage' | 'unstage'; paths: string[] }
   | { type: 'commit'; message: string }
-  | { type: 'fetch' | 'pull' | 'push' };
+  | { type: 'fetch' }
+  | SyncAction;
 export interface RelationAction {
   type: 'pull' | 'push' | 'integrate';
   source: string;

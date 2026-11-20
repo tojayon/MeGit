@@ -413,7 +413,7 @@ export default {
     exportHelp: '导出当前可见内容，包含当前显示的仓库状态；不含工具栏和详情。',
     exporting: '正在导出',
     exportFailed: '导出失败，请重试或缩小聚焦范围。',
-    selectHelp: '拖动空白处框选，Shift 或 Ctrl 点选多项；方向键移动。',
+    selectHelp: '在空白处按住鼠标左键拖框；Shift 或 Ctrl 点选多项，方向键移动。',
   },
   note: {
     add: '添加说明',

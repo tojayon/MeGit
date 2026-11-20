@@ -3,14 +3,12 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowRightLeft,
   Cloud,
-  Download,
   FileCode2,
   FolderGit2,
   GitBranchPlus,
   LoaderCircle,
   MoreHorizontal,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react';
 import type {
@@ -40,6 +38,7 @@ import { PopupMenu } from './PopupMenu';
 import { Tooltip } from './Tooltip';
 import { CommitComposer } from './CommitComposer';
 import { RepositoryAvatar } from './RepositoryAvatar';
+import { RepositorySyncButtons } from './RepositorySyncButtons';
 import { RemoteDestinationButton } from './RemoteDestinationButton';
 import { RemoteActionDialog } from './RemoteActionDialog';
 import { RemoteAccessRow, RemoteGitHubLogin } from './RemoteAccess';
@@ -679,33 +678,20 @@ export function BranchTreePanel({
                           <div className="branch-tree-tracking-actions">
                             {state.pushTarget && !branch.upstreamGone
                               ? (
-                                  [
-                                    ['pull', Download],
-                                    ['push', Upload],
-                                  ] as const
-                                ).map(([type, Icon]) => (
-                                  <Tooltip
-                                    key={type}
-                                    detailed
-                                    content={
-                                      <GitHelp
-                                        topic={type}
-                                        preview={{ commands: [actionArguments({ type }, state)] }}
-                                      />
-                                    }
-                                  >
-                                    <Button
-                                      size="compact"
-                                      className="branch-detail-action"
-                                      aria-label={t(`repository.${type}`)}
-                                      icon={<Icon size={15} />}
-                                      disabled={blocked}
-                                      onClick={() => void act({ type })}
-                                    >
-                                      {t(`repository.${type}`)}
-                                    </Button>
-                                  </Tooltip>
-                                ))
+                                  <RepositorySyncButtons
+                                    repositoryName={repo.name}
+                                    state={state}
+                                    busy={busy}
+                                    disabled={blocked}
+                                    compact
+                                    onAction={async (action) => {
+                                      setActionError(null);
+                                      if (!(await onAction(action))) return false;
+                                      setReload((value) => value + 1);
+                                      return true;
+                                    }}
+                                  />
+                                )
                               : state.remotes.length > 0 &&
                                 !state.error && (
                                   <>

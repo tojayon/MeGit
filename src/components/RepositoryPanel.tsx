@@ -5,7 +5,6 @@ import {
   ArrowUp,
   ChevronRight,
   CircleAlert,
-  Download,
   FileCode2,
   GitBranch,
   GitCommitHorizontal,
@@ -13,7 +12,6 @@ import {
   Minus,
   Plus,
   RefreshCw,
-  Upload,
 } from 'lucide-react';
 import type {
   ChangedFile,
@@ -37,6 +35,7 @@ import { RepositoryInfo } from './RepositoryInfo';
 import { GitHelp, HelpTip } from './GitHelp';
 import { Tooltip } from './Tooltip';
 import { RepositoryAvatar } from './RepositoryAvatar';
+import { RepositorySyncButtons } from './RepositorySyncButtons';
 import {
   actionArguments,
   commitDiffArguments,
@@ -366,7 +365,7 @@ export function RepositoryToolsPanel({
   setMessage,
   busy,
   handleAction,
-  onCommitAction,
+  onAction,
   onGenerateCommit,
 }: {
   repo: Repository;
@@ -379,7 +378,7 @@ export function RepositoryToolsPanel({
   setMessage: (message: string) => void;
   busy: string;
   handleAction: (action: GitAction) => Promise<void>;
-  onCommitAction: (action: GitAction) => Promise<boolean>;
+  onAction: (action: GitAction) => Promise<boolean>;
   onGenerateCommit: () => Promise<boolean>;
 }) {
   const { t } = useTranslation();
@@ -502,48 +501,13 @@ export function RepositoryToolsPanel({
             {t('repository.fetch')}
           </Button>
         </Tooltip>
-        <Tooltip
-          detailed
-          content={
-            <GitHelp
-              topic="pull"
-              preview={{ commands: [actionArguments({ type: 'pull' }, state)] }}
-            />
-          }
-        >
-          <Button
-            size={isWorktree ? 'compact' : 'default'}
-            className={isWorktree ? 'branch-detail-action' : undefined}
-            aria-label={t('repository.pull')}
-            busy={busy === 'pull'}
-            icon={<Download size={15} />}
-            disabled={!!busy || !state?.pushTarget || state.detached || !!state.operation}
-            onClick={() => void handleAction({ type: 'pull' })}
-          >
-            {t('repository.pull')}
-          </Button>
-        </Tooltip>
-        <Tooltip
-          detailed
-          content={
-            <GitHelp
-              topic="push"
-              preview={{ commands: [actionArguments({ type: 'push' }, state)] }}
-            />
-          }
-        >
-          <Button
-            size={isWorktree ? 'compact' : 'default'}
-            className={isWorktree ? 'branch-detail-action' : undefined}
-            aria-label={t('repository.push')}
-            busy={busy === 'push'}
-            icon={<Upload size={15} />}
-            disabled={!!busy || !state?.pushTarget || state.detached || !!state.operation}
-            onClick={() => void handleAction({ type: 'push' })}
-          >
-            {t('repository.push')}
-          </Button>
-        </Tooltip>
+        <RepositorySyncButtons
+          repositoryName={repo.name}
+          state={state}
+          busy={busy}
+          compact={isWorktree}
+          onAction={onAction}
+        />
       </div>
       {!isWorktree && syncNote}
     </>
@@ -567,7 +531,7 @@ export function RepositoryToolsPanel({
           message={message}
           onMessage={setMessage}
           busy={busy}
-          onAction={onCommitAction}
+          onAction={onAction}
           onGenerate={onGenerateCommit}
         >
           <div className="worktree-file-panes">
@@ -867,7 +831,7 @@ export function RepositoryPanel({
               setMessage={setMessage}
               busy={busy}
               handleAction={handleAction}
-              onCommitAction={executeAction}
+              onAction={executeAction}
               onGenerateCommit={generateCommit}
             />
           </div>

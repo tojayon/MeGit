@@ -129,6 +129,8 @@ export function CommitComposer({
       <Button
         type="submit"
         variant="primary"
+        className="git-action-tone"
+        data-action="commit"
         icon={<GitCommitHorizontal size={16} />}
         busy={busy === 'commit'}
         disabled={!canCommit}

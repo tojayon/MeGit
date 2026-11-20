@@ -48,6 +48,9 @@
   --green: #86d21f;
   --green-soft: #223408;
   --green-border: #4a7411;
+  --sync-pull-bg: #aae062;
+  --sync-pull-text: #000d1f;
+  --sync-pull-hover: #98d941;
   --orange: #f5b84a;
   --orange-soft: #382b16;
   --orange-border: #665029;
@@ -132,6 +135,9 @@
   --green: #36540c;
   --green-soft: #edf8dd;
   --green-border: #aae062;
+  --sync-pull-bg: #aae062;
+  --sync-pull-text: #000d1f;
+  --sync-pull-hover: #98d941;
   --orange: #865710;
   --orange-soft: #fff4dd;
   --orange-border: #e7cf9c;

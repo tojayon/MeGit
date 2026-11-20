@@ -899,6 +899,8 @@ code {
 }
 .canvas-shell .react-flow {
   --xy-background-color: var(--canvas);
+  --xy-selection-background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+  --xy-selection-border: 1px solid var(--accent);
 }
 .react-flow__node:focus,
 .react-flow__node:focus-visible {
@@ -1654,6 +1656,14 @@ code {
     > .canvas-hover-tools {
     opacity: 0;
   }
+  .canvas-shell:has(> .react-flow .react-flow__pane.dragging)
+    :is(.canvas-hover-tools, .canvas-bottom > .canvas-tools) {
+    opacity: 0;
+  }
+  .canvas-shell:has(> .react-flow .react-flow__pane.dragging)
+    :is(.canvas-toolstrip, .canvas-toolstrip .canvas-tools, .canvas-bottom > .canvas-tools) {
+    pointer-events: none;
+  }
 }
 .canvas-menu {
   position: relative;
@@ -1914,8 +1924,11 @@ code {
   font-size: 12px;
   line-height: 1.5;
 }
+.canvas-shell .react-flow__pane.selection:not(.dragging) {
+  cursor: default;
+}
 .is-pan-tool .react-flow__node,
-.is-pan-tool .react-flow__pane {
+.is-pan-tool .react-flow__pane:not(.dragging) {
   cursor: grab;
 }
 .is-layout-locked .group-heading {
@@ -2277,7 +2290,7 @@ code {
   gap: 8px;
   margin: 0 20px;
 }
-.repo-actions .button {
+.repo-actions > .tooltip-anchor > .button {
   width: 100%;
   min-height: var(--control-compact);
   padding: 5px var(--space-2);
@@ -2496,18 +2509,21 @@ code {
   background: var(--hover);
   color: var(--text);
 }
-.commit-composer-compact .button.branch-detail-stage:not(:disabled) {
+.button.branch-detail-stage:not(:disabled) {
   background: var(--card-stage-bg);
   color: var(--card-stage-text);
 }
-.commit-composer-compact .button.branch-detail-stage:hover:not(:disabled) {
+.button.branch-detail-stage:hover:not(:disabled) {
   background: var(--card-stage-hover);
+  color: var(--card-stage-text);
 }
-.commit-composer-compact .button.branch-detail-unstage:not(:disabled) {
+.button.branch-detail-unstage:not(:disabled) {
   background: var(--danger);
   color: var(--canvas);
 }
-.commit-composer-compact .button.branch-detail-unstage:hover:not(:disabled) {
+.button.branch-detail-unstage:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--canvas);
   box-shadow: inset 0 0 0 1px var(--danger-border);
 }
 @container commit-composer (width < 385px) {
@@ -2979,6 +2995,7 @@ code {
   padding: 8px 13px;
   gap: 8px;
   color: var(--text-secondary);
+  pointer-events: auto;
   cursor: grab;
 }
 .group-heading h3 {
@@ -3485,18 +3502,18 @@ code {
   align-items: center;
   gap: var(--space-1);
 }
-.worktree-dialog-sync .repo-actions .button {
+.worktree-dialog-sync .repo-actions > .tooltip-anchor > .button {
   width: auto;
 }
 @container worktree-dialog (width < 485px) {
   .worktree-dialog-sync {
     grid-template-columns: max-content minmax(0, 1fr) max-content;
   }
-  .worktree-dialog-sync .repo-actions .button {
+  .worktree-dialog-sync .repo-actions > .tooltip-anchor > .button {
     width: var(--control-compact);
     padding-inline: 0;
   }
-  .worktree-dialog-sync .repo-actions .button-label {
+  .worktree-dialog-sync .repo-actions > .tooltip-anchor > .button > .button-label {
     display: none;
   }
 }
@@ -4335,7 +4352,7 @@ code {
 }
 .repo-ref strong,
 .repo-ref,
-.repo-actions .button,
+.repo-actions > .tooltip-anchor > .button,
 .remote-state,
 .file-name,
 .commit-form label,
@@ -4766,6 +4783,13 @@ code {
   opacity: 1;
   pointer-events: auto;
 }
+@media (hover: hover) and (pointer: fine) {
+  .canvas-shell:has(> .react-flow .react-flow__pane.dragging)
+    .repository-relation-shortcut:not([data-recommended='true']) {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
 @media (hover: none) or (pointer: coarse) {
   .repository-relation-shortcut {
     opacity: 1;
@@ -4775,26 +4799,38 @@ code {
 .repository-relation-shortcut .icon-button {
   background: var(--surface-raised);
 }
-.relation-sync-button {
+.relation-sync-button,
+.git-action-tone {
   --relation-sync-bg: var(--accent-solid);
   --relation-sync-text: var(--on-accent);
   --relation-sync-hover: var(--accent-hover);
 }
 .relation-sync-button[data-action='pull'] {
-  --relation-sync-bg: var(--green);
-  --relation-sync-text: var(--surface);
-  --relation-sync-hover: color-mix(in srgb, var(--relation-sync-bg) 90%, var(--relation-sync-text));
+  --relation-sync-bg: var(--sync-pull-bg);
+  --relation-sync-text: var(--sync-pull-text);
+  --relation-sync-hover: var(--sync-pull-hover);
 }
 .repository-relation-shortcut[data-recommended='true'] .relation-sync-button,
-.button.primary.relation-sync-button {
+.button.primary.relation-sync-button:not(:disabled),
+.button.relation-sync-button[data-pending='true']:not(:disabled),
+.button.git-action-tone:not(:disabled) {
   color: var(--relation-sync-text);
   background: var(--relation-sync-bg);
   border-color: var(--relation-sync-bg);
 }
 .repository-relation-shortcut[data-recommended='true'] .relation-sync-button:hover,
-.button.primary.relation-sync-button:hover:not(:disabled) {
+.button.primary.relation-sync-button:hover:not(:disabled),
+.button.relation-sync-button[data-pending='true']:hover:not(:disabled),
+.button.git-action-tone:hover:not(:disabled) {
+  color: var(--relation-sync-text);
   background: var(--relation-sync-hover);
   border-color: var(--relation-sync-hover);
+}
+.button.git-action-tone[data-action='commit']:disabled {
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+  color: var(--muted);
+  box-shadow: none;
 }
 .repository-relation-shortcut .icon-button[aria-disabled='true'] {
   color: var(--muted);
@@ -5118,6 +5154,7 @@ code {
   .button,
   .button.compact,
   .repo-actions > .button,
+  .repo-actions > .tooltip-anchor > .button,
   .workspace-header .button.compact {
     min-height: var(--control-touch);
   }

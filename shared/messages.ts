@@ -45,6 +45,7 @@ export const errorMessages = {
   branchExists: '同名分支已存在，请使用其他名称。',
   branchNoCommits: '仓库尚无提交，请先完成首次提交。',
   branchStateChanged: '当前分支或提交已变化，请刷新后重新确认。',
+  syncTargetChanged: '上游分支或其本地记录已变化，请刷新后重新确认。',
   branchTargetChanged: '目标分支或起点已变化，请刷新后重新确认。',
   branchStartPoint: '请选择图上的提交、现有本地分支、远端分支或当前提交作为起点。',
   branchMissing: '找不到这个本地分支，请刷新后重试。',

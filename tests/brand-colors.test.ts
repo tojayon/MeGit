@@ -108,6 +108,9 @@ describe('MeGit 品牌色规范', () => {
       for (const background of ['card-stage-bg', 'card-stage-hover']) {
         expect(contrast(tokens['card-stage-text'], tokens[background])).toBeGreaterThanOrEqual(4.5);
       }
+      for (const background of ['sync-pull-bg', 'sync-pull-hover']) {
+        expect(contrast(tokens['sync-pull-text'], tokens[background])).toBeGreaterThanOrEqual(4.5);
+      }
       expect(contrast(tokens.canvas, tokens.danger)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(tokens['card-toolbar-bg'], tokens['card-commit-hover'])).toBeGreaterThanOrEqual(
         4.5,

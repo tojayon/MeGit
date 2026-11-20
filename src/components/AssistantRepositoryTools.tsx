@@ -76,7 +76,7 @@ export function AssistantRepositoryTools({
             setMessage={actions.setMessage}
             busy={disabled ? 'assistant' : actions.busy}
             handleAction={handleAction}
-            onCommitAction={actions.executeAction}
+            onAction={actions.executeAction}
             onGenerateCommit={actions.generateCommit}
           />
         ) : (

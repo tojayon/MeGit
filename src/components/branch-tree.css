@@ -556,11 +556,11 @@
   margin-inline-start: auto;
 }
 @container branch-tracking (width < 320px) {
-  .branch-tree-tracking-actions .branch-detail-action {
+  .branch-tree-tracking-actions > .tooltip-anchor > .branch-detail-action {
     width: var(--control-compact);
     padding-inline: 0;
   }
-  .branch-tree-tracking-actions .button-label {
+  .branch-tree-tracking-actions > .tooltip-anchor > .branch-detail-action > .button-label {
     display: none;
   }
 }
