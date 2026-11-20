@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Workspace } from '../../shared/types';
+import type { Board, Workspace } from '../../shared/types';
 import { api } from './api';
 import { ApiError } from './messages';
 import { BoardHistory } from './board-history';
@@ -9,6 +9,7 @@ export function useWorkspace() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'failed'>('saved');
+  const [hasPendingEdits, setHasPendingEdits] = useState(false);
   const [canRetrySave, setCanRetrySave] = useState(false);
   const [historyStatus, setHistoryStatus] = useState({ canUndo: false, canRedo: false });
   const current = useRef<Workspace | null>(null);
@@ -30,6 +31,7 @@ export function useWorkspace() {
         setWorkspace(current.current);
         persisted.current = version;
       }
+      setHasPendingEdits(false);
       setSaveStatus('saved');
     } catch (err) {
       blocked.current = true;
@@ -53,7 +55,7 @@ export function useWorkspace() {
   }, [canRetrySave, flush]);
 
   const enqueue = useCallback(
-    (next: Workspace) => {
+    (next: Workspace, kind: 'edit' | 'viewport' = 'edit') => {
       setHistoryStatus({
         canUndo: history.current.canUndo(next.activeBoardId),
         canRedo: history.current.canRedo(next.activeBoardId),
@@ -61,6 +63,7 @@ export function useWorkspace() {
       current.current = next;
       setWorkspace(next);
       sequence.current++;
+      if (kind === 'edit') setHasPendingEdits(true);
       setSaveStatus('saving');
       clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), 350);
@@ -76,6 +79,21 @@ export function useWorkspace() {
       if (JSON.stringify(next) === JSON.stringify(current.current)) return;
       history.current.record(current.current, next);
       enqueue(next);
+    },
+    [enqueue],
+  );
+
+  const updateViewport = useCallback(
+    (id: string, viewport: NonNullable<Board['viewport']>) => {
+      const workspace = current.current;
+      if (!workspace || blocked.current) return;
+      const board = workspace.boards.find((item) => item.id === id);
+      if (!board) return;
+      const previous = board.viewport;
+      if (previous?.x === viewport.x && previous.y === viewport.y && previous.zoom === viewport.zoom)
+        return;
+      const boards = workspace.boards.map((item) => item === board ? { ...board, viewport } : item);
+      enqueue({ ...workspace, boards }, 'viewport');
     },
     [enqueue],
   );
@@ -127,8 +145,10 @@ export function useWorkspace() {
   return {
     workspace,
     update,
+    updateViewport,
     error,
     saveStatus,
+    relationsSaved: !hasPendingEdits && saveStatus !== 'failed',
     canRetrySave,
     retrySave,
     restore,

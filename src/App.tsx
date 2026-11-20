@@ -110,8 +110,10 @@ export default function App() {
   const {
     workspace,
     update,
+    updateViewport,
     error: workspaceError,
     saveStatus,
+    relationsSaved,
     canRetrySave,
     retrySave,
     restore,
@@ -750,7 +752,7 @@ export default function App() {
                 selectedEdge={selectedEdge}
                 selectedGroup={selectedGroup}
                 selectedIds={selectedIds}
-                relationsSaved={saveStatus === 'saved'}
+                relationsSaved={relationsSaved}
                 onRefresh={refresh}
                 onNotice={notify}
                 onRepositoryState={(id, state) => {
@@ -886,11 +888,7 @@ export default function App() {
                       if (positions[node.id]) node.position = positions[node.id];
                   })
                 }
-                onViewport={(viewport) =>
-                  update((draft) => {
-                    draft.boards.find((b) => b.id === board.id)!.viewport = viewport;
-                  })
-                }
+                onViewport={(viewport) => updateViewport(board.id, viewport)}
                 onAdd={() => setModal('add')}
                 onClear={selectBackground}
               />

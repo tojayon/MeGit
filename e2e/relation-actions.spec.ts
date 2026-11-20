@@ -3,7 +3,7 @@ import { fixture, commitFile, git } from '../tests/fixtures';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
-test('待推送默认亮蓝色，确认按钮显示同款图标；同步后不可执行', async ({ page, request }) => {
+test('待推送拖动和保存视角期间保持亮蓝色，确认后才推送', async ({ page, request }) => {
   const { root, repo, cleanup } = await fixture();
   try {
     const remote = path.join(root, 'release.git');
@@ -35,6 +35,18 @@ test('待推送默认亮蓝色，确认按钮显示同款图标；同步后不�
     await expect(pushSlot).toHaveCSS('opacity', '1');
     await expect(pullSlot).toHaveCSS('opacity', '0');
     await expect(push).toHaveCSS('background-color', 'rgb(0, 169, 243)');
+    const saveState = page.locator('.save-state');
+    await expect(saveState).toHaveText('已保存');
+    let releaseViewportSave = () => {};
+    const viewportSave = new Promise<void>((resolve) => { releaseViewportSave = resolve; });
+    let viewportSaveStarted = false;
+    await page.route('**/api/workspace', async (route) => {
+      if (route.request().method() === 'PUT') {
+        viewportSaveStarted = true;
+        await viewportSave;
+      }
+      await route.continue();
+    });
     const tools = page.getByRole('group', { name: '白板工具', exact: true });
     const pan = tools.getByRole('button', { name: '平移', exact: true });
     const extraTools = tools.locator('.canvas-hover-tools');
@@ -43,20 +55,36 @@ test('待推送默认亮蓝色，确认按钮显示同款图标；同步后不�
     await page.mouse.move(anchor.x + anchor.width / 2, anchor.y - 40);
     await page.mouse.down();
     try {
-      await expect(page.locator('.react-flow__pane')).toHaveClass(/\bdragging\b/);
-      await page.mouse.move(anchor.x + anchor.width / 2, anchor.y + anchor.height / 2);
-      await expect(pullSlot).toHaveCSS('opacity', '0');
-      await expect(pushSlot).toHaveCSS('opacity', '1');
+      try {
+        await expect(page.locator('.react-flow__pane')).toHaveClass(/\bdragging\b/);
+        await page.mouse.move(anchor.x + anchor.width / 2, anchor.y + anchor.height / 2);
+        await expect(pullSlot).toHaveCSS('opacity', '0');
+        await expect(pushSlot).toHaveCSS('opacity', '1');
+        await expect(push).toHaveCSS('background-color', 'rgb(0, 169, 243)');
+        const switchBox = (await pan.boundingBox())!;
+        await page.mouse.move(switchBox.x + switchBox.width / 2, switchBox.y + switchBox.height / 2);
+        await expect(extraTools).toHaveCSS('opacity', '0');
+        await page.mouse.move(anchor.x + anchor.width / 2 + 30, anchor.y - 20);
+      } finally {
+        await page.mouse.up();
+      }
+      await expect(saveState).toHaveText('保存中');
+      await expect.poll(() => viewportSaveStarted).toBe(true);
+      await expect(pushSlot).toHaveCSS('opacity', '1', { timeout: 2000 });
       await expect(push).toHaveCSS('background-color', 'rgb(0, 169, 243)');
-      const switchBox = (await pan.boundingBox())!;
-      await page.mouse.move(switchBox.x + switchBox.width / 2, switchBox.y + switchBox.height / 2);
-      await expect(extraTools).toHaveCSS('opacity', '0');
+      await expect(push).toBeEnabled();
+      await push.click();
+      const pendingDialog = page.getByRole('dialog', { name: '推送' });
+      await expect(pendingDialog).toBeVisible();
+      await pendingDialog.getByRole('button', { name: '取消', exact: true }).click();
     } finally {
-      await page.mouse.up();
+      releaseViewportSave();
     }
+    await expect(saveState).toHaveText('已保存');
+    const persisted = await (await request.get('/api/workspace', { headers })).json();
+    expect(persisted.boards[0].viewport).toBeDefined();
+    await pan.hover();
     await expect(extraTools).toHaveCSS('opacity', '1');
-    await tools.getByRole('button', { name: '选择', exact: true }).click();
-    await page.getByRole('button', { name: '适应白板', exact: true }).click();
     await bridge.focus();
     await expect(pullSlot).toHaveCSS('opacity', '1');
     await expect(pull).toBeDisabled();
@@ -178,7 +206,20 @@ test('本地整合在关系中启用后可用，刷新仍保留且不添加远�
     await bridge.click();
     await page.getByRole('button', { name: 'Edit relation', exact: true }).first().click();
     await page.getByRole('checkbox', { name: 'Enable fast-forward integration on this connection' }).check();
-    await page.getByRole('dialog').getByRole('button', { name: 'Save relation', exact: true }).click();
+    let releaseRelationSave = () => {};
+    const relationSave = new Promise<void>((resolve) => { releaseRelationSave = resolve; });
+    await page.route('**/api/workspace', async (route) => {
+      if (route.request().method() === 'PUT') await relationSave;
+      await route.continue();
+    });
+    try {
+      await page.getByRole('dialog').getByRole('button', { name: 'Save relation', exact: true }).click();
+      await expect(page.locator('.save-state')).toHaveClass(/\bsaving\b/);
+      await bridge.hover();
+      await expect(integrate).toHaveCount(0);
+    } finally {
+      releaseRelationSave();
+    }
     await expect(integrate).toBeAttached();
     await page.reload();
     await page.getByRole('button', { name: 'Close relation details' }).click();

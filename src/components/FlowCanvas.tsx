@@ -5,7 +5,15 @@ import type { NoticeMessage } from '../lib/messages';
 import { RepositoryPorts } from './RepositoryPorts';
 import { useSelectedConnectionPorts } from '../lib/use-selected-connection-ports';
 import { repositoryImage } from '../lib/repository-images';
-import { memo, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -98,6 +106,7 @@ import { useViewState } from '../lib/use-view-state';
 import { isBoolean, isStrings, viewKey } from '../lib/view-storage';
 import { branchRef, cardRefLabel, cardUsesWorktree } from '../../shared/card-refs';
 import { relationStatus } from '../lib/relation-status';
+import { createAnimationFrameBatch } from '../lib/animation-frame-batch';
 
 type RepoNode = Node<
   {
@@ -384,6 +393,14 @@ function CanvasContents({
   const { zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
   const flowStore = useStoreApi<CanvasNode, CanvasEdge>();
   const updateNodeInternals = useUpdateNodeInternals();
+  const selectionSyncRef = useRef<() => void>(() => {});
+  const pendingSelectionIds = useRef<Set<string> | null>(null);
+  const selectionPublished = useRef(false);
+  const selectionBatch = useRef<ReturnType<typeof createAnimationFrameBatch> | null>(null);
+  const dragPreviewBatch = useRef<ReturnType<typeof createAnimationFrameBatch> | null>(null);
+  const previewDragRef = useRef<(raw: Point, bypass: boolean) => Record<string, Point> | null>(
+    () => null,
+  );
   const shellRef = useRef<HTMLDivElement>(null);
   const reconnectingId = useRef<string | null>(null);
   const { x: viewportX, y: viewportY, zoom } = useViewport();
@@ -808,15 +825,28 @@ function CanvasContents({
       const selections = changes.filter((change) => change.type === 'select');
       if (selections.length) {
         const boxSelecting = flowStore.getState().userSelectionRect !== null;
-        const ids = new Set(selectedIds);
-        for (const change of selections) {
-          const expandedGroup =
-            boxSelecting &&
-            board.groups?.some((group) => group.id === change.id && !group.collapsed);
-          if (change.selected && !expandedGroup) ids.add(change.id);
-          else ids.delete(change.id);
+        if (boxSelecting) {
+          const ids = new Set(pendingSelectionIds.current ?? selectedIds);
+          for (const change of selections) {
+            const expandedGroup = board.groups?.some(
+              (group) => group.id === change.id && !group.collapsed,
+            );
+            if (change.selected && !expandedGroup) ids.add(change.id);
+            else ids.delete(change.id);
+          }
+          pendingSelectionIds.current = ids;
+          if (!selectionPublished.current) {
+            onSelection([...ids]);
+            selectionPublished.current = true;
+          } else selectionBatch.current?.schedule();
+        } else {
+          const ids = new Set(selectedIds);
+          for (const change of selections) {
+            if (change.selected) ids.add(change.id);
+            else ids.delete(change.id);
+          }
+          onSelection([...ids]);
         }
-        onSelection([...ids]);
       }
       const measured = changes.filter(
         (change) => change.type === 'dimensions' && change.dimensions,
@@ -883,10 +913,32 @@ function CanvasContents({
     },
     [preferences.snappingEnabled, zoom, setPositions],
   );
+  useLayoutEffect(() => {
+    selectionSyncRef.current = () => {
+      if (pendingSelectionIds.current) onSelection([...pendingSelectionIds.current]);
+    };
+    previewDragRef.current = previewDrag;
+  }, [onSelection, previewDrag]);
+  useLayoutEffect(() => {
+    const selectionBatcher = createAnimationFrameBatch(() => selectionSyncRef.current());
+    const dragBatcher = createAnimationFrameBatch(() => {
+      const gesture = drag.current;
+      if (gesture) previewDragRef.current(gesture.raw, gesture.bypass);
+    });
+    selectionBatch.current = selectionBatcher;
+    dragPreviewBatch.current = dragBatcher;
+    return () => {
+      selectionBatcher.cancel();
+      dragBatcher.cancel();
+      selectionBatch.current = null;
+      dragPreviewBatch.current = null;
+    };
+  }, []);
 
   const cancelDrag = useCallback(() => {
     const gesture = drag.current;
     if (!gesture) return;
+    dragPreviewBatch.current?.cancel();
     // React Flow does not emit drag-stop after a multitouch abort. Ignore its
     // trailing raw position changes until the next gesture starts.
     dragCancelled.current = true;
@@ -1294,17 +1346,17 @@ function CanvasContents({
         onNodeDrag={(event, node) => {
           const gesture = drag.current;
           if (!gesture) return;
-          previewDrag(
-            {
-              x: node.position.x - gesture.origin.x,
-              y: node.position.y - gesture.origin.y,
-            },
-            'altKey' in event && event.altKey,
-          );
+          gesture.raw = {
+            x: node.position.x - gesture.origin.x,
+            y: node.position.y - gesture.origin.y,
+          };
+          gesture.bypass = 'altKey' in event && event.altKey;
+          dragPreviewBatch.current?.schedule();
         }}
         onNodeDragStop={(event, node) => {
           const gesture = drag.current;
           if (!gesture) return;
+          dragPreviewBatch.current?.cancel();
           const next = previewDrag(
             {
               x: node.position.x - gesture.origin.x,
@@ -1320,7 +1372,16 @@ function CanvasContents({
           onViewport(viewport);
         }}
         onPaneClick={onClear}
-        onSelectionStart={onClear}
+        onSelectionStart={() => {
+          pendingSelectionIds.current = new Set();
+          selectionPublished.current = false;
+          onClear();
+        }}
+        onSelectionEnd={() => {
+          selectionBatch.current?.flush();
+          pendingSelectionIds.current = null;
+          selectionPublished.current = false;
+        }}
         defaultViewport={board.viewport}
         fitView={!board.viewport}
         fitViewOptions={{ padding: 0.22, maxZoom: 1 }}
