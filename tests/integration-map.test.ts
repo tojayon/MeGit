@@ -36,9 +36,10 @@ it('目标停在共同版本时，目标最新提交仍位于目标列且只保�
   expect(map.nodes.find((node) => node.commit.hash === 'C')?.x).toBe(77);
   expect(map.nodes.find((node) => node.commit.hash === 'C')?.kind).toBe('common');
   expect(map.nodes).toHaveLength(3);
-  expect(map.edges.map((edge) => [edge.child, edge.parent, edge.x1, edge.x2])).toEqual([
-    ['E', 'D', 23, 23],
-    ['D', 'C', 23, 77],
+  expect(map.nodes.map(({ lane }) => lane)).toEqual(['source', 'source', 'target']);
+  expect(map.edges).toEqual([
+    { child: 'E', parent: 'D', path: 'M 23 28 V 84' },
+    { child: 'D', parent: 'C', path: expect.stringMatching(/^M 23 84 V 112 C .* C .* 77 140$/) },
   ]);
   const equal = integrationMap({
     ...history,

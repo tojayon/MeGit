@@ -75,6 +75,22 @@ test('关系详情使用响应式卡片、简短分支名及真实提交对比�
     ).toHaveCount(0);
     await expect(panel.locator(`[data-commit-hash="${base}"]`)).toBeVisible();
     await expect(panel.locator('.integration-history-wires path')).toHaveCount(2);
+    const map = panel.locator('.integration-history-map');
+    await expect(panel.locator('.integration-comparison + .integration-result')).toBeVisible();
+    const sourceLane = map.getByRole('group', { name: '来源', exact: true });
+    const targetLane = map.getByRole('group', { name: '目标', exact: true });
+    await expect(sourceLane.locator(`[data-commit-hash="${amendedSource}"]`)).toBeVisible();
+    await expect(targetLane.locator('.integration-map-commit')).toHaveCount(1);
+    await expect(sourceLane).toHaveCSS('border-top-style', 'dashed');
+    await expect(targetLane).toHaveCSS('border-top-style', 'dashed');
+    const wires = map.locator('.integration-history-wires path');
+    await expect(wires.first()).toHaveCSS('stroke-linecap', 'round');
+    const paths = await wires.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute('d') ?? ''),
+    );
+    expect(paths.filter((path) => !path.includes('C'))).toHaveLength(1);
+    expect(paths.filter((path) => path.match(/\bC\b/g)?.length === 2)).toHaveLength(1);
+    expect(paths.every((path) => path.includes('V'))).toBe(true);
     await panel.locator(`[data-commit-hash="${amendedSource}"] button`).focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('dialog', { name: '提交详情' })).toContainText('Public search');
@@ -132,7 +148,7 @@ test('关系详情使用响应式卡片、简短分支名及真实提交对比�
     await expect(panel.locator(`[data-commit-hash="${amendedSource}"]`)).toHaveClass(
       /basis-highlight/,
     );
-    await expect(panel.locator('.basis-commit-role')).toHaveText(['目标最新提交', '来源最新提交']);
+    await expect(panel.locator('.basis-commit-role')).toHaveText(['来源最新提交', '目标最新提交']);
     await expect(panel.locator('.integration-result details')).toContainText(
       amendedSource.slice(0, 12),
     );
@@ -206,8 +222,9 @@ test('关系详情使用响应式卡片、简短分支名及真实提交对比�
     await expect(targetPoint).toBeVisible();
     const pointBox = (await targetPoint.boundingBox())!;
     const targetLabel = (await english
-      .locator('.comparison-map-labels span')
-      .nth(1)
+      .locator('.integration-history-map')
+      .getByRole('group', { name: 'Target', exact: true })
+      .getByText('Target', { exact: true })
       .boundingBox())!;
     expect(
       Math.abs(pointBox.x + pointBox.width / 2 - targetLabel.x - targetLabel.width / 2),
@@ -245,6 +262,22 @@ test('关系详情真实示例支持明亮英文窄屏和帮助提示', async ({
     .locator('.design-card')
     .filter({ has: page.getByRole('heading', { name: 'Relation details panel', exact: true }) });
   await expect(card.locator('.integration-map-commit')).toHaveCount(4);
+  const map = card.locator('.integration-history-map');
+  const lanes = map.getByRole('group');
+  await expect(lanes).toHaveCount(2);
+  for (const lane of await lanes.all()) {
+    await expect(lane).toHaveCSS('border-top-style', 'dashed');
+    const frame = (await lane.boundingBox())!;
+    expect(frame.x).toBeGreaterThanOrEqual(0);
+    expect(frame.x + frame.width).toBeLessThanOrEqual(390);
+    for (const commit of await lane.locator('.integration-map-commit').all()) {
+      const bounds = (await commit.boundingBox())!;
+      expect(bounds.x).toBeGreaterThan(frame.x);
+      expect(bounds.x + bounds.width).toBeLessThan(frame.x + frame.width);
+      expect(bounds.y).toBeGreaterThan(frame.y);
+      expect(bounds.y + bounds.height).toBeLessThan(frame.y + frame.height);
+    }
+  }
   await card.getByRole('button', { name: 'About the commit comparison' }).focus();
   await expect(page.getByRole('tooltip')).toContainText('not necessarily');
   await page.keyboard.press('Escape');

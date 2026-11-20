@@ -185,6 +185,31 @@ export function RelationPanel({
             reference={edge.kind === 'integration' ? edge.targetRef : undefined}
           />
         </div>
+        {edge.kind === 'integration' && (
+          <>
+            {historyError !== null && (
+              <div className="relation-history-error" role="alert">
+                <p>{formatError(historyError)}</p>
+                <Button size="compact" onClick={() => setRetry((value) => value + 1)}>
+                  {t('relation.retryHistory')}
+                </Button>
+              </div>
+            )}
+            {!historyError && !detail && boardId && (
+              <p role="status">{t('relation.loadingHistory')}</p>
+            )}
+            {detail && (
+              <IntegrationComparison
+                key={historyKey}
+                history={detail}
+                columns={columns}
+                highlightTips={expanded}
+                loading={loading}
+                onMore={more}
+              />
+            )}
+          </>
+        )}
         {edge.kind === 'integration' ? (
           <div className={`integration-result ${currentResult?.state || 'unknown'}`}>
             <div>
@@ -247,31 +272,6 @@ export function RelationPanel({
                 : t('relation.deliveryInfo')}
             </p>
           </div>
-        )}
-        {edge.kind === 'integration' && (
-          <>
-            {historyError !== null && (
-              <div className="relation-history-error" role="alert">
-                <p>{formatError(historyError)}</p>
-                <Button size="compact" onClick={() => setRetry((value) => value + 1)}>
-                  {t('relation.retryHistory')}
-                </Button>
-              </div>
-            )}
-            {!historyError && !detail && boardId && (
-              <p role="status">{t('relation.loadingHistory')}</p>
-            )}
-            {detail && (
-              <IntegrationComparison
-                key={historyKey}
-                history={detail}
-                columns={columns}
-                highlightTips={expanded}
-                loading={loading}
-                onMore={more}
-              />
-            )}
-          </>
         )}
       </div>
     </aside>

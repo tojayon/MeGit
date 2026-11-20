@@ -1,4 +1,7 @@
 import type { Commit, IntegrationHistory } from '../../shared/types';
+import { commitGraphPath } from './commit-graph-path';
+
+const rowHeight = 56;
 
 export function integrationMap(history: IntegrationHistory, columns = { source: 25, target: 75 }) {
   const entries = new Map<string, { commit: Commit; kind: 'source' | 'target' | 'common' }>();
@@ -25,15 +28,15 @@ export function integrationMap(history: IntegrationHistory, columns = { source: 
   }
   const nodes = ordered.map((hash, row) => {
     const entry = entries.get(hash)!;
+    const lane = entry.kind === 'target' || hash === history.targetTip?.hash ? 'target' : 'source';
     return {
       ...entry,
       row,
       // A target tip can itself be the common base when the source has advanced.
       // Keep that real node in the target column instead of leaving it empty.
-      x:
-        entry.kind === 'target' || hash === history.targetTip?.hash
-          ? columns.target
-          : columns.source,
+      lane,
+      x: columns[lane],
+      y: (row + 0.5) * rowHeight,
       boundary:
         entry.kind !== 'common' && entry.commit.parents.some((parent) => !entries.has(parent)),
     };
@@ -41,19 +44,27 @@ export function integrationMap(history: IntegrationHistory, columns = { source: 
   const edges = nodes.flatMap((node) =>
     node.commit.parents.flatMap((parent) => {
       const ancestor = nodes.find((candidate) => candidate.commit.hash === parent);
-      return ancestor
-        ? [
-            {
-              child: node.commit.hash,
-              parent,
-              x1: node.x,
-              y1: node.row * 56 + 28,
-              x2: ancestor.x,
-              y2: ancestor.row * 56 + 28,
-            },
-          ]
-        : [];
+      if (!ancestor) return [];
+      const between = nodes.slice(node.row + 1, ancestor.row);
+      const track =
+        node.lane === ancestor.lane || !between.some((commit) => commit.lane === node.lane)
+          ? node.x
+          : !between.some((commit) => commit.lane === ancestor.lane)
+            ? ancestor.x
+            : (node.x + ancestor.x) / 2;
+      return [{ child: node.commit.hash, parent, path: commitGraphPath(node, ancestor, track) }];
     }),
   );
-  return { nodes, edges, height: Math.max(56, nodes.length * 56) };
+  const laneWidth = Math.min(
+    columns.source * 2,
+    (100 - columns.target) * 2,
+    columns.target - columns.source,
+  );
+  return {
+    nodes,
+    edges,
+    columns,
+    laneWidth,
+    height: Math.max(rowHeight, nodes.length * rowHeight),
+  };
 }

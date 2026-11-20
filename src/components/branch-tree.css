@@ -102,12 +102,6 @@
   display: block;
   overflow: visible;
 }
-.tree-edge {
-  fill: none;
-  stroke: var(--edge-neutral);
-  stroke-width: var(--branch-tree-branch-stroke);
-  stroke-linecap: round;
-}
 .tree-edge.trunk {
   stroke: var(--accent);
   stroke-width: var(--branch-tree-trunk-stroke);

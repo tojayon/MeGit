@@ -15,7 +15,8 @@ const valid = (value: unknown): value is Position =>
   Number.isFinite(value.ratio) &&
   value.ratio >= 0 &&
   value.ratio <= 1;
-const size = 56;
+const launcherWidth = 62;
+const launcherHeight = 56;
 export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   const [position, setPosition] = useViewState<Position>(
@@ -34,10 +35,11 @@ export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle:
     moved: boolean;
   } | null>(null);
   const suppress = useRef(false);
-  const extent = Math.min(size, viewport.width, viewport.height);
+  const width = Math.min(launcherWidth, viewport.width);
+  const height = Math.min(launcherHeight, viewport.height);
   const point = drag || {
-    x: position.edge === 'left' ? 0 : viewport.width - extent,
-    y: position.ratio * (viewport.height - extent),
+    x: position.edge === 'left' ? 0 : viewport.width - width,
+    y: position.ratio * (viewport.height - height),
   };
   useEffect(() => {
     const update = () => {
@@ -57,8 +59,8 @@ export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle:
     if (!current || current.id !== event.pointerId) return;
     if (current.moved && !cancelled)
       setPosition({
-        edge: point.x + extent / 2 < viewport.width / 2 ? 'left' : 'right',
-        ratio: viewport.height > extent ? point.y / (viewport.height - extent) : 0.5,
+        edge: point.x + width / 2 < viewport.width / 2 ? 'left' : 'right',
+        ratio: viewport.height > height ? point.y / (viewport.height - height) : 0.5,
       });
     gesture.current = null;
     setDrag(null);
@@ -69,7 +71,7 @@ export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle:
     <div
       className="assistant-launcher-position"
       hidden={open}
-      style={{ left: point.x, top: point.y, width: extent, height: extent }}
+      style={{ left: point.x, top: point.y, width, height }}
     >
       <Tooltip
         content={t('assistant.launcherHelp')}
@@ -83,7 +85,7 @@ export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle:
           aria-label={t('assistant.open')}
           aria-expanded={open}
           aria-controls="megit-assistant-panel"
-          style={{ width: extent, height: extent }}
+          style={{ width, height }}
           onPointerDown={(event) => {
             if (!event.isPrimary || event.button !== 0) return;
             suppress.current = false;
@@ -106,8 +108,8 @@ export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle:
             start.moved = true;
             suppress.current = true;
             setDrag({
-              x: Math.max(0, Math.min(start.left + dx, viewport.width - extent)),
-              y: Math.max(0, Math.min(start.top + dy, viewport.height - extent)),
+              x: Math.max(0, Math.min(start.left + dx, viewport.width - width)),
+              y: Math.max(0, Math.min(start.top + dy, viewport.height - height)),
             });
           }}
           onPointerUp={(event) => end(event)}
@@ -131,7 +133,7 @@ export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle:
                   1,
                   saved.ratio +
                     (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0) /
-                      Math.max(1, viewport.height - extent),
+                      Math.max(1, viewport.height - height),
                 ),
               ),
             }));
@@ -144,7 +146,7 @@ export function AssistantLauncher({ open, onToggle }: { open: boolean; onToggle:
             onToggle();
           }}
         >
-          <AssistantAvatar size={34} />
+          <AssistantAvatar size={Math.min(40, width, height)} />
         </button>
       </Tooltip>
     </div>

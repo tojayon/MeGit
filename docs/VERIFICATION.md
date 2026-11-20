@@ -2,6 +2,10 @@
 
 ## 2026-11-20：AI 助手品牌头像
 
+- 悬浮气泡拖离边缘时显示四角完整的胶囊，松手吸附后恢复对应平边。`npm run check`（247 项单元测试）及 2 项隔离 Edge 窗口场景通过；真实鼠标拖动覆盖拖动前、拖动中与吸附后的圆角。日志：`.megit/launcher-shape-check.log`、`.megit/launcher-shape-e2e.log`。
+
+- 悬浮入口与 MeWiki 统一为 62×56 px 无描边胶囊和 40 px 头像，保留 MeGit 明暗主题与无悬停变色。`npm run check`（247 项单元测试）及 2 项隔离 Edge 窗口场景通过；覆盖尺寸、头像、描边、悬停、拖动吸附和键盘操作。日志：`.megit/launcher-alignment-check.log`、`.megit/launcher-alignment-e2e.log`。
+
 - 悬浮入口取消悬停变色和头像独立底板。`npm run check` 及 2 项 Edge 窗口场景通过，覆盖暗黑中文和明亮英文的悬停状态。日志：`.megit/avatar-hover-check.log`、`.megit/avatar-hover-e2e.log`。
 
 - `npm run check` 通过（247 项单元测试）；助手窗口与聊天相关 4 项 Edge 场景通过，覆盖暗黑中文和明亮英文的头像加载及规范页复用。验证使用独立数据目录，未修改正式白板。日志：`.megit/avatar-check.log`、`.megit/avatar-e2e.log`。
@@ -761,3 +765,9 @@
 
 - `npm run check` 通过 215 项单元测试及构建；正式构建的 11 项隔离 Edge 场景通过，覆盖空态、暗色中文与亮色英文、读取结果与 GitHub 授权入口、窄屏独立滚动和 Escape 焦点恢复。截图位于 `.megit/verification/remote-management/`。
 - 本地预览 HTML、JS、CSS 与最新构建逐字节一致；预览核对仅读，测试使用独立数据及虚构仓库。
+
+## 2026-11-20：提交对比图分组与关系总结顺序
+
+- 旧版在来源／目标分组和总结位置的新增断言上按预期失败。新版 `npm run check` 通过 247 项单元测试及构建。两项关系详情 Edge 场景通过，覆盖蓝灰虚线分组、圆头连线、总结位于图下、比较依据高亮、暗色中文宽面板和亮色英文 390px 窄屏。
+- 分支树 7 项相关场景均通过；折叠历史展开在整组首次测试中超时，单独复跑通过。关系详情截图位于 `.megit/verification/relation-panel/`，隔离运行证据位于 `.megit/verification/comparison-lanes/`。
+- `127.0.0.1:4317` 返回的 HTML、JS 和 CSS 与最新构建逐字节一致，白板哈希不变。重启被策略拦截，沿用现有 MeGit 实例。

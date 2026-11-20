@@ -13,20 +13,32 @@ test('边缘悬浮入口与八向缩放、贴边、无输入聚焦框和明亮�
     await button.locator(avatar).hover();
     await expect(button).toHaveCSS('background-color', background);
     await expect(button.locator(avatar)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(button.locator(avatar)).toHaveCSS('filter', 'none');
     await page.mouse.move(10, 10);
   };
   await expectStableLauncher(launcher, 'rgb(29, 32, 36)');
   const initial = (await launcher.boundingBox())!;
+  expect(initial).toMatchObject({ width: 62, height: 56 });
+  await expect(launcher).toHaveCSS('border-top-width', '0px');
+  await expect(launcher.locator(avatar)).toHaveCSS('width', '40px');
   expect(initial.x + initial.width).toBe(1280);
+  await expect(launcher).toHaveCSS('border-top-right-radius', '0px');
   await launcher.focus();
   await page.keyboard.press('ArrowLeft');
   await expect.poll(async () => (await launcher.boundingBox())!.x).toBe(0);
+  await expect(launcher).toHaveCSS('border-top-left-radius', '0px');
   const left = (await launcher.boundingBox())!;
   await page.mouse.move(left.x + 28, left.y + 28);
   await page.mouse.down();
+  await page.mouse.move(640, 300, { steps: 4 });
+  await expect(launcher).toHaveAttribute('data-dragging', 'true');
+  for (const corner of ['top-left', 'top-right', 'bottom-left', 'bottom-right']) {
+    await expect(launcher).toHaveCSS(`border-${corner}-radius`, '28px');
+  }
   await page.mouse.move(1220, 300, { steps: 8 });
   await page.mouse.up();
   await expect(launcher).toHaveAttribute('data-edge', 'right');
+  await expect(launcher).toHaveCSS('border-top-right-radius', '0px');
   await expect(launcher).toHaveAttribute('aria-expanded', 'false');
   await launcher.focus();
   await page.keyboard.press('ArrowLeft');

@@ -43,15 +43,10 @@ export function IntegrationComparison({
       </div>
       {history.shallow && <p className="warning-text">{t('relation.shallowHistory')}</p>}
       {map.nodes.length > 0 && (
-        <div className="comparison-map-labels">
-          <span style={{ left: `${columns?.source ?? 25}%` }}>{t('relation.source')}</span>
-          <span style={{ left: `${columns?.target ?? 75}%` }}>{t('relation.target')}</span>
-        </div>
-      )}
-      {map.nodes.length > 0 && (
-        <div className="integration-history-map" style={{ height: map.height }}>
+        <div className="integration-history-map">
           <svg
             className="integration-history-wires"
+            height={map.height}
             viewBox={`0 0 100 ${map.height}`}
             preserveAspectRatio="none"
             role="img"
@@ -60,85 +55,105 @@ export function IntegrationComparison({
             {map.edges.map((edge) => (
               <path
                 key={`${edge.child}-${edge.parent}`}
-                d={`M ${edge.x1} ${edge.y1} C ${edge.x1} ${(edge.y1 + edge.y2) / 2} ${edge.x2} ${(edge.y1 + edge.y2) / 2} ${edge.x2} ${edge.y2}`}
-                fill="none"
+                className="commit-graph-wire"
+                d={edge.path}
                 vectorEffect="non-scaling-stroke"
               />
             ))}
           </svg>
-          {map.nodes.map((node) => (
+          {(['source', 'target'] as const).map((lane) => (
             <div
-              key={node.commit.hash}
-              data-commit-hash={node.commit.hash}
-              className={`integration-map-point ${node.kind}${highlightTips && (node.commit.hash === history.sourceTip?.hash || node.commit.hash === history.targetTip?.hash) ? ' basis-highlight' : ''}`}
-              style={{ left: `${node.x}%`, top: node.row * 56 + 28 }}
+              key={lane}
+              role="group"
+              aria-label={t(`relation.${lane}`)}
+              className="comparison-map-lane"
+              style={{
+                left: `${map.columns[lane]}%`,
+                width: `calc(${map.laneWidth}% - var(--space-4))`,
+              }}
             >
-              <InfoPopover
-                label={t('branchTree.commitDetails')}
-                triggerLabel={`${node.commit.shortHash} · ${node.commit.subject}`}
-                triggerClassName="integration-map-commit"
-                help={t('relation.openCommit')}
-                triggerContent={
-                  <>
-                    <GitCommitHorizontal size={18} aria-hidden="true" />
-                    <code>{node.commit.hash.slice(0, 7)}</code>
-                    {highlightTips &&
-                      (node.commit.hash === history.sourceTip?.hash ||
-                        node.commit.hash === history.targetTip?.hash) && (
-                        <span className="basis-commit-role">
-                          {[
-                            node.commit.hash === history.sourceTip?.hash
-                              ? t('relation.sourceLatest')
-                              : '',
-                            node.commit.hash === history.targetTip?.hash
-                              ? t('relation.targetLatest')
-                              : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' / ')}
-                        </span>
-                      )}
-                  </>
-                }
-              >
-                <div className="comparison-commit-info">
-                  <strong>{node.commit.subject}</strong>
-                  <code>{node.commit.hash}</code>
-                  <span>{node.commit.author}</span>
-                  {node.commit.date && (
-                    <time dateTime={node.commit.date}>
-                      {new Intl.DateTimeFormat(i18n.resolvedLanguage, {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                      }).format(new Date(node.commit.date))}
-                    </time>
-                  )}
-                  <div className="comparison-commit-roles">
-                    {node.kind === 'common' && (
-                      <span>{t('relation.commonBase', { count: history.commonBases.length })}</span>
-                    )}
-                    {node.commit.hash === history.sourceTip?.hash && (
-                      <span>{t('relation.sourceLatest')}</span>
-                    )}
-                    {node.commit.hash === history.targetTip?.hash && (
-                      <span>{t('relation.targetLatest')}</span>
-                    )}
-                    {node.commit.hash === history.includedAt?.hash && (
-                      <span>{t('relation.firstIncluded')}</span>
-                    )}
-                  </div>
-                  {node.commit.hash === history.includedAt?.hash && (
-                    <p>
-                      {t(
-                        history.includedAt.hash === history.sourceTip?.hash
-                          ? 'relation.sameCommit'
-                          : 'relation.includedAtPopupNote',
-                      )}
-                    </p>
-                  )}
-                  {node.boundary && <p>{t('relation.historyBoundary')}</p>}
-                </div>
-              </InfoPopover>
+              <span className="comparison-map-label">{t(`relation.${lane}`)}</span>
+              <div className="comparison-lane-commits">
+                {map.nodes
+                  .filter((node) => node.lane === lane)
+                  .map((node) => (
+                    <div
+                      key={node.commit.hash}
+                      data-commit-hash={node.commit.hash}
+                      className={`integration-map-point ${node.kind}${highlightTips && (node.commit.hash === history.sourceTip?.hash || node.commit.hash === history.targetTip?.hash) ? ' basis-highlight' : ''}`}
+                      style={{ top: node.y }}
+                    >
+                      <InfoPopover
+                        label={t('branchTree.commitDetails')}
+                        triggerLabel={`${node.commit.shortHash} · ${node.commit.subject}`}
+                        triggerClassName="integration-map-commit"
+                        help={t('relation.openCommit')}
+                        triggerContent={
+                          <>
+                            <GitCommitHorizontal size={18} aria-hidden="true" />
+                            <code>{node.commit.hash.slice(0, 7)}</code>
+                            {highlightTips &&
+                              (node.commit.hash === history.sourceTip?.hash ||
+                                node.commit.hash === history.targetTip?.hash) && (
+                                <span className="basis-commit-role">
+                                  {[
+                                    node.commit.hash === history.sourceTip?.hash
+                                      ? t('relation.sourceLatest')
+                                      : '',
+                                    node.commit.hash === history.targetTip?.hash
+                                      ? t('relation.targetLatest')
+                                      : '',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' / ')}
+                                </span>
+                              )}
+                          </>
+                        }
+                      >
+                        <div className="comparison-commit-info">
+                          <strong>{node.commit.subject}</strong>
+                          <code>{node.commit.hash}</code>
+                          <span>{node.commit.author}</span>
+                          {node.commit.date && (
+                            <time dateTime={node.commit.date}>
+                              {new Intl.DateTimeFormat(i18n.resolvedLanguage, {
+                                dateStyle: 'medium',
+                                timeStyle: 'short',
+                              }).format(new Date(node.commit.date))}
+                            </time>
+                          )}
+                          <div className="comparison-commit-roles">
+                            {node.kind === 'common' && (
+                              <span>
+                                {t('relation.commonBase', { count: history.commonBases.length })}
+                              </span>
+                            )}
+                            {node.commit.hash === history.sourceTip?.hash && (
+                              <span>{t('relation.sourceLatest')}</span>
+                            )}
+                            {node.commit.hash === history.targetTip?.hash && (
+                              <span>{t('relation.targetLatest')}</span>
+                            )}
+                            {node.commit.hash === history.includedAt?.hash && (
+                              <span>{t('relation.firstIncluded')}</span>
+                            )}
+                          </div>
+                          {node.commit.hash === history.includedAt?.hash && (
+                            <p>
+                              {t(
+                                history.includedAt.hash === history.sourceTip?.hash
+                                  ? 'relation.sameCommit'
+                                  : 'relation.includedAtPopupNote',
+                              )}
+                            </p>
+                          )}
+                          {node.boundary && <p>{t('relation.historyBoundary')}</p>}
+                        </div>
+                      </InfoPopover>
+                    </div>
+                  ))}
+              </div>
             </div>
           ))}
         </div>

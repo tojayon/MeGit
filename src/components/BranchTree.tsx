@@ -281,7 +281,7 @@ export function BranchTree({
                       <path
                         d={edge.path}
                         data-merge={edge.merge || undefined}
-                        className={`tree-edge ${edge.trunk ? 'trunk' : ''} ${edge.merge ? 'merge' : ''} ${sourceEdge ? 'source-only' : targetEdge ? 'target-only' : ''}`}
+                        className={`commit-graph-wire tree-edge ${edge.trunk ? 'trunk' : ''} ${edge.merge ? 'merge' : ''} ${sourceEdge ? 'source-only' : targetEdge ? 'target-only' : ''}`}
                       />
                       {branchRef && (
                         <path
