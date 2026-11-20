@@ -25,7 +25,8 @@ test('HEAD 卡片直接暂存、取消暂存和提交；草稿与工作区共用
     const card = page.locator('.branch-tree-selection');
     await expect(card.getByLabel('提交说明', { exact: true })).toBeVisible();
     await card.getByLabel('提交说明', { exact: true }).fill('从 HEAD 直接提交');
-    await expect(card.getByRole('button', { name: '提交 0 个文件', exact: true })).toBeDisabled();
+    const commit = card.getByRole('button', { name: '提交', exact: true });
+    await expect(commit).toBeDisabled();
     await card.getByRole('button', { name: '全部暂存', exact: true }).click();
     await expect.poll(async () => git(f.repo, 'diff', '--cached', '--name-only')).toBe('new.txt');
     await card.getByRole('button', { name: '全部取消', exact: true }).click();
@@ -41,15 +42,15 @@ test('HEAD 卡片直接暂存、取消暂存和提交；草稿与工作区共用
     await expect(dialog.getByLabel('提交说明', { exact: true })).toHaveValue('从 HEAD 直接提交');
     await dialog.getByRole('button', { name: '关闭工作区', exact: true }).click();
     await card.getByRole('button', { name: '全部暂存', exact: true }).click();
-    await expect(card.getByRole('button', { name: '提交 1 个文件', exact: true })).toBeEnabled();
+    await expect(commit).toBeEnabled();
     await page.route('**/api/repositories/commit-repo/actions', (route) =>
       route.fulfill({ status: 500, json: { error: { code: 'gitFailed' } } }),
     );
-    await card.getByRole('button', { name: '提交 1 个文件', exact: true }).click();
+    await commit.click();
     await expect(card.getByRole('alert')).toBeVisible();
     await expect(card.getByLabel('提交说明', { exact: true })).toHaveValue('从 HEAD 直接提交');
     await page.unroute('**/api/repositories/commit-repo/actions');
-    await card.getByRole('button', { name: '提交 1 个文件', exact: true }).click();
+    await commit.click();
     await expect.poll(async () => git(f.repo, 'log', '-1', '--format=%s')).toBe('从 HEAD 直接提交');
     await expect(card.getByLabel('提交说明', { exact: true })).toHaveValue('');
     await expect(page.getByRole('dialog', { name: '工作区', exact: true })).toHaveCount(0);
@@ -61,6 +62,47 @@ test('HEAD 卡片直接暂存、取消暂存和提交；草稿与工作区共用
     await f.cleanup();
   }
 });
+
+for (const [theme, stageColor, danger] of [
+  ['暗黑', 'rgb(74, 116, 17)', 'rgb(255, 155, 167)'],
+  ['明亮', 'rgb(134, 210, 31)', 'rgb(182, 53, 75)'],
+] as const) {
+  test(`${theme}详情的批量暂存和取消只在可用时着色`, async ({ page, request }) => {
+    const f = await fixture();
+    try {
+      await commitFile(f.repo);
+      await writeFile(path.join(f.repo, 'new.txt'), 'new content\n');
+      await setup(request, page, f.repo);
+      await page.getByRole('button', { name: '偏好设置', exact: true }).click();
+      await page.getByRole('button', { name: theme, exact: true }).click();
+      await page.keyboard.press('Escape');
+      await page.mouse.move(0, 0);
+
+      const card = page.locator('.branch-tree-selection');
+      const stage = card.getByRole('button', { name: '全部暂存', exact: true });
+      const unstage = card.getByRole('button', { name: '全部取消', exact: true });
+      const toolbarStage = page.locator('.repository-card-actions .repository-card-stage');
+      await expect(toolbarStage).toHaveCSS('background-color', stageColor);
+      await expect(stage).toBeEnabled();
+      await expect(stage).toHaveCSS('background-color', stageColor);
+      await expect(unstage).toBeDisabled();
+      await expect(unstage).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
+      await stage.press('Enter');
+      await expect(stage).toBeDisabled();
+      await expect(stage).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(unstage).toBeEnabled();
+      await expect(unstage).toHaveCSS('background-color', danger);
+
+      await unstage.press('Enter');
+      await expect(stage).toBeEnabled();
+      await expect(stage).toHaveCSS('background-color', stageColor);
+      await expect(unstage).toBeDisabled();
+    } finally {
+      await f.cleanup();
+    }
+  });
+}
 
 test('明亮英文窄屏可在 HEAD 提交，命令提示跟随说明，工作区保留同一草稿', async ({
   page,
@@ -79,7 +121,7 @@ test('明亮英文窄屏可在 HEAD 提交，命令提示跟随说明，工作�
     const card = page.locator('.branch-tree-selection');
     await card.getByLabel('Commit message', { exact: true }).fill('Save narrow screen change');
     await card.getByRole('button', { name: 'Stage all', exact: true }).click();
-    const commit = card.getByRole('button', { name: 'Commit 1 file', exact: true });
+    const commit = card.getByRole('button', { name: 'Commit', exact: true });
     await expect(commit).toBeEnabled();
     await commit.focus();
     await expect(page.getByRole('tooltip')).toContainText("commit -m 'Save narrow screen change'");
@@ -238,7 +280,7 @@ test('冲突时 HEAD 卡片明确说明并禁用提交', async ({ page, request 
     const card = page.locator('.branch-tree-selection');
     await card.getByLabel('提交说明', { exact: true }).fill('尚未解决冲突');
     await expect(card.locator('.commit-composer')).toContainText('请先解决冲突');
-    await expect(card.getByRole('button', { name: /提交 \d+ 个文件/ })).toBeDisabled();
+    await expect(card.getByRole('button', { name: '提交', exact: true })).toBeDisabled();
   } finally {
     await f.cleanup();
   }

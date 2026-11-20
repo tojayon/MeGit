@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
-import type { GitAction, RepoState, Repository } from '../../shared/types';
+import type { GitAction, RelationAction, RepoState, Repository } from '../../shared/types';
 import { api } from './api';
 import { useViewState } from './use-view-state';
 import { isText } from './view-storage';
@@ -81,5 +81,23 @@ export function useRepositoryActions({
       emit();
     }
   }
-  return { message, setMessage, busy, executeAction, generateCommit };
+  async function executeRelationAction(
+    type: RelationAction['type'], run: () => Promise<{ state: RepoState }>, target: string,
+  ): Promise<boolean> {
+    if (running.has(identity)) return false;
+    running.set(identity, type);
+    emit();
+    try {
+      const { state } = await run();
+      onState(state);
+      await onRefresh();
+      onNotice(type === 'integrate' ? { key: 'relation.sync.integrated', values: { target } } :
+        { key: `actions.${type}`, values: { name: repo.name, target } });
+      return true;
+    } finally {
+      running.delete(identity);
+      emit();
+    }
+  }
+  return { message, setMessage, busy, executeAction, generateCommit, executeRelationAction };
 }

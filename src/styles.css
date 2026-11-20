@@ -2496,6 +2496,20 @@ code {
   background: var(--hover);
   color: var(--text);
 }
+.commit-composer-compact .button.branch-detail-stage:not(:disabled) {
+  background: var(--card-stage-bg);
+  color: var(--card-stage-text);
+}
+.commit-composer-compact .button.branch-detail-stage:hover:not(:disabled) {
+  background: var(--card-stage-hover);
+}
+.commit-composer-compact .button.branch-detail-unstage:not(:disabled) {
+  background: var(--danger);
+  color: var(--canvas);
+}
+.commit-composer-compact .button.branch-detail-unstage:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--danger-border);
+}
 @container commit-composer (width < 385px) {
   .commit-compact-summary .branch-detail-action {
     width: var(--control-compact);
@@ -4731,6 +4745,73 @@ code {
 }
 .repository-relation-position {
   position: absolute;
+}
+.repository-relation-shortcut {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.repository-relation-shortcut[data-action='pull'] {
+  right: 100%;
+  padding-right: var(--space-1);
+}
+.repository-relation-shortcut:not([data-action='pull']) {
+  left: 100%;
+  padding-left: var(--space-1);
+}
+.repository-relation-position:is(:hover, :focus-within) .repository-relation-shortcut,
+.repository-relation-shortcut[data-recommended='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) or (pointer: coarse) {
+  .repository-relation-shortcut {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.repository-relation-shortcut .icon-button {
+  background: var(--surface-raised);
+}
+.relation-sync-button {
+  --relation-sync-bg: var(--accent-solid);
+  --relation-sync-text: var(--on-accent);
+  --relation-sync-hover: var(--accent-hover);
+}
+.relation-sync-button[data-action='pull'] {
+  --relation-sync-bg: var(--green);
+  --relation-sync-text: var(--surface);
+  --relation-sync-hover: color-mix(in srgb, var(--relation-sync-bg) 90%, var(--relation-sync-text));
+}
+.repository-relation-shortcut[data-recommended='true'] .relation-sync-button,
+.button.primary.relation-sync-button {
+  color: var(--relation-sync-text);
+  background: var(--relation-sync-bg);
+  border-color: var(--relation-sync-bg);
+}
+.repository-relation-shortcut[data-recommended='true'] .relation-sync-button:hover,
+.button.primary.relation-sync-button:hover:not(:disabled) {
+  background: var(--relation-sync-hover);
+  border-color: var(--relation-sync-hover);
+}
+.repository-relation-shortcut .icon-button[aria-disabled='true'] {
+  color: var(--muted);
+  background: var(--surface-raised);
+  cursor: not-allowed;
+}
+.relation-local-integration {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.relation-local-integration input {
+  accent-color: var(--accent-solid);
+}
+.relation-action-direction {
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 .relation-inspector {
   container-type: inline-size;

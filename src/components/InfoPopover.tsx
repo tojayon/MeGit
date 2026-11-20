@@ -1,4 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Info, X } from 'lucide-react';
 import {
@@ -20,6 +28,9 @@ export function InfoPopover({
   panelClassName,
   titleIcon,
   titleDetail,
+  placement = 'bottom',
+  onOpen,
+  onClose,
 }: {
   label: string;
   help?: ReactNode;
@@ -30,6 +41,9 @@ export function InfoPopover({
   panelClassName?: string;
   titleIcon?: ReactNode;
   titleDetail?: ReactNode;
+  placement?: 'bottom' | 'right';
+  onOpen?: () => void;
+  onClose?: () => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -38,42 +52,53 @@ export function InfoPopover({
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
 
-  function close(restore = false) {
-    if (restore) focusWithoutTooltip(trigger.current);
-    setOpen(false);
-  }
+  const close = useCallback(
+    (restore = false) => {
+      if (restore && panel.current?.contains(document.activeElement))
+        focusWithoutTooltip(trigger.current);
+      setOpen(false);
+      onClose?.();
+    },
+    [onClose],
+  );
 
   useLayoutEffect(() => {
     const element = panel.current;
-    if (!open || !element || !trigger.current) return;
+    const button = trigger.current;
+    if (!open || !element || !button) return;
     element.showPopover();
-    const rect = trigger.current.getBoundingClientRect();
-    const left = Math.max(
-      8,
-      Math.min(rect.right - element.offsetWidth, innerWidth - element.offsetWidth - 8),
-    );
-    const top =
-      rect.bottom + element.offsetHeight + 8 <= innerHeight - 8
-        ? rect.bottom + 8
-        : Math.max(8, rect.top - element.offsetHeight - 8);
-    element.style.left = `${left}px`;
-    element.style.top = `${top}px`;
+    const position = () => {
+      const rect = button.getBoundingClientRect();
+      const { offsetWidth: width, offsetHeight: height } = element;
+      const limit = innerWidth - width - 8;
+      const side = placement === 'right' && rect.right + 8 <= limit ? rect.right + 8 : null;
+      const left = side ?? Math.max(8, Math.min(rect.right - width, limit));
+      const top =
+        side !== null
+          ? Math.max(8, Math.min(rect.top, innerHeight - height - 8))
+          : rect.bottom + height + 8 <= innerHeight - 8
+            ? rect.bottom + 8
+            : Math.max(8, rect.top - height - 8);
+      element.style.left = `${left}px`;
+      element.style.top = `${top}px`;
+    };
+    position();
+    const observer = placement === 'right' ? new ResizeObserver(position) : null;
+    observer?.observe(element);
     focusWithoutTooltip(element);
-    return () =>
+    return () => {
+      observer?.disconnect();
       withoutFocusTooltip(() => {
         if (element.matches(':popover-open')) element.hidePopover();
       });
-  }, [open]);
+    };
+  }, [open, placement]);
 
   useEffect(() => {
     if (!open) return;
-    const dismiss = () => {
-      if (panel.current?.contains(document.activeElement)) focusWithoutTooltip(trigger.current);
-      setOpen(false);
-    };
+    const dismiss = () => close(true);
     const outside = (event: Event) => {
-      if (event.target instanceof Node && !container.current?.contains(event.target))
-        setOpen(false);
+      if (event.target instanceof Node && !container.current?.contains(event.target)) close();
     };
     const scroll = (event: Event) => {
       const target = event.target;
@@ -104,14 +129,14 @@ export function InfoPopover({
       window.removeEventListener('resize', dismiss);
       window.removeEventListener('blur', dismiss);
     };
-  }, [open]);
+  }, [open, close]);
 
   return (
     <div
       className="info-popover-anchor"
       ref={container}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && open) {
+        if (event.key === 'Escape' && open && !event.defaultPrevented) {
           event.preventDefault();
           event.stopPropagation();
           close(true);
@@ -131,6 +156,7 @@ export function InfoPopover({
             if (open) close();
             else {
               dismissPopups();
+              onOpen?.();
               setOpen(true);
             }
           }}

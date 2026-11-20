@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import { request, type Server } from 'node:http';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fixture, commitFile, git } from './fixtures.js';
 import { createApp } from '../server/app.js';
 import type { Workspace } from '../shared/types.js';
@@ -38,6 +39,96 @@ async function setup() {
 }
 
 describe('本机 API 边界与端到端 Git 数据', () => {
+  it.each(['integrate', 'push', 'pull'] as const)('执行已确认的连线操作 %s', async (type) => {
+    const { repo, root, base, headers } = await setup();
+    const other = path.join(root, 'other repo');
+    await mkdir(other);
+    const initial = await git(repo, 'rev-parse', 'HEAD');
+    let newer: string;
+    if (type === 'integrate') {
+      await git(root, 'clone', '--', repo, other);
+      await git(other, 'remote', 'remove', 'origin');
+      newer = await commitFile(repo, 'incoming.txt', 'from A');
+    } else {
+      await git(other, 'init', '--bare');
+      await git(repo, 'remote', 'add', 'origin', other);
+      await git(repo, 'push', '-u', 'origin', 'main');
+      await git(repo, 'push', 'origin', 'main:other');
+      if (type === 'push') {
+        newer = await commitFile(repo, 'incoming.txt', 'from A');
+      } else {
+        const publisher = path.join(root, 'publisher');
+        await git(root, 'clone', '-b', 'main', '--', other, publisher);
+        await git(publisher, 'config', 'user.name', 'MeGit Test');
+        await git(publisher, 'config', 'user.email', 'test@example.invalid');
+        newer = await commitFile(publisher, 'incoming.txt', 'from remote');
+        await git(publisher, 'push');
+        await git(repo, 'fetch', 'origin');
+      }
+    }
+    const workspace: Workspace = await fetch(`${base}/api/workspace`, { headers }).then((r) => r.json());
+    workspace.repositories = [{ id: 'repo-a', name: 'A', path: repo }];
+    if (type === 'integrate') workspace.repositories.push({ id: 'repo-b', name: 'B', path: other });
+    const board = workspace.boards[0];
+    const targetRepo = type === 'integrate' ? 'repo-b' : 'repo-a';
+    const targetRef = type === 'integrate' ? 'refs/heads/main' : 'refs/remotes/origin/main';
+    board.nodes = [
+      { id: 'a', repoId: 'repo-a', ref: 'refs/heads/main', position: { x: 0, y: 0 } },
+      { id: 'b', repoId: targetRepo, ref: targetRef, position: { x: 500, y: 0 } },
+    ];
+    const edge = { id: 'link', source: 'a', target: 'b', kind: 'integration' as const, label: '' };
+    board.edges = [edge];
+    const save = async () => {
+      const response = await fetch(`${base}/api/workspace`, { method: 'PUT', headers, body: JSON.stringify(workspace) });
+      expect(response.ok).toBe(true);
+      workspace.revision = (await response.json()).revision;
+    };
+    await save();
+    const action = (overrides = {}) => fetch(`${base}/api/boards/${board.id}/relations/link/action`, {
+      method: 'POST', headers, body: JSON.stringify({
+        type, source: 'a', target: 'b', sourceRepo: 'repo-a', targetRepo,
+        sourceRef: 'refs/heads/main', targetRef,
+        sourceHead: type === 'pull' ? initial : newer,
+        targetHead: type === 'pull' ? newer : initial, ...overrides,
+      }),
+    });
+    if (type === 'integrate') {
+      expect((await action()).status).toBe(409);
+      board.edges = [{ ...edge, localIntegration: true }];
+      await save();
+      await writeFile(path.join(other, 'dirty.txt'), 'untouched');
+      expect(await (await action()).json()).toMatchObject({ code: 'dirtyPull' });
+      expect(await git(other, 'rev-parse', 'HEAD')).toBe(initial);
+      await git(other, 'clean', '-f', '--', 'dirty.txt');
+      await git(other, 'config', 'user.name', 'MeGit Test');
+      await git(other, 'config', 'user.email', 'test@example.invalid');
+      const divergent = await commitFile(other, 'divergent.txt', 'independent');
+      expect(await (await action({ targetHead: divergent })).json()).toMatchObject({ code: 'relationNonFastForward' });
+      expect(await git(other, 'rev-parse', 'HEAD')).toBe(divergent);
+      await git(other, 'reset', '--hard', initial);
+      await git(other, 'switch', '-c', 'not-the-target');
+      expect((await action()).status).toBe(409);
+      await git(other, 'switch', 'main');
+    } else {
+      await git(repo, 'branch', '--set-upstream-to=origin/other');
+      expect((await action()).status).toBe(409);
+      await git(repo, 'branch', '--set-upstream-to=origin/main');
+      if (type === 'push') {
+        await git(repo, 'remote', 'set-url', '--push', 'origin', path.join(root, 'wrong repo'));
+        expect(await (await action()).json()).toMatchObject({ code: 'relationRemoteMismatch' });
+        await git(repo, 'config', '--unset', 'remote.origin.pushurl');
+      }
+    }
+    expect((await action({ sourceRepo: 'repo-b' })).status).toBe(409);
+    expect((await action({ sourceHead: type === 'pull' ? newer : initial })).status).toBe(409);
+    const response = await action();
+    expect(response.status, await response.text()).toBe(200);
+    expect(await git(type === 'pull' ? repo : other, 'rev-parse', 'refs/heads/main')).toBe(newer);
+    if (type === 'integrate') {
+      expect(await readFile(path.join(other, 'incoming.txt'), 'utf8')).toBe('from A');
+      expect(await git(other, 'remote')).toBe('');
+    }
+  });
   it('提交点创建沿用会话和登记校验，严格接收完整提交编号', async () => {
     const { base, headers, repo } = await setup();
     const workspace = (await fetch(`${base}/api/workspace`, { headers }).then((r) =>

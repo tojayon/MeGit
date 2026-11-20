@@ -39,16 +39,97 @@ test('仓库默认打开图形树，更换树干与比较不切换代码，文�
     await trunkDialog.getByLabel('比较树干', { exact: true }).selectOption('refs/heads/功能/登录');
     await trunkDialog.getByRole('button', { name: '应用视角', exact: true }).click();
     expect(await git(f.repo, 'branch', '--show-current')).toBe('main');
-    await tree.getByRole('button', { name: '查看分支 main', exact: true }).click();
-    await page.getByRole('button', { name: '图上比较', exact: true }).click();
-    await expect(page.locator('.branch-tree-selection')).toContainText('独有');
+    const branchLabel = tree.getByRole('button', { name: '查看分支 main', exact: true });
+    const compare = tree.getByRole('button', { name: '图上比较：main', exact: true });
+    const bounds = (await branchLabel.boundingBox())!;
+    expect((await compare.boundingBox())!.x).toBeGreaterThan(bounds.x + bounds.width);
+    await compare.press('Enter');
+    const comparison = page.getByRole('dialog', { name: '图上比较', exact: true });
+    await expect(comparison).toContainText('独有');
+    await expect(comparison).toContainText('与 功能/登录 比较');
+    await expect(comparison.getByRole('button', { name: '结束比较', exact: true })).toHaveCount(0);
+    const popupBounds = (await comparison.boundingBox())!;
+    expect(
+      popupBounds.x >= bounds.x + bounds.width ||
+        popupBounds.y >= bounds.y + bounds.height ||
+        popupBounds.y + popupBounds.height <= bounds.y,
+    ).toBe(true);
+    await expect(page.locator('.branch-tree-selection')).toHaveCount(0);
+    await expect(tree.locator('.tree-edge.source-only')).not.toHaveCount(0);
     await page.screenshot({
       path: '.megit/verification/branch-tree/product-comparison.png',
       animations: 'disabled',
     });
+    const help = comparison.getByRole('button', { name: '图上比较说明', exact: true });
+    await help.focus();
+    await expect(page.getByRole('tooltip')).toContainText('独有');
+    await page.keyboard.press('Escape');
+    await expect(comparison).toBeVisible();
     expect(await git(f.repo, 'branch', '--show-current')).toBe('main');
+    await page.keyboard.press('Escape');
+    await expect(comparison).toHaveCount(0);
+    await expect(compare).toBeFocused();
+    await expect(tree.locator('.tree-edge.source-only')).toHaveCount(0);
+    for (const close of [
+      () => comparison.getByRole('button', { name: '关闭图上比较', exact: true }).click(),
+      () => branchLabel.click(),
+      () => compare.click(),
+    ]) {
+      await compare.click();
+      await expect(tree.locator('.tree-edge.source-only')).not.toHaveCount(0);
+      await close();
+      await expect(comparison).toHaveCount(0);
+      await expect(tree.locator('.tree-edge.source-only')).toHaveCount(0);
+    }
     await page.getByRole('button', { name: '查看工作区改动', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '工作区', exact: true })).toBeVisible();
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test('分支标签外的差异按钮打开对应分支的最新提交', async ({ page, request }) => {
+  const f = await fixture();
+  try {
+    await commitFile(f.repo);
+    await git(f.repo, 'switch', '-c', 'feature');
+    const tip = await commitFile(f.repo, 'feature.txt');
+    await git(f.repo, 'switch', 'main');
+    await commitFile(f.repo, 'main.txt');
+    await git(f.repo, 'update-ref', 'refs/remotes/origin/feature', tip);
+    await seed(request, f.repo);
+    await page.goto('/');
+    await page.getByRole('button', { name: '查看分支树演示', exact: true }).click();
+    const tree = page.getByRole('region', { name: '分支生长树', exact: true });
+    const detail = page.locator('.branch-tree-selection');
+    const diff = page.getByRole('dialog', { name: '差异', exact: true });
+    await expect(detail).toHaveCount(0);
+    for (const name of ['feature', 'origin/feature']) {
+      if (name.startsWith('origin/')) {
+        await page.getByRole('button', { name: '分支树工具', exact: true }).click();
+        await page.getByRole('button', { name: '显示远端分支', exact: true }).click();
+      }
+      const label = page.getByRole('button', { name: `查看分支 ${name}`, exact: true });
+      const compare = tree.getByRole('button', { name: `图上比较：${name}`, exact: true });
+      const shortcut = tree
+        .locator('.tree-tip-anchor')
+        .filter({ has: label })
+        .getByRole('button', { name: `查看提交差异：${name}`, exact: true });
+      await expect(shortcut).toBeVisible();
+      const compareBox = (await compare.boundingBox())!;
+      expect((await shortcut.boundingBox())!.x).toBeGreaterThan(compareBox.x + compareBox.width);
+      if (name.startsWith('origin/')) await expect(shortcut).toHaveCSS('border-radius', '50%');
+      await shortcut.click();
+      await expect(diff.getByTestId('diff-view')).toContainText('feature.txt');
+      await expect(diff).toContainText(tip.slice(0, 7));
+      await expect(detail).toHaveCount(0);
+      await diff.getByRole('button', { name: '关闭差异', exact: true }).click();
+      await expect(shortcut).toBeFocused();
+    }
+    await tree.getByRole('button', { name: '查看分支 feature', exact: true }).click();
+    await expect(detail).toBeVisible();
+    await expect(detail.getByRole('button', { name: /^查看提交/ })).toHaveCount(0);
+    expect(await git(f.repo, 'branch', '--show-current')).toBe('main');
   } finally {
     await f.cleanup();
   }
@@ -84,6 +165,30 @@ test('真实合流、同点引用和长分支名在明亮英文及触控下可�
     await expect(tree.locator('[data-merge="true"]')).not.toHaveCount(0);
     await tree.getByRole('button', { name: 'View branch same-tip', exact: true }).click();
     await expect(page.locator('.branch-tree-selection')).toContainText('same-tip');
+    const compare = tree.getByRole('button', { name: 'Compare in tree: same-tip', exact: true });
+    await compare.click();
+    const popup = page.getByRole('dialog', { name: 'Compare in tree', exact: true });
+    await expect(popup.getByRole('status')).not.toContainText('Checking');
+    const popupBox = (await popup.boundingBox())!;
+    expect(popupBox.x).toBeGreaterThanOrEqual(8);
+    expect(popupBox.x + popupBox.width).toBeLessThanOrEqual(382);
+    await page.screenshot({
+      path: '.megit/verification/branch-tree/compare-light-en-mobile.png',
+      animations: 'disabled',
+    });
+    await page.keyboard.press('Escape');
+    await expect(popup).toHaveCount(0);
+    await expect(page.locator('.branch-tree-selection')).toContainText('same-tip');
+    const diffShortcut = tree.getByRole('button', {
+      name: 'View commit differences: same-tip',
+      exact: true,
+    });
+    await diffShortcut.click();
+    const diff = page.getByRole('dialog', { name: 'Diff', exact: true });
+    const head = await git(f.repo, 'rev-parse', 'HEAD');
+    await expect(diff).toContainText(head.slice(0, 7));
+    await diff.getByRole('button', { name: 'Close Diff', exact: true }).click();
+    await expect(diffShortcut).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

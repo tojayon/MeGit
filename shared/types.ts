@@ -50,6 +50,7 @@ export interface FlowEdge {
   label: string;
   sourceRef?: string;
   targetRef?: string;
+  localIntegration?: boolean;
   routing?: EdgeRouting;
   waypoints?: { x: number; y: number }[];
   sourcePort?: PortSide;
@@ -100,6 +101,7 @@ export interface RepoState {
   head: string | null;
   detached: boolean;
   upstream: string | null;
+  upstreamRef?: string | null;
   trackingConfigured?: boolean;
   pushTarget?: { remote: string; ref: string } | null;
   upstreamHead?: string | null;
@@ -220,6 +222,17 @@ export type GitAction =
   | { type: 'stage' | 'unstage'; paths: string[] }
   | { type: 'commit'; message: string }
   | { type: 'fetch' | 'pull' | 'push' };
+export interface RelationAction {
+  type: 'pull' | 'push' | 'integrate';
+  source: string;
+  target: string;
+  sourceRepo: string;
+  targetRepo: string;
+  sourceRef: string;
+  targetRef: string;
+  sourceHead: string;
+  targetHead: string;
+}
 export interface IntegrationState {
   state: 'integrated' | 'pending' | 'unknown';
   sourceHead: string | null;

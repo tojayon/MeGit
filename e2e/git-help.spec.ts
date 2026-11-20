@@ -85,7 +85,7 @@ test('Git 详细帮助支持悬停、键盘和点击固定，说明本地与远�
     await expect(page.getByRole('tooltip')).toContainText('不会改动');
     await expect(page.getByRole('tooltip')).toContainText('远端');
     await page.keyboard.press('Escape');
-    await repo.getByRole('button', { name: '图上比较', exact: true }).click();
+    await repo.getByRole('button', { name: '图上比较：main', exact: true }).click();
     await repo.getByRole('button', { name: '图上比较说明', exact: true }).focus();
     await expect(page.getByRole('tooltip')).toContainText('独有');
     await page.keyboard.press('Escape');

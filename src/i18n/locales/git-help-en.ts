@@ -37,21 +37,21 @@ export default {
       meaning:
         'A rounded rectangle labels a branch and marks the latest commit it currently points to. Multiple labels at one commit mean those branches currently point to the same version.',
       effect:
-        'Select a label to view branch details without switching your code. Remote labels are locally cached records and may be outdated; Fetch contacts remotes to update them and remove deleted remote records. Long names are shortened in the map; hover or focus to read the full name.',
+        'Select a label for branch details. The buttons to its right compare with the trunk or show the latest commit’s changes without switching branches. Remote labels show locally cached records that Fetch updates. Hover or focus a shortened label to read its full name.',
     },
     collapsedCommits: {
       title: 'Collapsed consecutive commits',
       meaning:
         '+X counts consecutive commits hidden to keep the map compact. It does not count changed files, unpushed commits or pending merges. Collapsing never deletes or modifies commits.',
       effect:
-        'Select +X to magnify this segment, scroll its graphical history independently, and select a commit to open the same actions as the main map. The compact card shows only the branch line and commit markers; hover or focus a marker to read its event. Viewing differences or creating a branch uses the selected ID. Escape or an outside click closes the view while keeping the main map position and zoom. The top-right tools can still expand consecutive commits across the map.',
+        'Select +X to open a local history that scrolls independently. Select a marker for the same actions as on the main map, including viewing its changes. Escape or an outside click closes the view without moving or zooming the main map. The top-right tools can still expand consecutive commits across the map.',
     },
     treeComparison: {
       title: 'Compare in tree',
       meaning:
         'Compare the selected branch with the trunk and count commits unique to each side. Unique means absent from the other history; it does not imply different files or tested features.',
       effect:
-        'Counts use the full locally available history; only loaded unique commits are highlighted. Changed references are checked again. Unrelated histories remain separate, and shallow history is explicitly identified.',
+        'Counts use the full locally available history. Only loaded unique commits are highlighted, and closing the panel clears the highlights. Unrelated histories remain separate, and shallow history is explicitly identified.',
     },
     repository: {
       title: 'Repository information',

@@ -750,6 +750,7 @@ export default function App() {
                 selectedEdge={selectedEdge}
                 selectedGroup={selectedGroup}
                 selectedIds={selectedIds}
+                relationsSaved={saveStatus === 'saved'}
                 onRefresh={refresh}
                 onNotice={notify}
                 onRepositoryState={(id, state) => {

@@ -8,11 +8,14 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Cloud, GitBranch, LocateFixed, Minus, Plus } from 'lucide-react';
-import type { BranchComparison, BranchTreeData, Commit } from '../../shared/types';
+import { Cloud, FileDiff, GitBranch, LocateFixed, Minus, Plus } from 'lucide-react';
+import type { BranchComparison, BranchTreeData, Commit, TreeBranch } from '../../shared/types';
+import { commitDiffArguments } from '../../shared/git-commands';
 import { buildBranchTree } from '../lib/branch-tree';
 import { CommitEvent } from './CommitEvent';
 import { Tooltip } from './Tooltip';
+import { IconButton } from './IconButton';
+import { GitHelp } from './GitHelp';
 import { CommitPointActions } from './CommitPointActions';
 import { CollapsedCommitsPopover } from './CollapsedCommitsPopover';
 import { dismissPopups } from '../lib/overlays';
@@ -32,6 +35,7 @@ export function BranchTree({
   comparison,
   expanded = false,
   onSelect,
+  comparisonControl,
   onCommit,
   onCreateBranch,
   createDisabled,
@@ -43,6 +47,7 @@ export function BranchTree({
   comparison?: BranchComparison | null;
   expanded?: boolean;
   onSelect: (ref: string) => void;
+  comparisonControl?: (branch: TreeBranch) => ReactNode;
   onCommit: (commit: Commit) => void;
   onCreateBranch: (commit: Commit) => void;
   createDisabled?: string;
@@ -53,7 +58,11 @@ export function BranchTree({
   const onCommitOpen = useCallback((hash: string, open: boolean) => {
     setActiveCommit((current) => (open ? hash : current === hash ? null : current));
   }, []);
-  const layout = useMemo(() => buildBranchTree(data, { expanded }), [data, expanded]);
+  const branchActionCount = comparisonControl ? 2 : 1;
+  const layout = useMemo(
+    () => buildBranchTree(data, { expanded, branchActionCount }),
+    [data, expanded, branchActionCount],
+  );
   const viewport = useRef<HTMLDivElement>(null);
   const [initialScale] = useState(() => {
     const saved = viewKey ? viewStorage.read(`${viewKey}.scale`) : undefined;
@@ -328,9 +337,10 @@ export function BranchTree({
                     />
                   </span>
                   {node.branches.map((branch, index) => (
-                    <span
+                    <div
                       key={branch.ref}
                       className="tree-tip-anchor"
+                      data-remote={branch.remote || undefined}
                       style={{ left: node.x, top: node.y - 24 / scale - index * 44 }}
                     >
                       <Tooltip
@@ -372,7 +382,33 @@ export function BranchTree({
                           )}
                         </button>
                       </Tooltip>
-                    </span>
+                      <div className="tree-tip-actions">
+                        {comparisonControl?.(branch)}
+                        <IconButton
+                          label={t('branchTree.viewBranchTipDiff', { name: branch.name })}
+                          className="tree-map-action"
+                          placement="right"
+                          help={
+                            <GitHelp
+                              topic="commitDiff"
+                              preview={{
+                                when: 'read',
+                                commands: [commitDiffArguments(branch.hash)],
+                              }}
+                            />
+                          }
+                          onClick={() =>
+                            onCommit({
+                              ...branch,
+                              shortHash: branch.hash.slice(0, 7),
+                              refs: branch.ref,
+                            })
+                          }
+                        >
+                          <FileDiff size={16} aria-hidden="true" />
+                        </IconButton>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ))}

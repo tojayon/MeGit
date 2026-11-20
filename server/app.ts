@@ -11,12 +11,13 @@ import {
   getDiff,
   inspectIntegration,
   performAction,
+  integrateLocalRelation,
 } from './git.js';
 import type { GitAction, RepoState, Snapshot } from '../shared/types.js';
 import { listRepositoryImages, readRepositoryImage } from './repository-images.js';
 import { readBranchTree, compareBranches } from './branch-tree.js';
 import { readIntegrationHistory } from './integration-history.js';
-import { isCardRef, relationRefs } from '../shared/card-refs.js';
+import { isCardRef, relationActionRef, relationRefs } from '../shared/card-refs.js';
 import { pickLocal } from './local-picker.js';
 import { realpath } from 'node:fs/promises';
 import { aiRouter } from './ai.js';
@@ -25,6 +26,17 @@ import { checkRemoteRead, githubLoginAvailable, loginRemoteGitHub } from './remo
 import { NetworkSettings, testNetworkProxy, withProxyFetch } from './network-proxy.js';
 
 const hashSchema = z.string().regex(/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
+const relationActionSchema = z.strictObject({
+  type: z.enum(['pull', 'push', 'integrate']),
+  source: z.string().min(1).max(100),
+  target: z.string().min(1).max(100),
+  sourceRepo: z.string().min(1).max(100),
+  targetRepo: z.string().min(1).max(100),
+  sourceRef: z.string().refine(isCardRef),
+  targetRef: z.string().refine(isCardRef),
+  sourceHead: hashSchema,
+  targetHead: hashSchema,
+});
 const branchExpectationSchema = z.strictObject({
   branch: z.string().max(240),
   head: hashSchema.nullable(),
@@ -293,6 +305,55 @@ export function createApp(options: { dataDirectory: string }) {
     res.json(
       await readIntegrationHistory(source.path, target.path, sourceRef, targetRef, query.data),
     );
+  });
+  app.post('/api/boards/:boardId/relations/:edgeId/action', async (req, res) => {
+    const parsed = relationActionSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError('invalidAction');
+    const action = parsed.data;
+    const { boardId, edgeId } = req.params;
+    const local = action.type === 'integrate';
+    const bothLocal = [action.sourceRef, action.targetRef].every((ref) => ref.startsWith('refs/heads/'));
+    if (local !== (action.sourceRepo !== action.targetRepo && bothLocal) ||
+      (!local && (action.sourceRepo !== action.targetRepo ||
+        action.sourceRef.startsWith('refs/heads/') === action.targetRef.startsWith('refs/heads/'))))
+      throw new AppError('relationActionChanged', 409);
+    async function selection() {
+      const workspace = await store.read();
+      const board = workspace.boards.find((item) => item.id === boardId);
+      const edge = board?.edges.find((item) => item.id === edgeId && item.kind === 'integration');
+      const source = board?.nodes.find((item) => item.id === edge?.source);
+      const target = board?.nodes.find((item) => item.id === edge?.target);
+      if (!board || !edge || source?.id !== action.source || target?.id !== action.target ||
+        source.repoId !== action.sourceRepo || target.repoId !== action.targetRepo ||
+        (local && !edge.localIntegration)) throw new AppError('relationActionChanged', 409);
+      const refs = relationRefs(edge, board.nodes);
+      const sourceRepo = await repository(source.repoId);
+      const targetRepo = local ? await repository(target.repoId) : sourceRepo;
+      const [sourceState, targetState] = await Promise.all([
+        refs.sourceRef === 'HEAD' ? readRepository(sourceRepo.path) : undefined,
+        refs.targetRef === 'HEAD' ? readRepository(targetRepo.path) : undefined,
+      ]);
+      if (relationActionRef(refs.sourceRef, sourceState) !== action.sourceRef ||
+        relationActionRef(refs.targetRef, targetState) !== action.targetRef ||
+        (refs.sourceRef === 'HEAD' && sourceState?.head !== action.sourceHead) ||
+        (refs.targetRef === 'HEAD' && targetState?.head !== action.targetHead))
+        throw new AppError('relationActionChanged', 409);
+      return [sourceRepo.path, targetRepo.path] as const;
+    }
+    const [sourcePath, targetPath] = await selection();
+    const validate = async () => {
+      const [source, target] = await selection();
+      if (source !== sourcePath || target !== targetPath) throw new AppError('relationActionChanged', 409);
+    };
+    if (action.type === 'integrate') {
+      await integrateLocalRelation(sourcePath, targetPath, action, validate);
+    } else {
+      await performAction(sourcePath, { type: action.type }, undefined, await network.proxy(), {
+        before: validate,
+        relation: action,
+      });
+    }
+    res.json({ state: await readRepository(targetPath) });
   });
   app.get('/api/repositories/:id/images', async (req, res) => {
     const repo = await repository(req.params.id);

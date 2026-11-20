@@ -15,6 +15,9 @@ import type { FlowEdge, Snapshot } from '../../shared/types';
 import { useEdgeRoute, type RouteEditing } from './EdgeRouteEditor';
 import { Tooltip } from './Tooltip';
 import { relationLabelState, relationStatus } from '../lib/relation-status';
+import type { RelationShortcut } from '../lib/relation-actions';
+import { IconButton } from './IconButton';
+import { RelationActionIcon } from './RelationActionIcon';
 
 export type RelationEdge = Edge<
   RouteEditing & {
@@ -23,6 +26,8 @@ export type RelationEdge = Edge<
     focused: boolean;
     labelOffset: number;
     onOpen: (id: string) => void;
+    shortcuts?: RelationShortcut[];
+    onShortcut?: (shortcut: RelationShortcut) => void;
   },
   'relation'
 >;
@@ -168,6 +173,39 @@ export const RepositoryRelationEdge = memo(function RepositoryRelationEdge({
               <span>{status}</span>
             </button>
           </Tooltip>
+          {!data!.editing && data!.shortcuts?.map((shortcut) => {
+            const { type } = shortcut;
+            const title = t(`relation.sync.${type}`);
+            const direction = t('relation.sync.direction', shortcut);
+            const unavailable = type !== 'integrate' && !shortcut.recommended;
+            const disabled = !!shortcut.blocked || unavailable;
+            const help = shortcut.blocked ? t(`errors.${shortcut.blocked}`) :
+              unavailable ? t(`relation.sync.${type}Current`) : t(`relation.sync.${type}Help`);
+            return (
+              <div
+                key={type}
+                className="repository-relation-shortcut"
+                data-action={type}
+                data-recommended={!disabled && shortcut.recommended ? true : undefined}
+              >
+                <IconButton
+                  className="relation-sync-button"
+                  data-action={type}
+                  label={`${title}: ${direction}`}
+                  help={<><strong>{title}</strong><span>{direction}</span><span>{help}</span></>}
+                  size="small"
+                  placement="top"
+                  aria-disabled={disabled || undefined}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!disabled) data!.onShortcut?.(shortcut);
+                  }}
+                >
+                  <RelationActionIcon action={type} size={15} />
+                </IconButton>
+              </div>
+            );
+          })}
         </div>
       </EdgeLabelRenderer>
       {route.controls}

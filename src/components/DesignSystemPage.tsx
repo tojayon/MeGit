@@ -29,6 +29,9 @@ import { GitLearningPreview } from './GitLearningPreview';
 import { gitLearningDemoIds, type GitLearningDemoId } from '../lib/git-learning-media';
 import { RepositoryAvatar } from './RepositoryAvatar';
 import { BranchTree } from './BranchTree';
+import { BranchComparisonPopover } from './BranchComparisonPopover';
+import { treeAncestors, treeRefHash } from '../lib/branch-tree';
+import { comparisonArguments } from '../../shared/git-commands';
 import { BranchTrunkDialog } from './BranchTrunkDialog';
 import { BranchDialog, type BranchSelection } from './BranchesPanel';
 import { Dialog } from './Dialogs';
@@ -45,7 +48,13 @@ import { RepositoryCardExample } from './RepositoryCardExample';
 import { AssistantExample } from './AssistantExample';
 import { AssistantGuidanceExample } from './AssistantGuidanceExample';
 import { RemoteManagement, RemoteManagementCard } from './RemoteManagement';
-import type { BranchTreeData, Commit, RepoState, TreeBranch } from '../../shared/types';
+import type {
+  BranchComparison,
+  BranchTreeData,
+  Commit,
+  RepoState,
+  TreeBranch,
+} from '../../shared/types';
 
 const sampleRepository = 'MeGit / repository-with-a-long-name-and-a-feature-branch';
 const sampleCommitIds: Record<string, string> = {
@@ -94,6 +103,7 @@ function CommitComposerExample() {
         message={message}
         onMessage={setMessage}
         busy=""
+        showFileCount={false}
         onGenerate={async () => {
           setMessage(t('repositoryCard.aiExample'));
           return true;
@@ -155,6 +165,7 @@ function RemoteManagementExample() {
 function TreeExample() {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<string | null>(null);
+  const [compared, setCompared] = useState<string | null>(null);
   const [base, setBase] = useState('refs/heads/main');
   const [choosingTrunk, setChoosingTrunk] = useState(false);
   const [selection, setSelection] = useState<BranchSelection | null>(null);
@@ -232,6 +243,35 @@ function TreeExample() {
     fetchedAt: null,
     checkedAt: '',
   };
+  const trunk = data.branches.find((item) => item.ref === base);
+  const trunkHash = treeRefHash(data, base);
+  const comparedBranch = data.branches.find((item) => item.ref === compared);
+  const source = treeAncestors(data, comparedBranch?.hash ?? null);
+  const target = treeAncestors(data, trunkHash);
+  const sourceCommits = [...source].filter((hash) => !target.has(hash));
+  const targetCommits = [...target].filter((hash) => !source.has(hash));
+  const comparison: BranchComparison | null =
+    comparedBranch && trunkHash
+      ? {
+          sourceRef: comparedBranch.ref,
+          targetRef: base,
+          sourceHash: comparedBranch.hash,
+          targetHash: trunkHash,
+          sourceOnly: sourceCommits.length,
+          targetOnly: targetCommits.length,
+          sourceCommits,
+          targetCommits,
+          mergeBases: [],
+          relation: sourceCommits.length
+            ? targetCommits.length
+              ? 'diverged'
+              : 'ahead'
+            : targetCommits.length
+              ? 'included'
+              : 'same',
+          checkedAt: '',
+        }
+      : null;
   return (
     <section className="design-card">
       <h2>{t('branchTree.demo')}</h2>
@@ -239,6 +279,22 @@ function TreeExample() {
         <BranchTree
           data={data}
           selectedRef={selected}
+          comparison={comparison}
+          comparisonControl={
+            trunkHash
+              ? (tip) => (
+                  <BranchComparisonPopover
+                    branchName={tip.name}
+                    trunkName={trunk?.name ?? 'HEAD'}
+                    commands={comparisonArguments(tip.hash, trunkHash)}
+                    result={tip.ref === compared ? comparison : null}
+                    active={tip.ref === compared}
+                    onStart={() => setCompared(tip.ref)}
+                    onClose={() => setCompared((current) => (current === tip.ref ? null : current))}
+                  />
+                )
+              : undefined
+          }
           onSelect={setSelected}
           onCommit={setDiff}
           onCreateBranch={(commit) =>

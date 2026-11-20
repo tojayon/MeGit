@@ -6,6 +6,8 @@ import { RepositoryPorts } from './RepositoryPorts';
 import { relationPorts } from '../lib/relation-ports';
 import { usePreferences } from '../preferences/store';
 import { Field } from './Field';
+import { RelationActionConfirmation } from './RelationActionDialog';
+import type { RelationShortcut } from '../lib/relation-actions';
 import type { IntegrationState } from '../../shared/types';
 
 function ExampleRepository({ data }: { data: { name: string } }) {
@@ -27,6 +29,9 @@ export function RelationBridgeExample() {
   const [layout, setLayout] = useState('horizontal');
   const [state, setState] = useState<IntegrationState['state']>('integrated');
   const [selected, setSelected] = useState(false);
+  const [sync, setSync] = useState('none');
+  const upstream = sync === 'upstream' || sync === 'pendingPull' || sync === 'pendingPush';
+  const [shortcut, setShortcut] = useState<RelationShortcut | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
@@ -70,8 +75,12 @@ export function RelationBridgeExample() {
         targetRef: 'main',
       },
       result: {
-        state,
+        state: sync === 'pendingPush' ? 'pending' : upstream ? 'integrated' : state,
         pending: state === 'pending' ? 2 : 0,
+        divergence: upstream ? {
+          targetAhead: sync === 'pendingPull' ? 1 : 0,
+          targetBehind: sync === 'pendingPush' ? 1 : 0,
+        } : undefined,
         sourceHead: null,
         targetHead: null,
         message: '',
@@ -81,6 +90,11 @@ export function RelationBridgeExample() {
       focused: false,
       labelOffset: 0,
       onOpen: () => setSelected((value) => !value),
+      shortcuts: upstream ? [
+        { type: 'pull', from: 'MeWiki · origin/main', to: 'MeWiki · main', recommended: sync === 'pendingPull' },
+        { type: 'push', from: 'MeWiki · main', to: 'MeWiki · origin/main', recommended: sync === 'pendingPush' },
+      ] : sync === 'local' ? [{ type: 'integrate', from: 'MeWiki · main', to: 'MeWiki-Server · main' }] : undefined,
+      onShortcut: setShortcut,
     },
   };
   return (
@@ -99,6 +113,7 @@ export function RelationBridgeExample() {
         <Field label={t('relation.heading')}>
           <select
             value={state}
+            disabled={upstream}
             onChange={(event) => setState(event.target.value as IntegrationState['state'])}
           >
             <option value="integrated">{t('relation.integrated')}</option>
@@ -107,6 +122,15 @@ export function RelationBridgeExample() {
           </select>
         </Field>
       </div>
+      <Field label={t('relation.sync.example')}>
+        <select value={sync} onChange={(event) => setSync(event.target.value)}>
+          <option value="none">{t('relation.sync.compareOnly')}</option>
+          <option value="upstream">{t('relation.sync.upstream')} · {t('relation.refsInSync')}</option>
+          <option value="pendingPush">{t('relation.sync.pendingPush')}</option>
+          <option value="pendingPull">{t('relation.sync.pendingPull')}</option>
+          <option value="local">{t('relation.sync.integrate')}</option>
+        </select>
+      </Field>
       <div ref={container} style={{ height: 'var(--relation-bridge-example-height)' }}>
         <ReactFlow
           key={`${layout}:${narrow}`}
@@ -129,6 +153,13 @@ export function RelationBridgeExample() {
           onPaneClick={() => setSelected(false)}
         />
       </div>
+      {shortcut && (
+        <RelationActionConfirmation
+          shortcut={shortcut}
+          onClose={() => setShortcut(null)}
+          onConfirm={() => setShortcut(null)}
+        />
+      )}
     </section>
   );
 }

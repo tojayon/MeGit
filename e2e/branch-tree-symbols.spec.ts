@@ -32,6 +32,16 @@ test.describe('明亮英文触控', () => {
     });
     await page.keyboard.press('Escape');
     await expect(help).toHaveCount(0);
+    const shortcut = tree.getByRole('button', {
+      name: 'View commit differences: feature/search',
+      exact: true,
+    });
+    expect((await shortcut.boundingBox())!.width).toBeGreaterThanOrEqual(44);
+    await shortcut.tap();
+    const diff = page.getByRole('dialog', { name: 'View differences', exact: true });
+    await expect(diff).toContainText('search');
+    await diff.getByRole('button', { name: 'Close View differences', exact: true }).click();
+    await expect(shortcut).toBeFocused();
   });
 });
 
@@ -113,18 +123,18 @@ test('折叠数量打开可逐个点选的局部树，明亮英文主题保持�
     await expect(actions.locator('.commit-point-summary')).toContainText(author);
     expect(await mapState()).toEqual(before);
     await expect(lens).toBeVisible();
-    await actions.getByRole('button', { name: '查看差异', exact: true }).focus();
+    const diffButton = actions.getByRole('button', { name: '查看差异', exact: true });
+    await diffButton.focus();
     await expect(page.getByRole('tooltip')).toContainText('show --diff-merges=first-parent');
     await expect(page.getByRole('tooltip')).toContainText(hidden);
     await page.keyboard.press('Escape');
     await expect(lens).toBeVisible();
-    await actions.getByRole('button', { name: '查看差异', exact: true }).click();
+    await diffButton.press('Enter');
     const diff = page.getByRole('dialog', { name: '差异', exact: true });
     await expect(diff).toContainText(hidden.slice(0, 7));
     await page.keyboard.press('Escape');
     await expect(lens).toHaveCount(0);
-    await tree.getByRole('button', { name: '查看分支 feature/example', exact: true }).click();
-    await page.getByRole('button', { name: '图上比较', exact: true }).click();
+    await tree.getByRole('button', { name: '图上比较：feature/example', exact: true }).click();
     await expect(tree.locator('.tree-edge.source-only')).not.toHaveCount(0);
     const comparisonWidths = await tree.evaluate((element) => {
       const width = (selector: string) =>
@@ -135,7 +145,9 @@ test('折叠数量打开可逐个点选的局部树，明亮英文主题保持�
       };
     });
     expect(comparisonWidths.trunk / comparisonWidths.branch).toBeCloseTo(3);
-    await folded.click();
+    await page.keyboard.press('Escape');
+    await expect(tree.locator('.tree-edge.source-only')).toHaveCount(0);
+    await folded.press('Enter');
     await expect(lens).toBeVisible();
     await page.screenshot({
       path: '.megit/verification/collapsed-lens/dark-zh.png',
@@ -147,7 +159,6 @@ test('折叠数量打开可逐个点选的局部树，明亮英文主题保持�
     await page.getByRole('button', { name: '明亮', exact: true }).click();
     await page.getByLabel('界面语言').selectOption('en');
     await page.getByRole('button', { name: 'Close Preferences', exact: true }).click();
-    await page.getByRole('button', { name: 'Close branch details', exact: true }).click();
     await page.setViewportSize({ width: 390, height: 420 });
     const english = page.getByRole('button', {
       name: '37 consecutive commits collapsed',
@@ -184,9 +195,10 @@ test('折叠数量打开可逐个点选的局部树，明亮英文主题保持�
     });
     await page.keyboard.press('Escape');
     await expect(english).toBeFocused();
-    await page.getByRole('button', { name: 'Branch tree tools', exact: true }).click();
-    await page.getByRole('button', { name: 'Expand consecutive commits', exact: true }).focus();
-    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'Branch tree tools', exact: true }).press('Enter');
+    await page
+      .getByRole('button', { name: 'Expand consecutive commits', exact: true })
+      .press('Enter');
     await expect(english).toHaveCount(0);
     expect(await git(f.repo, 'branch', '--show-current')).toBe('main');
   } finally {

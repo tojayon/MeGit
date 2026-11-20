@@ -13,11 +13,12 @@ import type {
   IntegrationState,
   RepoState,
   RemoteAction,
+  RelationAction,
 } from '../shared/types.js';
 import { AppError, safeMessage } from './errors.js';
 import { isBranchName, isSafeRef } from '../shared/refs.js';
 import { gitProxyRoute, proxyEnvironment, proxyFailure } from './network-proxy.js';
-import { cardUsesWorktree } from '../shared/card-refs.js';
+import { cardUsesWorktree, relationUpstreamMatches } from '../shared/card-refs.js';
 import {
   actionArguments,
   commitDiffArguments,
@@ -41,6 +42,7 @@ async function run(
   outputLimit?: number,
   remoteProbe = false,
   proxy?: GitProxy,
+  localOnly = false,
 ) {
   const proxyArgs = proxy
     ? [
@@ -71,6 +73,7 @@ async function run(
           LC_ALL: 'C',
           LANG: 'C',
           ...(proxy || remoteProbe ? { GIT_ALLOW_PROTOCOL: 'file:git:http:https:ssh' } : {}),
+          ...(localOnly ? { GIT_ALLOW_PROTOCOL: 'file' } : {}),
           ...(remoteProbe
             ? {
                 GIT_ASKPASS: '',
@@ -229,12 +232,14 @@ export async function readRepository(repo: string, expandUntracked = false): Pro
   const remoteNames = remoteResult.stdout.trim().split('\n').filter(Boolean);
   let pushTarget: RepoState['pushTarget'] = null;
   let upstreamHead: string | null = null;
+  let upstreamRef: string | null = null;
   let trackingConfigured = false;
   if (branch) {
-    const [remote, ref, tip] = await Promise.all([
+    const [remote, ref, tip, fullUpstream] = await Promise.all([
       optional(repo, ['config', '--get', `branch.${branch}.remote`]),
       optional(repo, ['config', '--get-all', `branch.${branch}.merge`]),
       upstream ? optional(repo, ['rev-parse', '--verify', '@{upstream}^{commit}']) : null,
+      upstream ? optional(repo, ['rev-parse', '--symbolic-full-name', '@{upstream}']) : null,
     ]);
     trackingConfigured = !!(remote || ref);
     if (
@@ -249,6 +254,7 @@ export async function readRepository(repo: string, expandUntracked = false): Pro
     ) {
       pushTarget = { remote, ref };
       upstreamHead = tip;
+      upstreamRef = fullUpstream;
     }
   }
   return {
@@ -257,6 +263,7 @@ export async function readRepository(repo: string, expandUntracked = false): Pro
       headers['branch.oid'] && headers['branch.oid'] !== '(initial)' ? headers['branch.oid'] : null,
     detached: headers['branch.head'] === '(detached)',
     upstream,
+    upstreamRef,
     trackingConfigured,
     pushTarget,
     upstreamHead,
@@ -539,14 +546,31 @@ export async function performAction(
   action: GitAction,
   worktreeRef?: string,
   proxy?: string,
-  guard?: { before: () => Promise<void>; after: () => Promise<void> },
+  guard?: { before: () => Promise<void>; after?: () => Promise<void>; relation?: RelationAction },
 ): Promise<string> {
-  const previous = queues.get(repo) || Promise.resolve();
-  const next = previous
-    .catch(() => {})
-    .then(async () => {
+  return queueAction(repo, async () => {
       await guard?.before();
       const state = await readRepository(repo, !!guard);
+      if (guard?.relation) {
+        const relation = guard.relation;
+        const fromLocal = relation.sourceRef.startsWith('refs/heads/');
+        const localRef = fromLocal ? relation.sourceRef : relation.targetRef;
+        const remoteRef = fromLocal ? relation.targetRef : relation.sourceRef;
+        if (!relationUpstreamMatches(localRef, remoteRef, state) ||
+          state.head !== (fromLocal ? relation.sourceHead : relation.targetHead) ||
+          state.upstreamHead !== (fromLocal ? relation.targetHead : relation.sourceHead))
+          throw new AppError('relationActionChanged', 409);
+        if (state.ahead && state.behind) throw new AppError('relationNonFastForward', 409);
+        if (action.type === 'push' && state.pushTarget) {
+          const remote = state.pushTarget.remote;
+          const [readUrl, pushUrl] = await Promise.all([
+            run(repo, ['remote', 'get-url', '--all', '--', remote]),
+            run(repo, ['remote', 'get-url', '--push', '--all', '--', remote]),
+          ]);
+          if (readUrl.stdout.trim() !== pushUrl.stdout.trim())
+            throw new AppError('relationRemoteMismatch', 409);
+        }
+      }
       if (worktreeRef && !cardUsesWorktree(worktreeRef, state))
         throw new AppError('branchStateChanged', 409);
       let args: string[];
@@ -635,15 +659,53 @@ export async function performAction(
         if (action.type === 'publishBranch' && !outcome.some((line) => line.startsWith('*\t')))
           throw new AppError('remoteBranchExists', 409);
       }
-      await guard?.after();
+      await guard?.after?.();
       return safeMessage(new Error((result.stdout + result.stderr).trim() || 'OK'));
-    });
+  });
+}
+
+async function queueAction<T>(repo: string, operation: () => Promise<T>): Promise<T> {
+  const previous = queues.get(repo) || Promise.resolve();
+  const next = previous.catch(() => {}).then(operation);
   queues.set(repo, next);
   try {
     return await next;
   } finally {
     if (queues.get(repo) === next) queues.delete(repo);
   }
+}
+
+export function integrateLocalRelation(
+  source: string,
+  target: string,
+  action: RelationAction,
+  validate: () => Promise<void>,
+) {
+  return queueAction(target, async () => {
+    const verify = async () => {
+      await validate();
+      const [sourceHead, state] = await Promise.all([
+        commitHash(source, action.sourceRef),
+        readRepository(target),
+      ]);
+      if (sourceHead !== action.sourceHead || state.head !== action.targetHead ||
+        !cardUsesWorktree(action.targetRef, state))
+        throw new AppError('relationActionChanged', 409);
+      if (state.operation) throw new AppError('branchOperation', 409);
+      if (state.changed) throw new AppError('dirtyPull', 409);
+    };
+    await verify();
+    const address = (await run(target, ['ls-remote', '--get-url', '--', source])).stdout.trim();
+    if (address !== source) throw new AppError('relationActionChanged', 409);
+    await run(target, ['fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
+      '--no-auto-maintenance', '--no-write-commit-graph', '--refmap=', '--', source, action.sourceHead],
+    true, false, undefined, false, undefined, true);
+    const ancestor = await run(target, ['merge-base', '--is-ancestor', action.targetHead, action.sourceHead], false, true);
+    if ('failed' in ancestor) throw new AppError('relationNonFastForward', 409);
+    await verify();
+    await run(target, ['-c', 'submodule.recurse=false', 'merge', '--ff-only', '--no-squash',
+      '--no-autostash', '--no-overwrite-ignore', '--', action.sourceHead]);
+  });
 }
 
 function requireCurrentBranch(state: RepoState, expected: BranchExpectation) {

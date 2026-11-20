@@ -39,7 +39,7 @@ export function CommitStageButton({
     >
       <Button
         size="compact"
-        className={compact ? 'branch-detail-action' : undefined}
+        className={compact ? `branch-detail-action branch-detail-${type}` : undefined}
         aria-label={label}
         icon={type === 'stage' ? <Plus size={15} /> : <Minus size={15} />}
         disabled={disabled || !!busy || !paths.length}
@@ -58,6 +58,7 @@ export function CommitComposer({
   onMessage,
   busy,
   disabled = false,
+  showFileCount = true,
   onAction,
   onGenerate,
   children,
@@ -67,6 +68,7 @@ export function CommitComposer({
   onMessage: (value: string) => void;
   busy: string;
   disabled?: boolean;
+  showFileCount?: boolean;
   onAction: (action: GitAction) => Promise<boolean>;
   onGenerate?: () => Promise<boolean>;
   children?: ReactNode;
@@ -131,7 +133,9 @@ export function CommitComposer({
         busy={busy === 'commit'}
         disabled={!canCommit}
       >
-        {t('repository.commitFiles', { count: staged.length })}
+        {showFileCount
+          ? t('repository.commitFiles', { count: staged.length })
+          : t('repositoryCard.commit')}
       </Button>
     </Tooltip>
   );

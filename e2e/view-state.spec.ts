@@ -45,8 +45,9 @@ test('刷新恢复打开的详情、地图视角、横向位置及白板关闭�
     await page.getByRole('button', { name: '浏览甲', exact: true }).click();
     const panel = page.getByRole('complementary', { name: '浏览甲 仓库详情', exact: true });
     await selectBranch(panel, 'feature/search');
-    await panel.getByRole('button', { name: '图上比较', exact: true }).click();
+    await panel.getByRole('button', { name: '图上比较：feature/search', exact: true }).click();
     await expect(panel.locator('.branch-tree-comparison strong')).toBeVisible();
+    await page.keyboard.press('Escape');
     await panel.getByRole('button', { name: '分支树工具', exact: true }).click();
     await panel.getByRole('button', { name: '展开连续提交', exact: true }).click();
     await panel.getByRole('button', { name: '放大分支树', exact: true }).click();
@@ -56,8 +57,6 @@ test('刷新恢复打开的详情、地图视角、横向位置及白板关闭�
     });
     await expect.poll(() => map.evaluate((el) => el.scrollTop)).toBe(180);
     const detail = panel.locator('.branch-tree-selection-body');
-    await detail.evaluate((el) => el.scrollTo({ top: 40, behavior: 'instant' }));
-    await expect.poll(() => detail.evaluate((el) => el.scrollTop)).toBe(40);
     const dock = page.locator('.dock-panels');
     await dock.evaluate((el) => el.scrollTo({ left: 110, behavior: 'instant' }));
     await expect.poll(() => dock.evaluate((el) => el.scrollLeft)).toBe(110);
@@ -68,16 +67,15 @@ test('刷新恢复打开的详情、地图视角、横向位置及白板关闭�
     });
     await page.reload();
     await expect(page.locator('.dock-card')).toHaveCount(2);
-    await expect(page.locator('.dock-card').first()).toHaveAttribute(
-      'data-key',
-      'repository:a',
-    );
+    await expect(page.locator('.dock-card').first()).toHaveAttribute('data-key', 'repository:a');
     await expect(panel.getByRole('region', { name: '分支详情', exact: true })).toContainText(
       'feature/search',
     );
     await expect(panel.locator('.branch-tree-drawing')).toHaveCSS('transform', /matrix\(1\.1,/);
     await expect.poll(() => map.evaluate((el) => el.scrollTop)).toBe(180);
-    await expect.poll(() => detail.evaluate((el) => el.scrollTop)).toBe(40);
+    await expect(detail).toBeVisible();
+    await expect(panel.getByRole('dialog', { name: '图上比较', exact: true })).toHaveCount(0);
+    await expect(panel.locator('[data-comparing="true"]')).toHaveCount(0);
     await expect.poll(() => dock.evaluate((el) => el.scrollLeft)).toBe(110);
     await expect(page.getByRole('button', { name: '重新打开工作流', exact: true })).toBeVisible();
     expect(writes).toEqual([]);

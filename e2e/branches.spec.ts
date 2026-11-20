@@ -61,8 +61,12 @@ test('当前分支使用紧凑提交栏，展开编辑保留多行草稿', async
     await expect(tracking.getByText('upstream', { exact: true })).toHaveCount(0);
     await expect(card.getByRole('button', { name: '获取', exact: true })).toHaveCount(0);
     await expect(card.getByRole('button', { name: '远端名称', exact: true })).toHaveCount(0);
-    await expect(card.getByRole('button', { name: '图上比较' })).toBeVisible();
-    await expect(tracking.getByRole('button', { name: '图上比较' })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: /^图上比较/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '图上比较：main', exact: true })).toBeVisible();
+    expect(
+      await worktree.evaluate((section) => getComputedStyle(section).backgroundColor),
+    ).not.toBe(await tracking.evaluate((section) => getComputedStyle(section).backgroundColor));
+    await page.screenshot({ path: '.megit/verification/branch-tree/worktree-and-sync.png' });
     await page.getByRole('button', { name: '分支树工具', exact: true }).click();
     await expect(page.getByRole('button', { name: '获取', exact: true })).toBeEnabled();
     await page.keyboard.press('Escape');
@@ -130,7 +134,7 @@ test('当前分支使用紧凑提交栏，展开编辑保留多行草稿', async
     await editor.getByRole('textbox').press('Escape');
     await expect(editor).toHaveCount(0);
     await expect(card.getByRole('textbox')).toHaveValue('Title\n\nBody');
-    await card.getByRole('button', { name: '提交 1 个文件' }).click();
+    await card.getByRole('button', { name: '提交', exact: true }).click();
     await expect(card.getByRole('textbox')).toHaveValue('');
     expect(await git(f.repo, 'log', '-1', '--format=%B')).toBe('Title\n\nBody');
   } finally {
@@ -200,6 +204,9 @@ test('远端跟踪分支只读本地缓存；两主题、英文和窄屏可用',
     await expect(remoteLabel.locator('svg.lucide-cloud')).toBeVisible();
     await expect(localLabel).toHaveCSS('border-top-style', 'solid');
     await expect(remoteLabel).toHaveCSS('border-top-style', 'dashed');
+    await expect(
+      page.getByRole('button', { name: '图上比较：origin/feature', exact: true }),
+    ).toHaveCSS('border-top-left-radius', '50%');
     expect(
       await remoteLabel.evaluate((element) => getComputedStyle(element).borderRadius),
     ).not.toBe(await localLabel.evaluate((element) => getComputedStyle(element).borderRadius));

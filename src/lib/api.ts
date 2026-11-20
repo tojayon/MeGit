@@ -6,6 +6,7 @@ import type {
   DiffResult,
   GitAction,
   IntegrationHistory,
+  RelationAction,
   RepoState,
   RemoteReadStatus,
   RepositoryImage,
@@ -77,6 +78,11 @@ export const api = {
     request<IntegrationHistory>(
       `/boards/${encodeURIComponent(boardId)}/relations/${encodeURIComponent(edgeId)}/history?${new URLSearchParams(Object.entries(options).map(([key, value]) => [key, String(value)]))}`,
       { signal },
+    ),
+  relationAction: (boardId: string, edgeId: string, action: RelationAction) =>
+    request<{ state: RepoState }>(
+      `/boards/${encodeURIComponent(boardId)}/relations/${encodeURIComponent(edgeId)}/action`,
+      { method: 'POST', body: JSON.stringify(action) },
     ),
   generateCommit: (repositoryId: string, signal: AbortSignal) =>
     request<{ kind: 'commit'; text: string }>('/ai/assist', {

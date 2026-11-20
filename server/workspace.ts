@@ -87,6 +87,7 @@ export const workspaceSchema = z.object({
               label: z.string().max(100),
               sourceRef: ref.optional(),
               targetRef: ref.optional(),
+              localIntegration: z.boolean().optional(),
               routing: z.enum(['smoothstep', 'step', 'bezier', 'straight']).optional(),
               waypoints: z.array(point).max(20).optional(),
               sourcePort: port.optional(),

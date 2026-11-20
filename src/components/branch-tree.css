@@ -356,6 +356,35 @@
 .tree-tip-anchor {
   transform: translate(-50%, -100%);
 }
+.tree-tip-anchor:focus-within {
+  z-index: 2;
+}
+.tree-tip-actions {
+  position: absolute;
+  inset-inline-start: calc(100% + var(--space-1));
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  transform: translateY(-50%);
+}
+.icon-button.tree-map-action {
+  width: var(--control-compact);
+  height: var(--control-compact);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+.tree-tip-anchor[data-remote='true'] .icon-button.tree-map-action {
+  border-radius: 50%;
+}
+.icon-button.tree-map-action:hover,
+.icon-button.tree-map-action[aria-expanded='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .tree-tip {
   display: flex;
   align-items: center;
@@ -466,9 +495,14 @@
   font-size: var(--text-caption);
   overflow-wrap: anywhere;
 }
-.branch-tree-detail-section + .branch-tree-detail-section {
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-1);
+.branch-tree-sync-section {
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+}
+.branch-tree-detail-section + .branch-tree-sync-section {
+  margin-top: var(--space-3);
 }
 .branch-tree-detail-section-header {
   display: flex;
@@ -477,6 +511,18 @@
   gap: var(--space-2);
   min-height: var(--control-compact);
   margin-bottom: var(--space-1);
+}
+.branch-tree-detail-section-header > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.branch-tree-detail-section-header > strong > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.branch-tree-sync-heading > strong > svg {
+  color: var(--accent);
 }
 .branch-tree-tracking,
 .branch-tree-tracking-name,
@@ -493,13 +539,14 @@
   flex-wrap: wrap;
   column-gap: var(--space-2);
   row-gap: var(--space-1);
-  margin-bottom: var(--space-2);
 }
 .branch-tree-tracking-name {
   overflow-wrap: anywhere;
 }
 .branch-tree-sync-heading {
   justify-content: flex-start;
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
 }
 .branch-tree-sync-heading > strong {
   flex-shrink: 0;
@@ -568,32 +615,45 @@
 .branch-tree-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
 }
-.branch-tree-actions > .tooltip-anchor:has(.button) {
-  flex: 1;
-}
-.branch-tree-actions .button {
-  width: 100%;
-}
-.branch-tree-actions .button[aria-pressed='true'] {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-soft);
+.branch-tree-actions:empty {
+  display: none;
 }
 .branch-tree-comparison {
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface-raised);
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  overflow-wrap: anywhere;
 }
-.branch-tree-comparison > p {
-  margin: 0 0 var(--space-2);
+.branch-tree-comparison-popover .info-popover-title {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+}
+.branch-tree-comparison-popover .info-popover-title > svg {
+  color: var(--accent);
+}
+.branch-tree-comparison-popover .info-popover-title > h3 {
+  margin: 0;
+}
+.branch-tree-comparison-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+}
+.branch-tree-comparison-heading > div {
+  display: grid;
   gap: var(--space-1);
+  min-width: 0;
+}
+.branch-tree-comparison > p {
+  margin: 0;
 }
 .tree-comparison-counts {
   display: grid;
@@ -650,6 +710,10 @@
   text-align: start;
 }
 @media (pointer: coarse) {
+  .icon-button.tree-map-action {
+    width: var(--control-touch);
+    height: var(--control-touch);
+  }
   .tree-tip,
   .branch-tree-menu-items button {
     min-height: var(--control-touch);

@@ -385,6 +385,7 @@ export function RelationDialog({
   const [label, setLabel] = useState(initial?.label || '');
   const [sourceRef, setSourceRef] = useState(initial?.sourceRef ?? '');
   const [targetRef, setTargetRef] = useState(initial?.targetRef ?? '');
+  const [localIntegration, setLocalIntegration] = useState(!!initial?.localIntegration);
   const [appearance, setAppearance] = useState<
     Pick<FlowEdge, 'routing' | 'sourcePort' | 'targetPort'>
   >({
@@ -397,6 +398,12 @@ export function RelationDialog({
     ...n,
     name: n.displayName || repositories.find((r) => r.id === n.repoId)!.name,
   }));
+  const distinctRepositories = nodes.find((node) => node.id === source)?.repoId !==
+    nodes.find((node) => node.id === target)?.repoId;
+  const canEnableLocalIntegration = kind === 'integration' && distinctRepositories &&
+    [sourceRef || nodes.find((node) => node.id === source)?.ref || 'HEAD',
+      targetRef || nodes.find((node) => node.id === target)?.ref || 'HEAD']
+      .every((ref) => ref === 'HEAD' || ref.startsWith('refs/heads/'));
   return (
     <Dialog
       title={initial?.id ? t('relation.editTitle') : t('relation.createTitle')}
@@ -444,6 +451,7 @@ export function RelationDialog({
             label: label.trim(),
             sourceRef: sourceRef || undefined,
             targetRef: targetRef || undefined,
+            localIntegration: canEnableLocalIntegration && localIntegration ? true : undefined,
           });
           onClose();
         }}
@@ -455,6 +463,7 @@ export function RelationDialog({
                 value={source}
                 onChange={(e) => {
                   setSource(e.target.value);
+                  setLocalIntegration(false);
                   setError(null);
                 }}
               >
@@ -474,6 +483,7 @@ export function RelationDialog({
                 value={target}
                 onChange={(e) => {
                   setTarget(e.target.value);
+                  setLocalIntegration(false);
                   setError(null);
                 }}
               >
@@ -538,6 +548,7 @@ export function RelationDialog({
                   placeholder={t('relation.inheritCardRef')}
                   onChange={(e) => {
                     setSourceRef(e.target.value);
+                    setLocalIntegration(false);
                     setError(null);
                   }}
                   maxLength={240}
@@ -557,6 +568,7 @@ export function RelationDialog({
                   placeholder={t('relation.inheritCardRef')}
                   onChange={(e) => {
                     setTargetRef(e.target.value);
+                    setLocalIntegration(false);
                     setError(null);
                   }}
                   maxLength={240}
@@ -564,6 +576,12 @@ export function RelationDialog({
                 />
               </Field>
             </div>
+          )}
+          {canEnableLocalIntegration && (
+            <label className="relation-local-integration">
+              <input type="checkbox" checked={localIntegration} onChange={(event) => setLocalIntegration(event.target.checked)} />
+              <span>{t('relation.sync.enableLocal')}</span>
+            </label>
           )}
           <RelationAppearance
             edge={appearance}

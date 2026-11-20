@@ -187,6 +187,18 @@ test('规范页复用状态桥并支持状态、布局和窄屏双语', async ({
   await expect(card.locator('.repository-relation-label')).toHaveText('待核对');
   await card.getByLabel('仓库排列').selectOption('vertical');
   await card.screenshot({ path: '.megit/verification/relation-bridge/example-dark.png' });
+  const sync = card.getByLabel('连线快捷操作');
+  await sync.selectOption('upstream');
+  await card.locator('.repository-relation-label').focus();
+  await expect(card.getByRole('button', { name: /^推送:/ })).toBeDisabled();
+  await expect(card.getByRole('button', { name: /^拉取:/ })).toBeDisabled();
+  await sync.selectOption('pendingPush');
+  await card.getByRole('button', { name: /^推送:/ }).click();
+  const preview = page.getByRole('dialog', { name: '推送' });
+  const confirm = preview.getByRole('button', { name: '推送', exact: true });
+  await expect(confirm.locator('svg.lucide-upload')).toBeVisible();
+  await confirm.click();
+  await expect(preview).toBeHidden();
   await page.evaluate(() =>
     localStorage.setItem(
       'megit.preferences',

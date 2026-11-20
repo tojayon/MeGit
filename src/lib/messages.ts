@@ -22,9 +22,11 @@ export function formatError(error: unknown): string {
 export type NoticeMessage =
   | { key: `actions.${GitAction['type']}`; values: { name: string; target: string } }
   | { key: 'board.duplicate' }
+  | { key: 'relation.sync.integrated'; values: { target: string } }
   | Error
   | ErrorInfo;
 export function formatNotice(message: NoticeMessage): string {
   if (!('key' in message)) return formatError(message);
+  if (message.key === 'relation.sync.integrated') return i18n.t(message.key, message.values);
   return 'values' in message ? i18n.t(message.key, message.values) : i18n.t(message.key);
 }

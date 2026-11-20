@@ -50,6 +50,9 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { RepositoryRelationEdge, type RelationEdge } from './RepositoryRelationEdge';
+import { RelationActionDialog } from './RelationActionDialog';
+import { relationShortcuts, type RelationShortcut } from '../lib/relation-actions';
+import { api } from '../lib/api';
 import { relationPorts } from '../lib/relation-ports';
 import type { RoutePoint } from '../lib/edge-route';
 import { IconButton } from './IconButton';
@@ -60,6 +63,7 @@ import type {
   PortSide,
   RepoState,
   Repository,
+  RelationAction,
   Snapshot,
 } from '../../shared/types';
 import { updatePreferences, usePreferences } from '../preferences/store';
@@ -311,6 +315,7 @@ function CanvasContents({
   onRefresh,
   onNotice,
   onSelectEdge,
+  relationsSaved,
   onSelectConnection,
   onEditConnection,
   onReconnect,
@@ -346,6 +351,7 @@ function CanvasContents({
   onRefresh: () => Promise<void>;
   onNotice: (notice: NoticeMessage, error?: boolean) => void;
   onSelectEdge: (id: string) => void;
+  relationsSaved: boolean;
   onSelectConnection: (id: string) => void;
   onEditConnection: (id: string) => void;
   onReconnect: (id: string, connection: Connection) => void;
@@ -436,6 +442,9 @@ function CanvasContents({
   const lastFocus = useRef(focus);
   const [exporting, setExporting] = useState(false);
   const [routeEditing, setRouteEditing] = useState<string | null>(null);
+  const [relationAction, setRelationAction] = useState<{
+    id: string; action: RelationAction; shortcut: RelationShortcut; repo: Repository;
+  } | null>(null);
   const [exportError, setExportError] = useState(false);
   const [dimensions, setDimensions] = useState<Record<string, Size>>({});
   const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
@@ -648,6 +657,8 @@ function CanvasContents({
   }
   const edges: CanvasEdge[] = visible.map(({ relation, source, target }): RelationEdge => {
     const focused = seeds.length > 0 && context.edgeIds.has(relation.id);
+    const sync = relationsSaved && source === relation.source && target === relation.target
+      ? relationShortcuts(relation, board.nodes, repositories, snapshot) : undefined;
     const siblings = parallel.get(
       JSON.stringify([
         source,
@@ -698,6 +709,10 @@ function CanvasContents({
         result: snapshot?.relations[relation.id],
         focused,
         onOpen: onSelectEdge,
+        shortcuts: sync?.shortcuts,
+        onShortcut: sync ? (shortcut) => setRelationAction({
+          id: relation.id, action: { ...sync.base, type: shortcut.type }, shortcut, repo: sync.repo,
+        }) : undefined,
         labelOffset: (siblings.indexOf(relation.id) - (siblings.length - 1) / 2) * 30,
       },
     };
@@ -1591,6 +1606,18 @@ function CanvasContents({
           />
         )}
       </div>
+      {relationAction && (
+        <RelationActionDialog
+          action={relationAction.action}
+          shortcut={relationAction.shortcut}
+          repo={relationAction.repo}
+          onRun={() => api.relationAction(board.id, relationAction.id, relationAction.action)}
+          onClose={() => setRelationAction(null)}
+          onState={(state) => onRepositoryState(relationAction.repo.id, state)}
+          onRefresh={onRefresh}
+          onNotice={onNotice}
+        />
+      )}
     </div>
   );
 }

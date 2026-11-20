@@ -32,3 +32,15 @@ export function relationRefs(
     targetRef: edge.targetRef ?? nodes.find((node) => node.id === edge.target)?.ref ?? 'HEAD',
   };
 }
+
+export function relationActionRef(ref: string, state?: RepoState): string | undefined {
+  const resolved = ref === 'HEAD' && state && !state.detached && state.branch
+    ? `refs/heads/${state.branch}`
+    : ref;
+  return isCardRef(resolved) ? resolved : undefined;
+}
+
+export function relationUpstreamMatches(local: string, remote: string, state?: RepoState): boolean {
+  return local.startsWith('refs/heads/') && remote.startsWith('refs/remotes/') &&
+    cardUsesWorktree(local, state) && !!state?.pushTarget && state.upstreamRef === remote;
+}

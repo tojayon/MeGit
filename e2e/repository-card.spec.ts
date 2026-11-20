@@ -74,7 +74,7 @@ test('仓库卡片两行信息和直接暂存提交，共用详情草稿，失�
     await expect(
       page
         .locator('.branch-tree-selection')
-        .getByRole('button', { name: '提交 1 个文件', exact: true }),
+        .getByRole('button', { name: '提交', exact: true }),
     ).toBeDisabled();
     await expect(card.getByRole('button', { name: '提交', exact: true })).toBeDisabled();
     expect(count).toBe(1);

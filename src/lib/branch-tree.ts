@@ -56,7 +56,7 @@ export function treeAncestors(data: BranchTreeData, hash: string | null): Set<st
 
 export function buildBranchTree(
   data: BranchTreeData,
-  options: { expanded?: boolean } = {},
+  options: { expanded?: boolean; branchActionCount?: number } = {},
 ): TreeLayout {
   const commits = new Map(data.commits.map((commit) => [commit.hash, commit]));
   const references = new Map<string, TreeBranch[]>();
@@ -160,16 +160,19 @@ export function buildBranchTree(
     commitRowGap,
     ...[...references.values()].map((branches) => branches.length * 44 + commitRowGap),
   );
+  const actionSpace = (options.branchActionCount ?? 0) * 48;
+  const laneGap = 116 + actionSpace;
+  const sideInset = 64 + actionSpace;
   let width = Math.max(
     320,
-    Math.max(0, ...[...lanes.values()].map((lane) => Math.abs(lane))) * 232 + 128,
+    2 * (Math.max(0, ...[...lanes.values()].map((lane) => Math.abs(lane))) * laneGap + sideInset),
   );
   const height = Math.max(180, maximum + labelSpace + 60);
   const nodes = [...visible].map((hash) => ({
     commit: commits.get(hash)!,
     branches: references.get(hash) || [],
     lane: lanes.get(hash) || 0,
-    x: width / 2 + (lanes.get(hash) || 0) * 116,
+    x: width / 2 + (lanes.get(hash) || 0) * laneGap,
     y: labelSpace + maximum - progress.get(hash)!,
     onTrunk: trunk.has(hash),
     boundary: boundaries.some((boundary) => boundary.child === hash),
@@ -215,10 +218,10 @@ export function buildBranchTree(
     });
   }
   const extent = Math.max(
-    width / 2 - 64,
+    width / 2 - sideInset,
     ...[...tracks.values()].map((x) => Math.abs(x - width / 2)),
   );
-  const padding = Math.max(0, extent + 64 - width / 2);
+  const padding = Math.max(0, extent + sideInset - width / 2);
   width += padding * 2;
   for (const node of nodes) node.x += padding;
   const edges = unfinished.map((edge) => {
