@@ -6,6 +6,8 @@ import { formatError } from '../lib/messages';
 import { Button } from './Button';
 import { Dialog } from './Dialogs';
 import { Field } from './Field';
+import { GitCommandPreview } from './GitCommandPreview';
+import { actionArguments } from '../../shared/git-commands';
 
 export function RemoteActionDialog({
   type,
@@ -94,6 +96,7 @@ export function RemoteActionDialog({
             </Field>
           )}
           {!!error && <p className="error-message" role="alert">{formatError(error)}</p>}
+          <GitCommandPreview commands={action ? [actionArguments(action, source)] : []} when="confirm" />
         </div>
         <footer className="dialog-footer">
           <Button disabled={pending} onClick={onClose}>{t('common.cancel')}</Button>

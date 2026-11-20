@@ -40,6 +40,9 @@ import { relationRefs } from '../shared/card-refs';
 import { RelationPanel } from './components/RelationPanel';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { SettingsDialog } from './components/SettingsDialog';
+import { AssistantPanel } from './components/AssistantPanel';
+import { AssistantLauncher } from './components/AssistantLauncher';
+import { applyBoardOperations, boardSignature } from '../shared/assistant-board';
 import { formatError, formatNotice, type NoticeMessage } from './lib/messages';
 import { updatePreferences, usePreferences } from './preferences/store';
 import { BrandLogo } from './components/BrandLogo';
@@ -131,6 +134,7 @@ export default function App() {
     viewStorage.write('app.dialog', restorableModal(modal) ? modal : null);
   }, [modal]);
   const [learningOpen, setLearningOpen] = useViewState('app.learning', false, isBoolean);
+  const [assistantOpen, setAssistantOpen] = useViewState('app.assistant', false, isBoolean);
   const viewIssue = useViewIssue();
   const [avatarRepositoryId, setAvatarRepositoryId] = useState<string | null>(null);
   const [removalTarget, setRemovalTarget] = useState<{ id: string; name: string } | null>(null);
@@ -397,7 +401,11 @@ export default function App() {
     setModal('group');
   }
 
-  const [newCard, setNewCard] = useState<{ repo: Repository; state: RepoState; displayName?: string } | null>(null);
+  const [newCard, setNewCard] = useState<{
+    repo: Repository;
+    state: RepoState;
+    displayName?: string;
+  } | null>(null);
 
   function addRepository(repo: Repository, ref?: string, displayName?: string) {
     if (!board) return;
@@ -533,6 +541,44 @@ export default function App() {
         onPreferences={() => setModal('preferences')}
         onSettings={() => setModal('settings')}
         onHelp={() => setModal('help')}
+      />
+      <AssistantLauncher
+        open={assistantOpen}
+        onToggle={() => setAssistantOpen((saved) => !saved)}
+      />
+      <AssistantPanel
+        board={boardClosed ? undefined : board}
+        boardReady={saveStatus === 'saved'}
+        onApplyBoard={(plan) => {
+          if (
+            boardClosed ||
+            saveStatus !== 'saved' ||
+            plan.boardId !== board.id ||
+            Date.now() > Date.parse(plan.expiresAt)
+          )
+            return false;
+          let applied = false;
+          update((draft) => {
+            const target = draft.boards.find((item) => item.id === plan.boardId);
+            if (!target || target.layoutLocked || boardSignature(target) !== plan.baseline) return;
+            try {
+              Object.assign(target, applyBoardOperations(target, plan.operations));
+              applied = true;
+            } catch {
+              /* Leave the entire board unchanged if the plan no longer validates. */
+            }
+          });
+          return applied;
+        }}
+        repositories={workspace.repositories}
+        initialRepositoryIds={[...new Set(board.nodes.map((node) => node.repoId))]}
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        onSettings={() => setModal('settings')}
+        onRefresh={refresh}
+        settingsOpen={modal === 'settings'}
+        onRepositories={() => setModal('repositories')}
+        actionViewKey={(repo) => viewKey(board.id, repo.id, repo.path)}
       />
       <main
         className="main-workspace"
@@ -1132,7 +1178,8 @@ export default function App() {
           existing={workspace.repositories}
           onAdd={addRepository}
           onChooseCard={(repo, state, displayName) => {
-            if (board.nodes.some((node) => node.repoId === repo.id)) setNewCard({ repo, state, displayName });
+            if (board.nodes.some((node) => node.repoId === repo.id))
+              setNewCard({ repo, state, displayName });
             else addRepository(repo, undefined, displayName);
           }}
           onClose={() => setModal(null)}

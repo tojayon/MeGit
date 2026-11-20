@@ -8,6 +8,8 @@ import { aiDiagramSchema } from '../shared/ai.js';
 import type { RepoState } from '../shared/types.js';
 import { AppError } from './errors.js';
 import { commitMessage, type readCommitContext } from './ai-commit.js';
+import { AssistantService, assistantRouter } from './assistant.js';
+import type { Repository } from '../shared/types.js';
 
 const configSchema = z.strictObject({
   endpoint: z.string().trim().min(1).max(2048),
@@ -86,7 +88,7 @@ function protect(value: string, decrypt = false): Promise<string> {
 
 export async function completeAi(
   config: z.infer<typeof configSchema> & { apiKey: string },
-  messages: { role: 'system' | 'user'; content: string }[],
+  messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
   transport = fetch,
   signal?: AbortSignal,
 ) {
@@ -128,7 +130,11 @@ export async function completeAi(
     if (typeof content !== 'string' || !content.trim()) throw new Error();
     return content.trim();
   } catch (error) {
-    if (error instanceof AppError && (error.code === 'proxyConnection' || error.code === 'proxyTimeout')) throw error;
+    if (
+      error instanceof AppError &&
+      (error.code === 'proxyConnection' || error.code === 'proxyTimeout')
+    )
+      throw error;
     throw new AppError('aiUnavailable', 502);
   }
 }
@@ -138,6 +144,14 @@ export function aiRouter(
   readState: (id: string) => Promise<RepoState>,
   readCommit?: (id: string) => ReturnType<typeof readCommitContext>,
   getTransport: () => Promise<typeof fetch> = async () => fetch,
+  assistant?: {
+    board?: (id: string) => Promise<{
+      board: import('../shared/types.js').Board;
+      repositoryNames: Record<string, string>;
+    }>;
+    repository: (id: string) => Promise<Repository>;
+    proxy: () => Promise<string | undefined>;
+  },
 ) {
   const router = Router();
   const filename = path.join(directory, 'ai-settings.json');
@@ -165,6 +179,17 @@ export function aiRouter(
       : '';
     return { endpoint: config.endpoint, model: config.model, apiKey };
   }
+  if (assistant)
+    router.use(
+      '/assistant',
+      assistantRouter(
+        new AssistantService({
+          ...assistant,
+          complete: async (messages, signal) =>
+            completeAi(await configForRequest(), messages, await getTransport(), signal),
+        }),
+      ),
+    );
   router.get('/settings', async (_req, res) => res.json(summary(await load())));
   router.put('/settings', async (req, res) => {
     const input = inputSchema.safeParse(req.body);
@@ -201,7 +226,11 @@ export function aiRouter(
     }
   });
   router.post('/test', async (_req, res) => {
-    await completeAi(await configForRequest(), [{ role: 'user', content: 'Reply with OK only.' }], await getTransport());
+    await completeAi(
+      await configForRequest(),
+      [{ role: 'user', content: 'Reply with OK only.' }],
+      await getTransport(),
+    );
     res.json({ ok: true });
   });
   router.post('/assist', async (req, res) => {
@@ -260,22 +289,30 @@ export function aiRouter(
         hasCommit: Boolean(head),
         conflicts: files.filter((file) => file.conflicted).length,
       };
-      const text = await completeAi(config, [
-        {
-          role: 'system',
-          content: `Explain this read-only Git status in ${outputLanguage}. Null counts are unknown. Do not invent remote or file details. Return concise plain text.`,
-        },
-        { role: 'user', content: JSON.stringify(status) },
-      ], transport);
+      const text = await completeAi(
+        config,
+        [
+          {
+            role: 'system',
+            content: `Explain this read-only Git status in ${outputLanguage}. Null counts are unknown. Do not invent remote or file details. Return concise plain text.`,
+          },
+          { role: 'user', content: JSON.stringify(status) },
+        ],
+        transport,
+      );
       return res.json({ kind, text });
     }
-    const text = await completeAi(config, [
-      {
-        role: 'system',
-        content: `Draft a flowchart in ${outputLanguage}. Return only JSON: {"nodes":[{"title":"…","kind":"start|process|decision|end"}],"edges":[{"source":0,"target":1,"label":""}]}. Use zero-based node indices, 1–12 nodes and at most 24 edges. Titles and labels max 80 characters.`,
-      },
-      { role: 'user', content: task.data.prompt },
-    ], transport);
+    const text = await completeAi(
+      config,
+      [
+        {
+          role: 'system',
+          content: `Draft a flowchart in ${outputLanguage}. Return only JSON: {"nodes":[{"title":"…","kind":"start|process|decision|end"}],"edges":[{"source":0,"target":1,"label":""}]}. Use zero-based node indices, 1–12 nodes and at most 24 edges. Titles and labels max 80 characters.`,
+        },
+        { role: 'user', content: task.data.prompt },
+      ],
+      transport,
+    );
     const diagram = z
       .string()
       .transform((value, context) => {

@@ -24,6 +24,9 @@ describe('开发标准', () => {
       const tokens = Object.fromEntries(
         [...body.matchAll(/(--[\w-]+):\s*(#[\da-f]+);/g)].map((m) => [m[1], m[2]]),
       );
+      for (const [, name, target] of body.matchAll(/(--[\w-]+):\s*var\((--[\w-]+)\);/g)) {
+        tokens[name] = tokens[target];
+      }
       for (const [foreground, background] of [
         ['text', 'surface'],
         ['muted', 'surface'],
@@ -31,6 +34,11 @@ describe('开发标准', () => {
         ['muted', 'surface-raised'],
         ['accent', 'accent-soft'],
         ['on-accent', 'accent-solid'],
+        ['canvas-mode-text', 'canvas-mode-surface'],
+        ['canvas-mode-surface', 'canvas-mode-active'],
+        ['text-secondary', 'whiteboard-surface'],
+        ['assistant-header-text', 'assistant-header-bg'],
+        ['assistant-header-text', 'assistant-header-hover'],
         ['branch-selected-text', 'branch-selected-bg'],
         ['green', 'green-soft'],
         ['orange', 'orange-soft'],

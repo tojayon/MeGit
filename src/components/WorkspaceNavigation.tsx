@@ -99,9 +99,7 @@ export function WorkspaceNavigation({
         if (prior?.getClientRects().length) focusWithoutTooltip(prior);
         else
           focusWithoutTooltip(
-            document.querySelector<HTMLButtonElement>(
-              '.navigation-edge .navigation-toggle',
-            ),
+            document.querySelector<HTMLButtonElement>('.navigation-edge .navigation-toggle'),
           );
       });
     };
@@ -325,20 +323,20 @@ export function WorkspaceNavigation({
         </div>
         <div className="navigation-bottom">
           <div className="navigation-actions">
-          {!narrow && (
-            <div className="navigation-collapse-control">
-              <IconButton
-                label={t(collapsed ? 'nav.expand' : 'nav.collapse')}
-                placement="right"
-                className="navigation-toggle"
-                aria-expanded={!collapsed}
-                aria-controls="workspace-navigation"
-                onClick={() => updatePreferences({ navigationCollapsed: !collapsed })}
-              >
-                {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
-              </IconButton>
-            </div>
-          )}
+            {!narrow && (
+              <div className="navigation-collapse-control">
+                <IconButton
+                  label={t(collapsed ? 'nav.expand' : 'nav.collapse')}
+                  placement="right"
+                  className="navigation-toggle"
+                  aria-expanded={!collapsed}
+                  aria-controls="workspace-navigation"
+                  onClick={() => updatePreferences({ navigationCollapsed: !collapsed })}
+                >
+                  {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+                </IconButton>
+              </div>
+            )}
             {action(t('preferences.title'), <Palette size={20} />, onPreferences)}
             {action(t('nav.help'), <CircleHelp size={20} />, onHelp)}
             {action(t('settings.title'), <Settings2 size={20} />, onSettings)}

@@ -79,6 +79,80 @@ async function arrange(page: Page, label: string) {
   await page.getByRole('button', { name: label, exact: true }).click();
 }
 
+test('框选与平移常驻切换，其余白板工具按需显示且无底卡', async ({ page }) => {
+  await page.goto('/');
+  const tools = page.getByRole('group', { name: '白板工具', exact: true });
+  const modes = tools.locator('.canvas-mode-switch');
+  const extra = tools.locator('.canvas-hover-tools');
+  const selectMode = tools.getByRole('button', { name: '选择', exact: true });
+  const panMode = tools.getByRole('button', { name: '平移', exact: true });
+  const note = tools.getByRole('button', { name: '添加说明', exact: true });
+  await expect(selectMode).toBeVisible();
+  await expect(panMode).toBeVisible();
+  await expect(modes).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(selectMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(selectMode).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+  await expect(extra).toHaveCSS('opacity', '0');
+  await modes.hover();
+  await expect(extra).toHaveCSS('opacity', '1');
+  await expect(extra).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(extra).toHaveCSS('box-shadow', 'none');
+  await panMode.click();
+  await expect(panMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(selectMode).toHaveAttribute('aria-pressed', 'false');
+  await expect(panMode).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+
+  const exportButton = tools.getByRole('button', { name: '导出白板', exact: true });
+  await exportButton.click();
+  await page.mouse.move(5, 5);
+  await expect(exportButton).toHaveAttribute('aria-expanded', 'true');
+  await expect(extra).toHaveCSS('opacity', '1');
+  await page.keyboard.press('Escape');
+  await expect(exportButton).toHaveAttribute('aria-expanded', 'false');
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await expect(extra).toHaveCSS('opacity', '0');
+
+  await selectMode.focus();
+  await page.keyboard.press('Tab');
+  await expect(panMode).toBeFocused();
+  await expect(extra).toHaveCSS('opacity', '1');
+  await page.keyboard.press('Tab');
+  await expect(note).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: '说明详情' })).toBeVisible();
+});
+
+test('设计规范在明亮英文和触屏上复用白板开关', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({
+    baseURL,
+    hasTouch: true,
+    viewport: { width: 390, height: 720 },
+  });
+  try {
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'megit.preferences',
+        JSON.stringify({ version: 1, theme: 'light', language: 'en' }),
+      );
+    });
+    await page.goto('/design-system');
+    const tools = page.getByRole('group', { name: 'Board tools', exact: true });
+    const modes = tools.locator('.canvas-mode-switch');
+    const extra = tools.locator('.canvas-hover-tools');
+    const panMode = tools.getByRole('button', { name: 'Pan', exact: true });
+    await expect(modes).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(extra).toHaveCSS('opacity', '1');
+    await expect(extra).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(panMode).toHaveCSS('height', '44px');
+    await panMode.tap();
+    await expect(panMode).toHaveAttribute('aria-pressed', 'true');
+    await expect(panMode).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+  } finally {
+    await context.close();
+  }
+});
+
 test('选择、平移、独立锁定与说明历史；原生输入撤销不回退白板', async ({ page, request }) => {
   await seed(request);
   await page.setViewportSize({ width: 1520, height: 980 });

@@ -1,0 +1,104 @@
+import type { Locator } from '@playwright/test';
+import { test, expect } from './test';
+
+test('边缘悬浮入口与八向缩放、贴边、无输入聚焦框和明亮深色标题栏', async ({ page }) => {
+  await page.goto('/');
+  const launcher = page.getByRole('button', { name: 'AI 助手', exact: true });
+  await expect(launcher).toHaveClass(/assistant-launcher/);
+  const avatar = 'img[src="/brand/megit-assistant-avatar.svg"]';
+  await expect(launcher.locator(avatar)).toHaveJSProperty('naturalWidth', 64);
+  const expectStableLauncher = async (button: Locator, background: string) => {
+    await page.mouse.move(10, 10);
+    await expect(button).toHaveCSS('background-color', background);
+    await button.locator(avatar).hover();
+    await expect(button).toHaveCSS('background-color', background);
+    await expect(button.locator(avatar)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await page.mouse.move(10, 10);
+  };
+  await expectStableLauncher(launcher, 'rgb(29, 32, 36)');
+  const initial = (await launcher.boundingBox())!;
+  expect(initial.x + initial.width).toBe(1280);
+  await launcher.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await launcher.boundingBox())!.x).toBe(0);
+  const left = (await launcher.boundingBox())!;
+  await page.mouse.move(left.x + 28, left.y + 28);
+  await page.mouse.down();
+  await page.mouse.move(1220, 300, { steps: 8 });
+  await page.mouse.up();
+  await expect(launcher).toHaveAttribute('data-edge', 'right');
+  await expect(launcher).toHaveAttribute('aria-expanded', 'false');
+  await launcher.focus();
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowUp');
+  const savedY = (await launcher.boundingBox())!.y;
+  await launcher.click();
+  const panel = page.getByRole('complementary', { name: 'MeGit AI 助手' });
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('header').locator(avatar)).toBeVisible();
+  await expect(panel.locator('.assistant-welcome').locator(avatar)).toBeVisible();
+  await expect(launcher).toBeHidden();
+  await expect(panel.locator('[data-resize-edge]')).toHaveCount(8);
+  const input = panel.getByRole('textbox', { name: '给 AI 助手的消息' });
+  await input.focus();
+  await expect(input).toHaveCSS('outline-style', 'none');
+  await expect(input).toHaveCSS('box-shadow', 'none');
+  for (const [edge, dx, dy] of [
+    ['nw', -1500, -1000],
+    ['se', 1500, 1000],
+  ] as const) {
+    const box = (await panel.locator(`[data-resize-edge="${edge}"]`).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + dx, box.y + dy, { steps: 5 });
+    await page.mouse.up();
+  }
+  await expect
+    .poll(async () => await panel.boundingBox())
+    .toEqual({ x: 0, y: 0, width: 1280, height: 720 });
+  await page.reload();
+  await expect
+    .poll(async () => await panel.boundingBox())
+    .toEqual({ x: 0, y: 0, width: 1280, height: 720 });
+  await panel.getByRole('button', { name: '关闭 AI 助手', exact: true }).click();
+  await expect(launcher).toBeVisible();
+  expect((await launcher.boundingBox())!.y).toBe(savedY);
+  await page.getByRole('button', { name: '偏好设置', exact: true }).click();
+  await page.getByRole('button', { name: '明亮', exact: true }).click();
+  await page.getByLabel('界面语言').selectOption('en');
+  await page.keyboard.press('Escape');
+  const lightLauncher = page.getByRole('button', { name: 'AI assistant', exact: true });
+  await expectStableLauncher(lightLauncher, 'rgb(255, 255, 255)');
+  await lightLauncher.click();
+  const lightPanel = page.getByRole('complementary', { name: 'MeGit AI assistant' });
+  await expect(lightPanel.locator('header')).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+  await expect(lightPanel.locator('header')).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(lightPanel.locator('header').locator(avatar)).toHaveJSProperty('naturalWidth', 64);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(async () => await lightPanel.boundingBox())
+    .toEqual({ x: 0, y: 0, width: 390, height: 720 });
+  await lightPanel.locator('[data-resize-edge="s"]').focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Shift+ArrowDown');
+  await expect
+    .poll(async () => await lightPanel.boundingBox())
+    .toEqual({ x: 0, y: 0, width: 390, height: 844 });
+  await lightPanel.getByRole('textbox', { name: 'Message to the AI assistant' }).focus();
+  await page.screenshot({ path: '.megit/verification/assistant/window-light.png' });
+});
+
+test('规范页复用真实悬浮球和窗口，不请求工作区或 AI 服务', async ({ page }) => {
+  const requests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/')) requests.push(request.url());
+  });
+  await page.goto('/design-system');
+  await page.screenshot({ path: '.megit/verification/assistant/window-launcher.png' });
+  await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'MeGit AI 助手' });
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('[data-resize-edge]')).toHaveCount(8);
+  await page.screenshot({ path: '.megit/verification/assistant/window-dark.png' });
+  await panel.getByRole('button', { name: '关闭 AI 助手', exact: true }).click();
+  expect(requests).toEqual([]);
+});

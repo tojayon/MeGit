@@ -1,5 +1,18 @@
 // Stable transport codes; the browser translates them using its selected locale.
 export const errorMessages = {
+  assistantBoardInvalid: '流程图操作无效或目标不存在，请重新生成计划。',
+  assistantBoardChanged: '流程图已变化或尚未保存，请检查当前白板后重新生成计划。',
+  assistantBoardLocked: '白板布局已锁定，请先解锁再应用流程图修改。',
+  assistantOutput: 'AI 返回了不受支持或超出所选仓库范围的操作，请调整要求后重试。',
+  assistantScope:
+    '请选择当前流程图或 1–20 个仓库。每个仓库最多处理 2000 个改动文件、128 MiB 内容。',
+  assistantBoardCapacity: '当前流程图内容超过 200,000 字符，请精简后重试或取消流程图引用。',
+  assistantPlanMissing: '操作计划已不可用，请重新生成；已执行的操作不会重放。',
+  assistantPlanUsed: '这个计划已经开始执行或已结束，请查看执行结果。',
+  assistantPlanExpired: '操作计划已过期，请根据最新状态重新生成。',
+  assistantStateChanged: '仓库内容、分支或配置已变化，本仓库后续操作已停止，请重新生成计划。',
+  assistantCapacity: '操作计划过多，请稍后重试。',
+  assistantStopped: '已停止后续操作；已经完成的 Git 操作仍然保留。',
   unknown: '操作未完成，请重试。',
   connection: '无法连接 MeGit 本地服务。',
   aiInvalid: '请检查 AI 接口地址、模型及输入内容。',
@@ -79,7 +92,8 @@ export const errorMessages = {
   remoteGitHubOnly: '此操作仅适用于使用 GitHub.com HTTPS 地址的远端。',
   remoteGitHubBusy: '已有 GitHub 登录正在进行，请先完成或取消该登录。',
   remoteGitHubManagerMissing: '找不到 Git Credential Manager。请安装或启用它，再重试。',
-  remoteGitHubLoginFailed: '未能完成 GitHub 登录。请检查浏览器中的授权结果及本机凭据管理器，再重试。',
+  remoteGitHubLoginFailed:
+    '未能完成 GitHub 登录。请检查浏览器中的授权结果及本机凭据管理器，再重试。',
   remoteBranchExists: '目标远端分支已存在，未发布。',
   multiplePushDestinations: '此远端未配置唯一的推送地址，未发送任何提交。',
   noUpstream: '请先为当前分支配置跟踪分支。',

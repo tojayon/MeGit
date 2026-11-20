@@ -151,13 +151,30 @@ export function createApp(options: { dataDirectory: string }) {
       async (id) => readRepository((await repository(id)).path),
       async (id) => readCommitContext((await repository(id)).path),
       async () => withProxyFetch(await network.proxy()),
+      {
+        repository,
+        proxy: () => network.proxy(),
+        board: async (id) => {
+          const workspace = await store.read();
+          const board = workspace.boards.find((item) => item.id === id);
+          if (!board) throw new AppError('assistantBoardInvalid');
+          return {
+            board,
+            repositoryNames: Object.fromEntries(
+              workspace.repositories.map((repo) => [repo.id, repo.name]),
+            ),
+          };
+        },
+      },
     ),
   );
   app.get('/api/workspace', async (_req, res) => res.json(await store.read()));
   app.get('/api/network/settings', async (_req, res) => res.json(await network.read()));
   app.put('/api/network/settings', async (req, res) => res.json(await network.save(req.body)));
   app.post('/api/network/test', async (req, res) => {
-    const result = z.strictObject({ address: z.string().trim().min(1).max(2048) }).safeParse(req.body);
+    const result = z
+      .strictObject({ address: z.string().trim().min(1).max(2048) })
+      .safeParse(req.body);
     if (!result.success) throw new AppError('proxyInvalid');
     res.json(await testNetworkProxy(result.data.address));
   });
@@ -365,14 +382,20 @@ export function createApp(options: { dataDirectory: string }) {
   });
   app.post('/api/repositories/:id/remote-access', async (req, res) => {
     const repo = await repository(req.params.id);
-    const parsed = z.strictObject({
-      name: z.string().min(1).max(240),
-      action: z.enum(['read', 'githubLogin']),
-    }).safeParse(req.body);
+    const parsed = z
+      .strictObject({
+        name: z.string().min(1).max(240),
+        action: z.enum(['read', 'githubLogin']),
+      })
+      .safeParse(req.body);
     if (!parsed.success) throw new AppError('invalidAction');
     const { name, action } = parsed.data;
     const proxy = await network.proxy();
-    res.json(await (action === 'read' ? checkRemoteRead(repo.path, name, proxy) : loginRemoteGitHub(repo.path, name, proxy)));
+    res.json(
+      await (action === 'read'
+        ? checkRemoteRead(repo.path, name, proxy)
+        : loginRemoteGitHub(repo.path, name, proxy)),
+    );
   });
   app.post('/api/repositories/:id/actions', async (req, res) => {
     const repo = await repository(req.params.id);
@@ -381,7 +404,9 @@ export function createApp(options: { dataDirectory: string }) {
     const worktreeRef = z.string().refine(isCardRef).optional().safeParse(req.query.worktreeRef);
     if (!worktreeRef.success) throw new AppError('invalidRef');
     const action = parsed.data as GitAction;
-    const proxy = ['fetch', 'pull', 'push', 'publishBranch'].includes(action.type) ? await network.proxy() : undefined;
+    const proxy = ['fetch', 'pull', 'push', 'publishBranch'].includes(action.type)
+      ? await network.proxy()
+      : undefined;
     res.json({
       message: await performAction(repo.path, action, worktreeRef.data, proxy),
       state: await readRepository(repo.path),

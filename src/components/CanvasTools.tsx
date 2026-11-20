@@ -52,6 +52,44 @@ function CanvasMenu({
   );
 }
 
+export function CanvasToolStrip({
+  tool,
+  onTool,
+  children,
+}: {
+  tool: 'select' | 'pan';
+  onTool: (tool: 'select' | 'pan') => void;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="canvas-toolstrip" role="group" aria-label={t('tools.label')}>
+      <div className="canvas-tools canvas-mode-switch">
+        <Tooltip content={t('tools.selectHelp')}>
+          <button
+            type="button"
+            className="canvas-tool"
+            aria-label={t('tools.select')}
+            aria-pressed={tool === 'select'}
+            onClick={() => onTool('select')}
+          >
+            <MousePointer2 size={17} />
+          </button>
+        </Tooltip>
+        <IconButton
+          className="canvas-tool"
+          label={t('tools.pan')}
+          aria-pressed={tool === 'pan'}
+          onClick={() => onTool('pan')}
+        >
+          <Hand size={17} />
+        </IconButton>
+      </div>
+      <div className="canvas-tools canvas-hover-tools">{children}</div>
+    </div>
+  );
+}
+
 export function CanvasTools({
   tool,
   onTool,
@@ -122,28 +160,7 @@ export function CanvasTools({
   ] as const;
   return (
     <div className="canvas-editbar">
-      <div className="canvas-tools" role="group" aria-label={t('tools.label')}>
-        <Tooltip content={t('tools.selectHelp')}>
-          <button
-            className="canvas-tool"
-            aria-label={t('tools.select')}
-            aria-pressed={tool === 'select'}
-            onClick={() => onTool('select')}
-          >
-            <MousePointer2 size={17} />
-          </button>
-        </Tooltip>
-        <Tooltip content={t('tools.pan')}>
-          <button
-            className="canvas-tool"
-            aria-label={t('tools.pan')}
-            aria-pressed={tool === 'pan'}
-            onClick={() => onTool('pan')}
-          >
-            <Hand size={17} />
-          </button>
-        </Tooltip>
-        <i />
+      <CanvasToolStrip tool={tool} onTool={onTool}>
         <Tooltip content={t('tools.undoHelp')}>
           <button
             className="canvas-tool"
@@ -164,7 +181,6 @@ export function CanvasTools({
             <Redo2 size={17} />
           </button>
         </Tooltip>
-        <i />
         <Tooltip content={t('note.add')}>
           <button className="canvas-tool" aria-label={t('note.add')} onClick={onNote}>
             <StickyNote size={17} />
@@ -201,7 +217,7 @@ export function CanvasTools({
             </button>
           ))}
         </CanvasMenu>
-      </div>
+      </CanvasToolStrip>
       {(locked || focused || exporting || exportError) && (
         <div className="canvas-state" role={exportError ? 'alert' : 'status'}>
           {locked && (

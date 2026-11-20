@@ -1,5 +1,12 @@
 /* Shared geometry and typography. Colors belong to themes.css. */
 :root {
+  --assistant-resize-edge: 5px;
+  --assistant-resize-corner: 10px;
+  --assistant-launcher-radius: 28px;
+  --assistant-width: 424px;
+  --assistant-height: 660px;
+  --assistant-composer-height: 88px;
+  --assistant-picker-height: 280px;
   --repository-index-card-width: 300px;
   --settings-width: 760px;
   --settings-min-height: 420px;
@@ -14,6 +21,7 @@
   --commit-lens-row-height: 68px;
   --commit-compact-input-height: 72px;
   --worktree-dialog-height: 680px;
+  --assistant-repository-width: 900px;
   --edge-route-target: 28px;
   --edge-route-dot: 9px;
   --repository-ports-example-height: 280px;
@@ -67,7 +75,9 @@
   --navigation-gutter: var(--space-2);
   --navigation-bottom-inset: var(--space-3);
   --navigation-icon-size: 20px;
-  --navigation-action-inset: calc((var(--ribbon-width) - 2 * var(--navigation-gutter) - 1px - var(--navigation-icon-size)) / 2);
+  --navigation-action-inset: calc(
+    (var(--ribbon-width) - 2 * var(--navigation-gutter) - 1px - var(--navigation-icon-size)) / 2
+  );
   --inspector-width: 365px;
   --inspector-card-min: 320px;
   --branch-tree-menu-width: 240px;

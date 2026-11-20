@@ -4,6 +4,14 @@
 
 ## 用户行为
 
+AI 流程计划使用 `assistant.board` 双语资源，范围、操作、字段、审阅与保存说明同步翻译；步骤名称、原文和条件始终保持用户内容。新增 `assistantBoardInvalid/Changed/Locked/Capacity` 稳定错误，图形预览复用 surface、border、accent、edge-neutral 与 text，不新增色值。流程引用默认关闭，流程快捷问题显式开启；明暗、中英、390px与键盘确认使用同一组件，真实示例只修改内存。
+
+回复快捷引导使用 `assistantGuidance` 中英资源，并复用 `remoteActions` 与已有错误代码。仓库名称、分支和对话原文保持原样；按钮、工具提示和必要错误随语言切换。布局只使用语义颜色与共用间距、字号；窄屏自动换行，悬停／键盘提示和 Escape 沿用统一浮层。规范页的按钮和确认表单只更新本地示例，不调用助手或 Git 接口。
+
+AI助手入口与八向边缘调节使用assistant.launcherHelp、resizeEdges双语名称。明亮标题栏采用品牌深蓝，暗黑沿用header表面，通过assistant-header-bg／text／hover主题别名统一维护，不新增色值。输入焦点仅取消聊天输入的外围框，其他控件的键盘焦点保留。
+
+独立AI助手使用`assistant`中英资源，计划与步骤状态同步翻译，文件数量使用复数资源；仓库名、分支名、提交说明、对话原文不翻译。所有API错误登记稳定代码，原始诊断继续脱敏。助手、计划、输入、引用、键盘工具与本地规范示例复用两主题语义token，窗口尺寸放tokens.css。会话和位置属于标签页浏览状态，AI服务配置和密钥继续留在软件设置及服务数据目录。
+
 关系卡片、提交对比图使用现有 surface、text、accent、edge-neutral、orange、green，不新增色值或主题分支。提交胶囊详情复用 InfoPopover，新增角色和打开提示同步中英文；卡片与提交图移除重复详情，不新增颜色。完整引用、提交编号、作者和说明不翻译；角色、共同祖先、首次包含、边界、错误与加载动作使用 relation 稳定双语键。窄列上下／宽列并排由容器宽度决定，详细帮助复用 Tooltip 的焦点、500ms 悬停与 Escape 契约。
 
 仓库状态桥复用 edge-integration／edge-neutral、surface、green、orange 和 focus 语义色，无新增品牌色。圆形来源与汇入端口同时表达方向，整合状态始终以图标和文字显示。`relation.integrated/bridgeHelp/bridgeExample/bridgeLayout` 与布局选项同步中英；关系原名保留于详细提示、无障碍名称和详情。规范页使用真实组件检查布局、状态、两主题和键盘提示。

@@ -1,0 +1,43 @@
+.assistant-guidance-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.assistant-guidance {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  font-size: var(--text-caption);
+}
+.assistant-guidance > strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  overflow-wrap: anywhere;
+}
+.assistant-guidance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.assistant-guidance-actions > [role='status'] {
+  color: var(--muted);
+}
+.assistant-guidance .error-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.assistant-repository-dialog {
+  width: min(var(--assistant-repository-width), 95dvw);
+}
+.assistant-repository-dialog > .dialog-body {
+  display: flex;
+  min-height: 0;
+  height: min(var(--worktree-dialog-height), 80dvh);
+  padding: 0;
+}
+.assistant-repository-dialog .repository-inspector {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+}

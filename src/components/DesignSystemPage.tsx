@@ -5,6 +5,7 @@ import {
   CircleAlert,
   FolderGit2,
   Info,
+  Magnet,
   MoreHorizontal,
   Play,
   Plus,
@@ -35,11 +36,14 @@ import { PopupMenu } from './PopupMenu';
 import { NavigationExample } from './NavigationExample';
 import { WorkflowHeader } from './WorkflowHeader';
 import { FlowchartExample } from './FlowchartExample';
+import { CanvasToolStrip } from './CanvasTools';
 import { RepositoryPortsExample } from './RepositoryPortsExample';
 import { RelationBridgeExample } from './RelationBridgeExample';
 import { RelationPanelExample } from './RelationPanelExample';
 import { CommitComposer } from './CommitComposer';
 import { RepositoryCardExample } from './RepositoryCardExample';
+import { AssistantExample } from './AssistantExample';
+import { AssistantGuidanceExample } from './AssistantGuidanceExample';
 import { RemoteManagement, RemoteManagementCard } from './RemoteManagement';
 import type { BranchTreeData, Commit, RepoState, TreeBranch } from '../../shared/types';
 
@@ -125,10 +129,24 @@ function RemoteManagementExample() {
     <section className="design-card design-remote-management-example">
       <h2>{t('repository.manageRemotes')}</h2>
       <RemoteManagement count={4} onFetch={() => setChecked(false)} addDisabled onAdd={() => {}}>
-        <RemoteManagementCard name="origin" status={checked ? 'readable' : 'unchecked'} onCheck={() => setChecked(true)} />
-        <RemoteManagementCard name="community" status="readable" onCheck={() => {}} onLogin={() => {}} />
+        <RemoteManagementCard
+          name="origin"
+          status={checked ? 'readable' : 'unchecked'}
+          onCheck={() => setChecked(true)}
+        />
+        <RemoteManagementCard
+          name="community"
+          status="readable"
+          onCheck={() => {}}
+          onLogin={() => {}}
+        />
         <RemoteManagementCard name="mirror" status="checking" onCheck={() => {}} />
-        <RemoteManagementCard name="archive" status="failed" error={t('errors.remoteReadAuth')} onCheck={() => {}} />
+        <RemoteManagementCard
+          name="archive"
+          status="failed"
+          error={t('errors.remoteReadAuth')}
+          onCheck={() => {}}
+        />
       </RemoteManagement>
     </section>
   );
@@ -442,6 +460,27 @@ function LearningPreviewExample() {
   );
 }
 
+function CanvasToolsExample() {
+  const { t } = useTranslation();
+  const [tool, setTool] = useState<'select' | 'pan'>('select');
+  const [snapping, setSnapping] = useState(true);
+  return (
+    <div className="design-canvas-tools">
+      <CanvasToolStrip tool={tool} onTool={setTool}>
+        <IconButton
+          className="canvas-tool"
+          label={t('tools.snapping')}
+          help={t(snapping ? 'tools.snappingOn' : 'tools.snappingOff')}
+          aria-pressed={snapping}
+          onClick={() => setSnapping(!snapping)}
+        >
+          <Magnet size={17} />
+        </IconButton>
+      </CanvasToolStrip>
+    </div>
+  );
+}
+
 export function DesignSystemPage() {
   const { t } = useTranslation();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -659,6 +698,8 @@ export function DesignSystemPage() {
               </div>
             )}
           </section>
+          <AssistantExample />
+          <AssistantGuidanceExample />
           <section className="design-card design-empty-example">
             <FolderGit2 size={28} aria-hidden="true" />
             <h2>{t('designSystem.empty')}</h2>
@@ -669,6 +710,7 @@ export function DesignSystemPage() {
           </section>
           <section className="design-card">
             <h2>{t('designSystem.whiteboard')}</h2>
+            <CanvasToolsExample />
             <p className="design-caption">{t('designSystem.whiteboardRule')}</p>
             <p className="design-caption">{t('designSystem.acceptance')}</p>
           </section>

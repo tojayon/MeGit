@@ -59,7 +59,10 @@ test('configures the local AI service and adds a diagram only after confirmation
     await page.getByRole('button', { name: '测试连接' }).click();
     await expect(page.getByText('模型连接成功。')).toBeVisible();
     expect(requests[0]).not.toContain('isolated-test-key');
-    await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: '软件设置' })
+      .getByRole('button', { name: 'AI 助手', exact: true })
+      .click();
     await page.getByLabel('本次引用的仓库').selectOption('demo-repository');
     await page.getByRole('button', { name: '解读状态' }).click();
     await expect(page.getByText('One untracked change.')).toBeVisible();
@@ -78,7 +81,10 @@ test('configures the local AI service and adds a diagram only after confirmation
     await page.getByLabel('界面语言').selectOption('en');
     await page.getByRole('button', { name: 'Close Preferences' }).click();
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'AI assistant', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Settings', exact: true })
+      .getByRole('button', { name: 'AI assistant', exact: true })
+      .click();
     await page
       .getByLabel('Workflow description to send to the provider')
       .fill('Make a short workflow');

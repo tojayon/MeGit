@@ -42,34 +42,44 @@ async function run(
   remoteProbe = false,
   proxy?: GitProxy,
 ) {
-  const proxyArgs = proxy ? [
-    '-c', `http.proxy=${proxy.address}`,
-    '-c', 'http.followRedirects=false',
-    ...(proxy.url ? ['-c', `http.${proxy.url}.proxy=${proxy.address}`] : []),
-    ...proxy.routes.flatMap(([name, address]) => ['-c', `remote.${name}.proxy=${address}`]),
-  ] : [];
+  const proxyArgs = proxy
+    ? [
+        '-c',
+        `http.proxy=${proxy.address}`,
+        '-c',
+        'http.followRedirects=false',
+        ...(proxy.url ? ['-c', `http.${proxy.url}.proxy=${proxy.address}`] : []),
+        ...proxy.routes.flatMap(([name, address]) => ['-c', `remote.${name}.proxy=${address}`]),
+      ]
+    : [];
   const probeArgs = remoteProbe ? ['-c', 'http.lowSpeedLimit=1', '-c', 'http.lowSpeedTime=10'] : [];
   try {
-    const result = await execute('git', [...gitExecutionOptions, ...proxyArgs, ...probeArgs, ...args], {
-      cwd: repo,
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: remoteProbe ? 15_000 : network ? 120_000 : 20_000,
-      maxBuffer: outputLimit ? outputLimit * 4 + 4096 : 8 * 1024 * 1024,
-      env: {
-        ...(proxy ? proxyEnvironment(proxy.address) : process.env),
-        GIT_TERMINAL_PROMPT: '0',
-        GCM_INTERACTIVE: 'never',
-        GIT_OPTIONAL_LOCKS: '0',
-        LC_ALL: 'C',
-        LANG: 'C',
-        ...(proxy || remoteProbe ? { GIT_ALLOW_PROTOCOL: 'file:git:http:https:ssh' } : {}),
-        ...(remoteProbe ? {
-          GIT_ASKPASS: '',
-          SSH_ASKPASS_REQUIRE: 'never',
-        } : {}),
+    const result = await execute(
+      'git',
+      [...gitExecutionOptions, ...proxyArgs, ...probeArgs, ...args],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: remoteProbe ? 15_000 : network ? 120_000 : 20_000,
+        maxBuffer: outputLimit ? outputLimit * 4 + 4096 : 8 * 1024 * 1024,
+        env: {
+          ...(proxy ? proxyEnvironment(proxy.address) : process.env),
+          GIT_TERMINAL_PROMPT: '0',
+          GCM_INTERACTIVE: 'never',
+          GIT_OPTIONAL_LOCKS: '0',
+          LC_ALL: 'C',
+          LANG: 'C',
+          ...(proxy || remoteProbe ? { GIT_ALLOW_PROTOCOL: 'file:git:http:https:ssh' } : {}),
+          ...(remoteProbe
+            ? {
+                GIT_ASKPASS: '',
+                SSH_ASKPASS_REQUIRE: 'never',
+              }
+            : {}),
+        },
       },
-    });
+    );
     return outputLimit ? { ...result, stdout: result.stdout.slice(0, outputLimit + 1) } : result;
   } catch (error) {
     const result = error as Error & {
@@ -100,20 +110,40 @@ async function run(
 
 export { run as runGit };
 
-export function routeGitAddress(repo: string, name: string | undefined, address: string, proxy?: string) {
+export function routeGitAddress(
+  repo: string,
+  name: string | undefined,
+  address: string,
+  proxy?: string,
+) {
   if (!proxy) return undefined;
   const route = gitProxyRoute(repo, address, proxy);
-  return { address: route, routes: name ? [[name, route]] : [],
+  return {
+    address: route,
+    routes: name ? [[name, route]] : [],
     ...(!name && /^https?:\/\//i.test(address) ? { url: address } : {}),
   } satisfies GitProxy;
 }
 
-async function readProxyRoutes(repo: string, names: string[], proxy?: string, push = false): Promise<GitProxy | undefined> {
+async function readProxyRoutes(
+  repo: string,
+  names: string[],
+  proxy?: string,
+  push = false,
+): Promise<GitProxy | undefined> {
   if (!proxy) return;
-  const routes = await Promise.all(names.map(async (name): Promise<[string, string]> => {
-    const { stdout } = await run(repo, ['remote', 'get-url', ...(push ? ['--push'] : []), '--', name]);
-    return [name, gitProxyRoute(repo, stdout.trim(), proxy)];
-  }));
+  const routes = await Promise.all(
+    names.map(async (name): Promise<[string, string]> => {
+      const { stdout } = await run(repo, [
+        'remote',
+        'get-url',
+        ...(push ? ['--push'] : []),
+        '--',
+        name,
+      ]);
+      return [name, gitProxyRoute(repo, stdout.trim(), proxy)];
+    }),
+  );
   return { address: routes.some(([, address]) => !!address) ? proxy : '', routes };
 }
 
@@ -137,9 +167,16 @@ export async function resolveRepository(input: string): Promise<string> {
   return (await realpath(root)).replaceAll('\\', '/');
 }
 
-export async function readRepository(repo: string): Promise<RepoState> {
+export async function readRepository(repo: string, expandUntracked = false): Promise<RepoState> {
   const [raw, refResult, remoteResult, fetchFile] = await Promise.all([
-    run(repo, statusArguments),
+    run(
+      repo,
+      expandUntracked
+        ? statusArguments.map((arg) =>
+            arg === '--untracked-files=normal' ? '--untracked-files=all' : arg,
+          )
+        : statusArguments,
+    ),
     run(repo, [
       'for-each-ref',
       '--format=%(refname)%09%(HEAD)%09%(objectname)%09%(if)%(worktreepath)%(then)1%(else)0%(end)%09%(symref)',
@@ -502,12 +539,14 @@ export async function performAction(
   action: GitAction,
   worktreeRef?: string,
   proxy?: string,
+  guard?: { before: () => Promise<void>; after: () => Promise<void> },
 ): Promise<string> {
   const previous = queues.get(repo) || Promise.resolve();
   const next = previous
     .catch(() => {})
     .then(async () => {
-      const state = await readRepository(repo);
+      await guard?.before();
+      const state = await readRepository(repo, !!guard);
       if (worktreeRef && !cardUsesWorktree(worktreeRef, state))
         throw new AppError('branchStateChanged', 409);
       let args: string[];
@@ -531,7 +570,11 @@ export async function performAction(
       } else if (action.type === 'fetch') {
         if (!state.remotes.length) throw new AppError('noRemote');
         args = actionArguments(action, state)!;
-      } else if (action.type === 'addRemote' || action.type === 'publishBranch' || action.type === 'setTracking') {
+      } else if (
+        action.type === 'addRemote' ||
+        action.type === 'publishBranch' ||
+        action.type === 'setTracking'
+      ) {
         args = await remoteActionArguments(repo, state, action, proxy);
       } else {
         if (state.detached || !state.trackingConfigured) throw new AppError('noUpstream');
@@ -543,27 +586,56 @@ export async function performAction(
         } else {
           const { remote, ref } = state.pushTarget;
           const live = await remoteBranchTip(repo, remote, ref, proxy);
-          if (!state.head || !live || live !== state.upstreamHead) throw new AppError('pushNeedsFetch', 409);
-          const check = await run(repo, ['merge-base', '--is-ancestor', live, state.head], false, true);
+          if (!state.head || !live || live !== state.upstreamHead)
+            throw new AppError('pushNeedsFetch', 409);
+          const check = await run(
+            repo,
+            ['merge-base', '--is-ancestor', live, state.head],
+            false,
+            true,
+          );
           if ('failed' in check) throw new AppError('pushNonFastForward', 409);
           args = actionArguments(action, state)!;
         }
       }
       const pushing = action.type === 'publishBranch' || action.type === 'push';
-      const targets = action.type === 'fetch' ? state.remotes
-        : action.type === 'publishBranch' ? [action.remote]
-          : (action.type === 'pull' || action.type === 'push') && state.pushTarget ? [state.pushTarget.remote] : [];
-      const options = targets.length ? await readProxyRoutes(repo, targets, proxy, pushing) : undefined;
-      const result = await run(repo, args, pushing || ['fetch', 'pull'].includes(action.type), pushing, undefined, false, options);
+      const targets =
+        action.type === 'fetch'
+          ? state.remotes
+          : action.type === 'publishBranch'
+            ? [action.remote]
+            : (action.type === 'pull' || action.type === 'push') && state.pushTarget
+              ? [state.pushTarget.remote]
+              : [];
+      const options = targets.length
+        ? await readProxyRoutes(repo, targets, proxy, pushing)
+        : undefined;
+      const result = await run(
+        repo,
+        args,
+        pushing || ['fetch', 'pull'].includes(action.type),
+        pushing,
+        undefined,
+        false,
+        options,
+      );
       if (pushing) {
         const outcome = result.stdout.split(/\r?\n/);
         if (outcome.some((line) => line.startsWith('!\t') && line.endsWith('(stale info)')))
-          throw new AppError(action.type === 'publishBranch' ? 'remoteBranchExists' : 'pushNeedsFetch', 409);
+          throw new AppError(
+            action.type === 'publishBranch' ? 'remoteBranchExists' : 'pushNeedsFetch',
+            409,
+          );
         if ('failed' in result)
-          throw new AppError('gitFailed', 422, safeMessage(new Error((result.stderr + result.stdout).trim())));
+          throw new AppError(
+            'gitFailed',
+            422,
+            safeMessage(new Error((result.stderr + result.stdout).trim())),
+          );
         if (action.type === 'publishBranch' && !outcome.some((line) => line.startsWith('*\t')))
           throw new AppError('remoteBranchExists', 409);
       }
+      await guard?.after();
       return safeMessage(new Error((result.stdout + result.stderr).trim() || 'OK'));
     });
   queues.set(repo, next);
@@ -575,47 +647,87 @@ export async function performAction(
 }
 
 function requireCurrentBranch(state: RepoState, expected: BranchExpectation) {
-  if (state.branch !== expected.branch || state.head !== expected.head || state.detached !== expected.detached || state.detached || !state.branch)
+  if (
+    state.branch !== expected.branch ||
+    state.head !== expected.head ||
+    state.detached !== expected.detached ||
+    state.detached ||
+    !state.branch
+  )
     throw new AppError('branchStateChanged', 409);
   if (state.operation) throw new AppError('branchOperation', 409);
   if (!state.head) throw new AppError('branchNoCommits', 409);
 }
 
 async function remoteBranchTip(repo: string, remote: string, ref: string, proxy?: string) {
-  const destinations = (await run(repo, ['remote', 'get-url', '--push', '--all', '--', remote]))
-    .stdout.trim().split(/\r?\n/).filter(Boolean);
+  const destinations = (
+    await run(repo, ['remote', 'get-url', '--push', '--all', '--', remote])
+  ).stdout
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean);
   if (destinations.length !== 1) throw new AppError('multiplePushDestinations', 409);
   const options = routeGitAddress(repo, undefined, destinations[0], proxy);
-  const { stdout } = await run(repo, ['ls-remote', '--refs', '--', destinations[0], ref], true, false, undefined, !!proxy, options);
-  return stdout.split(/\r?\n/).map((line) => line.split('\t')).find(([, name]) => name === ref)?.[0] ?? null;
+  const { stdout } = await run(
+    repo,
+    ['ls-remote', '--refs', '--', destinations[0], ref],
+    true,
+    false,
+    undefined,
+    !!proxy,
+    options,
+  );
+  return (
+    stdout
+      .split(/\r?\n/)
+      .map((line) => line.split('\t'))
+      .find(([, name]) => name === ref)?.[0] ?? null
+  );
 }
 
-async function remoteActionArguments(repo: string, state: RepoState, action: RemoteAction, proxy?: string) {
+async function remoteActionArguments(
+  repo: string,
+  state: RepoState,
+  action: RemoteAction,
+  proxy?: string,
+) {
   if (action.type === 'addRemote') {
     if (!isBranchName(action.name) || action.name.includes('/')) throw new AppError('remoteName');
     if (state.remotes.includes(action.name)) throw new AppError('remoteExists', 409);
     const destination = action.destination;
     if (httpRemoteHasCredentials(destination)) throw new AppError('remoteDestinationCredentials');
     if (
-      destination !== destination.trim() || /\p{Cc}/u.test(destination) ||
-      !(/^(?:https?|ssh|git|file):\/\/[^\s]/i.test(destination) ||
+      destination !== destination.trim() ||
+      /\p{Cc}/u.test(destination) ||
+      !(
+        /^(?:https?|ssh|git|file):\/\/[^\s]/i.test(destination) ||
         (path.isAbsolute(destination) && !destination.startsWith('//')) ||
-        /^(?:[\w.-]+@)?[\w.-]+:(?![:/])\S/u.test(destination))
-    ) throw new AppError('remoteDestination');
+        /^(?:[\w.-]+@)?[\w.-]+:(?![:/])\S/u.test(destination)
+      )
+    )
+      throw new AppError('remoteDestination');
   } else {
     requireCurrentBranch(state, action.expected);
     if (action.type === 'publishBranch') {
       if (state.trackingConfigured) throw new AppError('upstreamAlreadySet', 409);
-      if (!state.remotes.includes(action.remote) || action.remote.startsWith('-') || action.remote === '.')
+      if (
+        !state.remotes.includes(action.remote) ||
+        action.remote.startsWith('-') ||
+        action.remote === '.'
+      )
         throw new AppError('remoteNotConfigured', 409);
       const ref = `refs/heads/${action.name}`;
       if (!isBranchName(action.name) || (await optional(repo, ['check-ref-format', ref])) === null)
         throw new AppError('branchName');
-      if (await remoteBranchTip(repo, action.remote, ref, proxy)) throw new AppError('remoteBranchExists', 409);
+      if (await remoteBranchTip(repo, action.remote, ref, proxy))
+        throw new AppError('remoteBranchExists', 409);
     } else {
       if (state.pushTarget) throw new AppError('upstreamAlreadySet', 409);
-      const target = state.branches.find((branch) => branch.remote && `refs/remotes/${branch.name}` === action.targetRef);
-      if (!target || target.hash !== action.targetHash) throw new AppError('branchTargetChanged', 409);
+      const target = state.branches.find(
+        (branch) => branch.remote && `refs/remotes/${branch.name}` === action.targetRef,
+      );
+      if (!target || target.hash !== action.targetHash)
+        throw new AppError('branchTargetChanged', 409);
     }
   }
   return actionArguments(action, state)!;

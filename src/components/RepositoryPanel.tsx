@@ -355,7 +355,7 @@ function FileGroup({
   );
 }
 
-function RepositoryToolsPanel({
+export function RepositoryToolsPanel({
   repo,
   cardRef,
   viewKey,

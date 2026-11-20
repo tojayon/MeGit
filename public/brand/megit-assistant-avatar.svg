@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">MeGit AI</title>
+  <path fill="#01357C" d="M29 22v-1q1.5 0 1.5-1.5v-5.7q0-1.6-1.25-2.1L32 9l2.75 2.7q-1.25.5-1.25 2.1v.65q0 1.2 1.12.7l3.2-1.44q.96-.43 1.58-1.11L42 13.5l-1.06 2.72q-.96-.28-1.9.14l-4.42 1.99q-1.12.5-1.12 1.15Q33.5 21 35 21v1Z"/>
+  <circle cx="32" cy="9" r="4" fill="#86D21F"/>
+  <circle cx="42" cy="13.5" r="3" fill="#00A9F3"/>
+  <path fill="#01357C" d="M25 21H39C47 21 59 21 59 38.5S47 56 39 56H25C17 56 5 56 5 38.5S17 21 25 21Z"/>
+  <path fill="#FFFFFF" d="M26.7 31.3C30.3 34 30.5 36.4 33.85 36.4C35.95 36.4 36.69 35.48 37.62 34.24A7.1 7.1 0 1 1 37.62 42.76C36.69 41.52 35.95 40.6 33.85 40.6C30.5 40.6 30.3 43 26.7 45.7A9 9 0 1 1 26.7 31.3Z"/>
+  <circle cx="21.3" cy="38.5" r="3.5" fill="#01357C"/>
+  <path d="M39.95 39a3.35 2.9 0 0 1 6.7 0" fill="none" stroke="#01357C" stroke-width="2.65" stroke-linecap="round"/>
+</svg>

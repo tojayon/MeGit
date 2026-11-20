@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Circle, CircleAlert, CircleCheck, Cloud, CloudDownload, KeyRound, LoaderCircle, Plus, ShieldCheck } from 'lucide-react';
+import { Circle, CircleAlert, CircleCheck, Cloud, CloudDownload, KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { Button } from './Button';
 import { InfoPopover } from './InfoPopover';
 import { Tooltip } from './Tooltip';
+import { RemoteActionButton } from './RemoteActionButton';
 
 export function RemoteManagement({
   count,
@@ -59,9 +60,7 @@ export function RemoteManagement({
       )}
       <footer className="remote-management-footer">
         {fetchHelp ? <Tooltip content={fetchHelp} detailed>{fetchButton}</Tooltip> : fetchButton}
-        <Button size="compact" variant="primary" icon={<Plus size={16} />} disabled={addDisabled} onClick={onAdd}>
-          {t('remoteActions.addRemoteOpen')}
-        </Button>
+        <RemoteActionButton type="addRemote" disabled={addDisabled} onClick={onAdd} />
       </footer>
     </InfoPopover>
   );

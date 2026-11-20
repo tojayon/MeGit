@@ -36,7 +36,9 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   expect(badgeBox.x).toBeGreaterThan(logoBox.x + logoBox.width);
   expect(badgeBox.y + badgeBox.height).toBeCloseTo(logoBox.y + logoBox.height, 1);
   expect(badgeBox.x + badgeBox.width).toBeCloseTo(brandBox.x + brandBox.width - 8, 1);
-  const help = navigation.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true });
+  const help = navigation
+    .locator('.navigation-bottom')
+    .getByRole('button', { name: '使用帮助', exact: true });
   await expect(help).toHaveCount(1);
   await expect(brandHeader.getByRole('button', { name: '使用帮助', exact: true })).toHaveCount(0);
   await help.focus();
@@ -141,7 +143,9 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await navigation.getByRole('button', { name: 'Expand workflow navigation' }).click();
   await expect(navigation).toHaveAttribute('data-collapsed', 'false');
   await expect(navigation.locator('.workspace-logo')).toBeVisible();
-  await expect(navigation.locator('.navigation-bottom').getByRole('button', { name: 'Help', exact: true })).toBeVisible();
+  await expect(
+    navigation.locator('.navigation-bottom').getByRole('button', { name: 'Help', exact: true }),
+  ).toBeVisible();
   await expect(navigation.getByRole('button', { name: 'Help', exact: true })).toHaveCount(1);
   await expect(brandHeader.getByLabel(`Version ${version}`, { exact: true })).toHaveText(
     `v${version}`,
@@ -200,7 +204,9 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
   await expect(navigation.getByRole('link', { name: 'MeGit 首页' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(close).toBeFocused();
-  const help = navigation.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true });
+  const help = navigation
+    .locator('.navigation-bottom')
+    .getByRole('button', { name: '使用帮助', exact: true });
   await help.focus();
   await expect(page.getByRole('tooltip', { name: '使用帮助', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -265,7 +271,9 @@ test('画布两侧控件在桌面、折叠和触控窄屏保持同一尺寸与�
       await expect(
         page.locator('.navigation-brand').getByLabel(`版本 ${version}`, { exact: true }),
       ).toBeVisible();
-      await expect(page.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true })).toBeVisible();
+      await expect(
+        page.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true }),
+      ).toBeVisible();
       await page.getByRole('button', { name: '关闭流程导航', exact: true }).click();
       await page.setViewportSize({ width: 320, height: 700 });
       await expectControlsAligned(page);

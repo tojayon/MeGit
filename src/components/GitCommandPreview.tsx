@@ -3,7 +3,7 @@ import { formatGitCommand } from '../../shared/git-commands';
 
 export type GitCommandPreviewData = {
   commands?: (string[] | null)[];
-  when?: 'now' | 'confirm' | 'name' | 'read';
+  when?: 'now' | 'confirm' | 'name' | 'read' | 'plan';
   empty?: 'pending' | 'clipboard' | 'view' | 'untracked';
   scope?: 'repository' | 'workspace';
 };

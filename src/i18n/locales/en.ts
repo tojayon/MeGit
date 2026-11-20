@@ -11,6 +11,7 @@ const en = {
     invalid: 'Unreadable view records were ignored. Board data is unchanged.',
   },
   gitCommands: {
+    plan: 'Runs in the corresponding repository after you confirm this plan. New commit IDs are determined after the commit succeeds.',
     title: 'Git command preview',
     workspaceScope:
       'PowerShell · Checks local state in each registered repository without fetching remotes.',
@@ -118,6 +119,169 @@ const en = {
     indexHelp: 'A repository can belong to multiple workflows.',
     indexEmpty: 'No repositories registered yet.',
   },
+  assistantGuidance: {
+    title: 'Reply shortcuts',
+    forRepository: 'Actions for {{name}}',
+    checking: 'Checking repository state…',
+    branches: 'Open branch map',
+    fetch: 'Fetch remotes',
+    worktree: 'Open worktree',
+    remotes: 'Manage remotes',
+    updated: 'Continue using the latest state.',
+    continue: 'Continue',
+    continuePrompt:
+      'Check the latest state of these repositories and continue with the previous issue. Explain the next plan first.',
+    refresh: 'Refresh state',
+    prepareAgain: 'Prepare a new plan',
+    continueHelp:
+      'Fill a continuation request into the chat draft, keeping any existing draft. Review and send it yourself; no Git action runs automatically.',
+    refreshHelp:
+      'Read local repository state again without fetching remotes or executing the previous plan.',
+    help: {
+      worktree:
+        'Open the existing worktree to inspect conflicts, stage changes, or prepare a commit. No files are changed or committed automatically.',
+      branches:
+        'Open the existing branch map to inspect the current branch, divergence, or detached HEAD before choosing an action.',
+      remotes:
+        'Open remote management to check access and use the existing GitHub sign-in when available.',
+    },
+  },
+  assistant: {
+    board: {
+      plan: 'Flowchart change plan',
+      scope: 'Current flowchart: {{name}}',
+      remove: 'Remove flowchart reference',
+      apply: 'Apply to whiteboard',
+      preview: 'Flowchart after changes',
+      details: 'View exact changes',
+      applied:
+        'Applied to the whiteboard. Use whiteboard undo to restore; saving status is shown at the bottom of the page.',
+      discarded: 'This change plan was discarded.',
+      review:
+        'Apply the entire plan with one undo step. Removing a step also removes its flow connections. Step commands are not executed and Git repositories are not modified.',
+      waitSave: 'Waiting for the whiteboard to finish saving.',
+      horizontal: 'Left to right',
+      vertical: 'Top to bottom',
+      fields: {
+        name: 'Flowchart name',
+        description: 'Flowchart description',
+        title: 'Name',
+        text: 'Details',
+        summary: 'Summary',
+        kind: 'Shape',
+        source: 'Source',
+        target: 'Target',
+        label: 'Condition',
+        position: 'Position',
+      },
+      operations: {
+        addStep: 'Add step',
+        updateStep: 'Edit step',
+        removeStep: 'Remove step and its connections',
+        connect: 'Add flow connection',
+        updateConnection: 'Edit flow connection',
+        removeConnection: 'Remove flow connection',
+        moveElement: 'Move element',
+        arrange: 'Arrange layout',
+        updateBoard: 'Update flowchart name or description',
+      },
+    },
+    deleteConversation: 'Delete conversation {{name}}',
+    open: 'AI assistant',
+    title: 'MeGit AI assistant',
+    name: 'MeGit assistant',
+    close: 'Close AI assistant',
+    move: 'Move AI assistant window',
+    resize: 'Resize AI assistant window',
+    launcherHelp:
+      'Open the AI assistant. Drag to snap to a screen edge; use arrow keys to reposition.',
+    resizeEdges: {
+      n: 'Resize AI assistant top edge',
+      e: 'Resize AI assistant right edge',
+      s: 'Resize AI assistant bottom edge',
+      w: 'Resize AI assistant left edge',
+      ne: 'Resize AI assistant top right corner',
+      nw: 'Resize AI assistant top left corner',
+      se: 'Resize AI assistant bottom right corner',
+      sw: 'Resize AI assistant bottom left corner',
+    },
+    history: 'Conversation history',
+    newConversation: 'New conversation',
+    messages: 'Assistant messages',
+    prompt: 'Message to the AI assistant',
+    placeholder: 'Describe repository actions or flowchart changes…',
+    welcome: 'Move your repositories forward together',
+    welcomeHelp:
+      'Reference repositories or the current flowchart and describe your goal. Review and confirm changes before applying them.',
+    quick: {
+      inspect: 'Check repositories',
+      commit: 'Prepare commits',
+      push: 'Push to remotes',
+      explainFlow: 'Explain this flow',
+      createFlow: 'Add a testing flow',
+      arrangeFlow: 'Arrange the flow',
+    },
+    prompts: {
+      explainFlow:
+        'Explain the current flowchart, its steps, conditions and possible gaps without changing it.',
+      createFlow:
+        'Add testing steps with pass and fail branches to the current flowchart. Preserve existing content and propose a plan first.',
+      arrangeFlow:
+        'Arrange the current flowchart from top to bottom, preserving all content and connections. Show a preview first.',
+      inspect: 'Check branch and sync status of the selected repositories and suggest next steps.',
+      commit:
+        'Prepare a commit plan for the selected repositories. Check staged changes first and ask me for commit messages if needed.',
+      push: 'Prepare a plan to push existing commits in the selected repositories to their configured upstream branches.',
+    },
+    loadingPlan: 'Checking the operation plan…',
+    thinking: 'Analyzing references and preparing a response…',
+    latest: 'Jump to latest',
+    scope: 'Select references',
+    dataScope: 'Data scope and capabilities',
+    includeDiff: 'Allow staged differences for this request',
+    disclosure:
+      'Sends selected repository names, branches, status and recent conversation. Referencing the current flowchart also sends its name, description, full step text, positions, groups and connections, including content you entered. Registered repository paths are not automatically attached. Opting in sends up to 48,000 characters of staged differences in total, including filenames and code. Confirmed plans support fetch, stage, commit, push and flowchart changes. Flowchart changes use one undo step and never execute step commands. Git actions and flowchart edits are reviewed separately.',
+    removeRepository: 'Remove {{name}} from references',
+    missingRepository: 'Removed repository',
+    noModel: 'No model configured',
+    configure: 'Configure AI service',
+    send: 'Send message',
+    stopGeneration: 'Stop generation',
+    selectScope: 'Reference the current flowchart or select repositories first.',
+    historyFull: 'This conversation is full. Start a new conversation.',
+    plan: 'Operation plan',
+    execute: 'Confirm and execute plan',
+    discard: 'Discard plan',
+    stopActions: 'Stop remaining actions',
+    review:
+      'Review branches, scope and commit messages. Confirming executes real Git operations; pushing writes to the remote. Plans expire after 15 minutes.',
+    partial:
+      'Completed operations are retained. Remaining steps for failed repositories were skipped. Generate a new plan from the current state.',
+    files_one: '{{count}} file',
+    files_other: '{{count}} files',
+    target: 'Target: {{target}}',
+    operations: {
+      fetch: 'Fetch remote status',
+      stageAll: 'Stage all changes',
+      commit: 'Create commit',
+      push: 'Push to upstream',
+    },
+    planStatus: {
+      ready: 'Awaiting confirmation',
+      running: 'Running',
+      completed: 'Execution complete',
+      failed: 'Some actions failed',
+      stopped: 'Stopped',
+    },
+    stepStatus: {
+      pending: 'Pending',
+      running: 'Running',
+      succeeded: 'Completed',
+      failed: 'Failed',
+      skipped: 'Skipped',
+    },
+    example: 'Multi-repository AI assistant',
+  },
   ai: {
     title: 'MeGit AI Assistant',
     service: 'AI service',
@@ -174,7 +338,8 @@ const en = {
     proxyEnabled: 'Enable proxy for MeGit',
     proxyAddress: 'Proxy address',
     proxyExample: 'Example: http://127.0.0.1:7890',
-    proxyHelp: 'Only MeGit’s external HTTP/HTTPS requests use the proxy. Local services connect directly. Browser pages use the browser’s own settings.',
+    proxyHelp:
+      'Only MeGit’s external HTTP/HTTPS requests use the proxy. Local services connect directly. Browser pages use the browser’s own settings.',
     proxyTest: 'Test proxy',
     proxyTestBeforeSave: 'Run a successful connection test before enabling or changing your proxy.',
     proxySave: 'Save proxy settings',
@@ -442,7 +607,8 @@ const en = {
   remoteActions: {
     addRemote: 'Add remote',
     addRemoteOpen: 'Add remote…',
-    addRemoteHelp: 'Saves the remote address without checking or fetching. Do not include a password or token.',
+    addRemoteHelp:
+      'Saves the remote address without checking or fetching. Do not include a password or token.',
     count_one: '{{count}} remote',
     count_other: '{{count}} remotes',
     checkRead: 'Check read access',
@@ -456,23 +622,28 @@ const en = {
     githubLogin: 'Sign in to GitHub',
     githubLoginOpen: 'Sign in to GitHub…',
     githubAuthorize: 'Authorize in browser',
-    githubHelp: 'Git Credential Manager opens GitHub. Confirm your account in the browser. MeGit does not read or store tokens. Signing in does not fetch branches or check repository permissions.',
+    githubHelp:
+      'Git Credential Manager opens GitHub. Confirm your account in the browser. MeGit does not read or store tokens. Signing in does not fetch branches or check repository permissions.',
     githubWaiting: 'Waiting for GitHub authorization in your browser…',
-    githubCompleted: 'Git Credential Manager completed the sign-in. Return to Manage remotes to check read access manually.',
+    githubCompleted:
+      'Git Credential Manager completed the sign-in. Return to Manage remotes to check read access manually.',
     githubDone: 'Done',
     publishBranch: 'Publish branch',
     publishBranchOpen: 'Publish branch…',
-    publishBranchHelp: 'Publishes existing local commits to a new remote branch. Uncommitted changes are not included, and no upstream is set.',
+    publishBranchHelp:
+      'Publishes existing local commits to a new remote branch. Uncommitted changes are not included, and no upstream is set.',
     setTracking: 'Set upstream',
     setTrackingOpen: 'Set upstream…',
-    setTrackingHelp: 'Links the current local branch to the selected remote branch without fetching, pulling, or pushing.',
+    setTrackingHelp:
+      'Links the current local branch to the selected remote branch without fetching, pulling, or pushing.',
     localBranch: 'Local branch',
     remoteName: 'Remote name',
     remoteBranch: 'Remote branch',
     destination: 'Remote address or local repository path',
     chooseRemote: 'Select a remote',
     chooseBranch: 'Select a remote branch',
-    noTrackingTargets: 'No remote branches are available. Close this dialog and fetch from Manage remotes.',
+    noTrackingTargets:
+      'No remote branches are available. Close this dialog and fetch from Manage remotes.',
   },
   actions: {
     addRemote: '{{name}}: Added remote {{target}} without fetching',
@@ -772,6 +943,24 @@ const en = {
       'Check dark and light themes, Chinese and English, keyboard use, narrow screens, loading, errors and long content with every change.',
   },
   errors: {
+    assistantBoardInvalid: 'The flowchart operation or target is invalid. Generate a new plan.',
+    assistantBoardChanged:
+      'The flowchart changed or has unsaved changes. Review the current board and generate a new plan.',
+    assistantBoardLocked: 'The board layout is locked. Unlock it before applying flowchart edits.',
+    assistantOutput:
+      'The AI proposed unsupported operations or repositories outside the selected scope. Adjust your request and try again.',
+    assistantScope:
+      'Select the current flowchart or 1–20 repositories. Each repository supports up to 2,000 changed files and 128 MiB of content.',
+    assistantBoardCapacity:
+      'The current flowchart exceeds 200,000 characters. Reduce its content or remove the flowchart reference.',
+    assistantPlanMissing:
+      'This plan is no longer available. Generate a new plan; completed actions will not be replayed.',
+    assistantPlanUsed: 'This plan has already started or finished. Check its results.',
+    assistantPlanExpired: 'This plan has expired. Generate a new plan from the current state.',
+    assistantStateChanged:
+      'Repository content, branch or configuration changed. Remaining actions for this repository stopped. Generate a new plan.',
+    assistantCapacity: 'Too many operation plans. Try again later.',
+    assistantStopped: 'Remaining actions stopped. Git operations already completed are retained.',
     unknown: 'The operation could not be completed. Please try again.',
     connection: 'Cannot connect to the local MeGit service.',
     aiInvalid: 'Check the AI endpoint, model and input.',
@@ -847,30 +1036,47 @@ const en = {
     noRemote: 'No remote is configured for this repository.',
     remoteName: 'Invalid remote name. Use a name without spaces or slashes.',
     remoteExists: 'This remote name already exists. The configuration was not changed.',
-    remoteDestination: 'Enter a Git remote address (HTTPS, SSH, etc.) or an absolute local repository path.',
+    remoteDestination:
+      'Enter a Git remote address (HTTPS, SSH, etc.) or an absolute local repository path.',
     remoteNotConfigured: 'The selected remote no longer exists. Refresh and try again.',
-    remoteDestinationCredentials: 'Use a remote address without an embedded account, password, or token.',
-    remoteReadAuth: 'The remote requires authentication or rejected the current credentials. Check the credentials for this connection method.',
-    remoteReadNetwork: 'Could not reach the remote. Check your network and the remote host address.',
-    proxyInvalid: 'Enter an HTTP/HTTPS proxy address without credentials or a path, for example http://127.0.0.1:7890.',
+    remoteDestinationCredentials:
+      'Use a remote address without an embedded account, password, or token.',
+    remoteReadAuth:
+      'The remote requires authentication or rejected the current credentials. Check the credentials for this connection method.',
+    remoteReadNetwork:
+      'Could not reach the remote. Check your network and the remote host address.',
+    proxyInvalid:
+      'Enter an HTTP/HTTPS proxy address without credentials or a path, for example http://127.0.0.1:7890.',
     proxyStorage: 'Could not read or save MeGit’s proxy settings.',
-    proxyConnection: 'Could not connect through the selected proxy. Check that it is running and permits access to the destination.',
-    proxyTimeout: 'Timed out waiting for a response through the proxy. Check the proxy and destination service.',
-    proxyUnsupported: 'The MeGit proxy supports external HTTP/HTTPS connections only. This remote uses a different protocol, so no direct connection was attempted.',
+    proxyConnection:
+      'Could not connect through the selected proxy. Check that it is running and permits access to the destination.',
+    proxyTimeout:
+      'Timed out waiting for a response through the proxy. Check the proxy and destination service.',
+    proxyUnsupported:
+      'The MeGit proxy supports external HTTP/HTTPS connections only. This remote uses a different protocol, so no direct connection was attempted.',
     proxyTestTarget: 'The proxy reached GitHub, but GitHub did not return a successful status.',
-    remoteReadLocal: 'Could not read the local remote. Check that the path contains a Git repository and that you have access to it.',
-    remoteReadUnknown: 'Could not verify read access. Check the remote address, whether the repository exists, and whether your account has access.',
+    remoteReadLocal:
+      'Could not read the local remote. Check that the path contains a Git repository and that you have access to it.',
+    remoteReadUnknown:
+      'Could not verify read access. Check the remote address, whether the repository exists, and whether your account has access.',
     remoteGitHubOnly: 'This action requires a GitHub.com HTTPS remote.',
     remoteGitHubBusy: 'A GitHub sign-in is already in progress. Complete or cancel it first.',
-    remoteGitHubManagerMissing: 'Git Credential Manager was not found. Install or enable it and try again.',
-    remoteGitHubLoginFailed: 'Could not complete GitHub sign-in. Check the authorization in your browser and your credential manager, then try again.',
+    remoteGitHubManagerMissing:
+      'Git Credential Manager was not found. Install or enable it and try again.',
+    remoteGitHubLoginFailed:
+      'Could not complete GitHub sign-in. Check the authorization in your browser and your credential manager, then try again.',
     remoteBranchExists: 'The target branch already exists on the remote. Nothing was published.',
-    multiplePushDestinations: 'This remote does not have exactly one push destination. No commits were sent.',
+    multiplePushDestinations:
+      'This remote does not have exactly one push destination. No commits were sent.',
     noUpstream: 'Configure an upstream for the current branch first.',
-    upstreamUnavailable: 'The configured upstream is unavailable. Fetch remote records or explicitly select another upstream.',
-    upstreamAlreadySet: 'This branch already has an upstream configured. This action cannot publish it or replace an active upstream.',
-    pushNeedsFetch: 'The push target changed or was deleted. Fetch first. No branch was created or overwritten.',
-    pushNonFastForward: 'Push stopped because the update is not a fast-forward. Resolve the difference between local and remote commits first.',
+    upstreamUnavailable:
+      'The configured upstream is unavailable. Fetch remote records or explicitly select another upstream.',
+    upstreamAlreadySet:
+      'This branch already has an upstream configured. This action cannot publish it or replace an active upstream.',
+    pushNeedsFetch:
+      'The push target changed or was deleted. Fetch first. No branch was created or overwritten.',
+    pushNonFastForward:
+      'Push stopped because the update is not a fast-forward. Resolve the difference between local and remote commits first.',
     dirtyPull: 'The working tree has changes. Commit or handle them before pulling.',
     pushConfig: 'The current upstream does not support pushing. Check the remote configuration.',
     invalidWorkspace: 'Invalid workspace. Check names, paths, coordinates and references.',
