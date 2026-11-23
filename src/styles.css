@@ -1049,30 +1049,46 @@ code {
   width: var(--repository-card-width);
   border-radius: var(--radius-panel);
 }
-.local-service-card-controls {
+.local-service-card-tray {
   position: absolute;
   inset-inline-end: var(--space-3);
-  inset-block-end: calc(100% - var(--radius-panel));
+  inset-block-end: calc(100% + 1px);
   z-index: 1;
+  overflow: clip;
+  pointer-events: none;
+}
+.local-service-card-controls {
   display: flex;
   align-items: center;
   column-gap: var(--space-1);
-  padding: 1px 1px var(--radius-panel);
+  pointer-events: auto;
+  padding-inline: 1px;
   background: var(--surface);
-  border-start-start-radius: var(--radius-panel);
-  border-start-end-radius: var(--radius-panel);
-}
-.local-service-card-controls::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 var(--radius-panel);
-  pointer-events: none;
   border: 1px solid var(--border-strong);
   border-block-end: 0;
-  border-radius: inherit;
+  border-start-start-radius: var(--radius-panel);
+  border-start-end-radius: var(--radius-panel);
+  transition-property: none;
 }
-.repository-card.is-selected > .local-service-card-controls::before {
+.repository-card.is-selected > .local-service-card-tray > .local-service-card-controls {
   border-color: var(--accent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .local-service-card-controls {
+    transform: translateY(calc(100% - var(--space-2)));
+  }
+  .repository-card:hover > .local-service-card-tray > .local-service-card-controls,
+  .local-service-card-controls:has(:focus-visible) {
+    transform: none;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .local-service-card-controls:not(:has(:focus-visible)) {
+    transition: transform 150ms var(--ease-out) 100ms;
+  }
+  .repository-card:hover > .local-service-card-tray > .local-service-card-controls {
+    transition-delay: 0s;
+  }
 }
 .local-service-card-controls .icon-button:focus-visible {
   outline-offset: -2px;
@@ -5186,11 +5202,11 @@ code {
   opacity: 0;
   pointer-events: none;
 }
-.repository-relation-shortcut[data-action='pull'] {
+.repository-relation-shortcut:is([data-action='pull'], [data-action='merge']) {
   right: 100%;
   padding-right: var(--space-1);
 }
-.repository-relation-shortcut:not([data-action='pull']) {
+.repository-relation-shortcut:not([data-action='pull'], [data-action='merge']) {
   left: 100%;
   padding-left: var(--space-1);
 }
@@ -5213,6 +5229,45 @@ code {
   }
 }
 .repository-relation-shortcut .icon-button {
+  background: var(--surface-raised);
+}
+.relation-merge-body h3 {
+  margin: 0;
+  font-size: var(--text-dense);
+}
+.relation-merge-tips {
+  display: flex;
+  gap: var(--space-2);
+  color: var(--muted);
+}
+.relation-merge-sides > section,
+.relation-merge-conflicts {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  overflow-wrap: anywhere;
+}
+.relation-merge-sides ul,
+.relation-merge-conflicts ul {
+  margin: var(--space-2) 0;
+  padding-inline-start: var(--space-4);
+  max-height: 12rem;
+  overflow: auto;
+}
+.relation-merge-diff > summary {
+  cursor: pointer;
+}
+.relation-merge-diff > :not(:first-child) {
+  margin-block-start: var(--space-2);
+}
+.relation-merge-patch {
+  margin: 0;
+  max-height: 16rem;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
   background: var(--surface-raised);
 }
 .relation-sync-button,

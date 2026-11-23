@@ -7,6 +7,8 @@ import type {
   GitAction,
   IntegrationHistory,
   RelationAction,
+  RelationMergeRequest,
+  RelationMergeResult,
   RepoState,
   RemoteReadStatus,
   RepositoryImage,
@@ -83,6 +85,11 @@ export const api = {
     request<{ state: RepoState }>(
       `/boards/${encodeURIComponent(boardId)}/relations/${encodeURIComponent(edgeId)}/action`,
       { method: 'POST', body: JSON.stringify(action) },
+    ),
+  relationMerge: (boardId: string, edgeId: string, action: RelationMergeRequest, signal?: AbortSignal) =>
+    request<RelationMergeResult>(
+      `/boards/${encodeURIComponent(boardId)}/relations/${encodeURIComponent(edgeId)}/merge`,
+      { method: 'POST', body: JSON.stringify(action), signal },
     ),
   generateCommit: (repositoryId: string, signal: AbortSignal) =>
     request<{ kind: 'commit'; text: string }>('/ai/assist', {

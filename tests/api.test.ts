@@ -154,6 +154,81 @@ describe('本机 API 边界与端到端 Git 数据', () => {
       expect(await git(other, 'remote')).toBe('');
     }
   });
+  it('跨仓库审阅不导入对象，显式准备和提交保留双方历史', async () => {
+    const { base, headers, repo, root } = await setup();
+    const target = path.join(root, 'merge-target');
+    await git(root, 'clone', '--', repo, target);
+    await git(target, 'remote', 'remove', 'origin');
+    await git(target, 'config', 'user.name', 'MeGit Test');
+    await git(target, 'config', 'user.email', 'test@example.invalid');
+    await git(target, 'config', 'commit.gpgsign', 'false');
+    const sourceHead = await commitFile(repo, 'incoming.txt', 'from source\n');
+    const targetHead = await commitFile(target, 'existing.txt', 'from target\n');
+    const workspace = (await fetch(`${base}/api/workspace`, { headers }).then((r) => r.json())) as Workspace;
+    workspace.repositories = [
+      { id: 'a', name: 'Source', path: repo.replaceAll('\\', '/') },
+      { id: 'b', name: 'Target', path: target.replaceAll('\\', '/') },
+    ];
+    const board = workspace.boards[0];
+    board.nodes = [
+      { id: 'a-node', repoId: 'a', position: { x: 0, y: 0 } },
+      { id: 'b-node', repoId: 'b', position: { x: 500, y: 0 } },
+    ];
+    const edge = { id: 'link', kind: 'integration' as const, source: 'a-node', target: 'b-node', label: '' };
+    const save = async (localMerge: boolean) => {
+      board.edges = [{ ...edge, localMerge: localMerge || undefined }];
+      const response = await fetch(`${base}/api/workspace`, { method: 'PUT', headers, body: JSON.stringify(workspace) });
+      const saved = await response.json();
+      expect(response.ok, JSON.stringify(saved)).toBe(true);
+      workspace.revision = saved.revision;
+    };
+    const refs = { source: 'a-node', target: 'b-node', sourceRepo: 'a', targetRepo: 'b', sourceRef: 'refs/heads/main', targetRef: 'refs/heads/main', sourceHead, targetHead };
+    const merge = (step: string, fields: Record<string, unknown> = {}) => fetch(`${base}/api/boards/${board.id}/relations/link/merge`, {
+      method: 'POST', headers, body: JSON.stringify({ ...refs, step, ...fields }),
+    });
+    await save(false);
+    expect((await merge('prepare')).status).toBe(409);
+    await save(true);
+    const review = await (await merge('review')).json();
+    expect(review).toMatchObject({ phase: 'review', sourceTotal: 1, targetTotal: 1, diff: { text: expect.stringContaining('+from source') } });
+    await expect(git(target, 'cat-file', '-e', sourceHead)).rejects.toThrow();
+    expect(await git(target, 'status', '--porcelain')).toBe('');
+    expect((await merge('prepare', { sourceHead: targetHead })).status).toBe(409);
+    const prepared = await (await merge('prepare')).json();
+    expect(prepared).toMatchObject({ phase: 'pending', conflicts: [], ready: true, diff: { text: expect.stringContaining('incoming.txt') } });
+    expect(await git(target, 'rev-parse', 'HEAD')).toBe(targetHead);
+    expect(await git(target, 'rev-parse', 'MERGE_HEAD')).toBe(sourceHead);
+    expect(await git(target, 'show', ':incoming.txt')).toBe('from source');
+    expect(await git(target, 'remote')).toBe('');
+    expect((await merge('commit', { session: prepared.session, index: 'a'.repeat(64), message: 'Merge source' })).status).toBe(409);
+    await writeFile(path.join(target, 'extra.txt'), 'not reviewed');
+    expect(await (await merge('commit', { session: prepared.session, index: prepared.index, message: 'Merge source' })).json())
+      .toMatchObject({ code: 'relationMergeUnstaged' });
+    await git(target, 'clean', '-f', '--', 'extra.txt');
+    await writeFile(path.join(target, 'incoming.txt'), 'edited since review');
+    await git(target, 'add', '--', 'incoming.txt');
+    expect(await (await merge('commit', { session: prepared.session, index: prepared.index, message: 'Merge source' })).json())
+      .toMatchObject({ code: 'relationMergeIndexChanged' });
+    expect((await merge('abort', { session: prepared.session })).ok).toBe(true);
+    expect(await git(target, 'status', '--porcelain')).toBe('');
+    const afterAbort = await (await merge('prepare')).json();
+    await git(target, 'merge', '--abort');
+    await git(target, 'merge', '--no-ff', '--no-commit', sourceHead);
+    expect((await merge('abort', { session: afterAbort.session })).status).toBe(409);
+    expect(await git(target, 'rev-parse', 'MERGE_HEAD')).toBe(sourceHead);
+    await git(target, 'merge', '--abort');
+    const preparedAgain = await (await merge('prepare')).json();
+    await commitFile(repo, 'later.txt', 'not included');
+    const resumed = await (await merge('review')).json();
+    expect(resumed).toMatchObject({ phase: 'pending', session: preparedAgain.session, sourceHead });
+    const finished = await merge('commit', { session: resumed.session, index: resumed.index, message: 'Merge source' });
+    expect(finished.status, await finished.text()).toBe(200);
+    expect(await git(target, 'show', '-s', '--format=%P', 'HEAD')).toBe(`${targetHead} ${sourceHead}`);
+    expect(await git(target, 'status', '--porcelain')).toBe('');
+    expect(await readFile(path.join(target, 'existing.txt'), 'utf8')).toBe('from target\n');
+    await expect(readFile(path.join(target, 'later.txt'))).rejects.toThrow();
+  }, 60000);
+
   it('提交点创建沿用会话和登记校验，严格接收完整提交编号', async () => {
     const { base, headers, repo } = await setup();
     const workspace = (await fetch(`${base}/api/workspace`, { headers }).then((r) =>

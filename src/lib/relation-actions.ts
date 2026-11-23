@@ -3,7 +3,7 @@ import type { FlowEdge, FlowNode, RelationAction, Repository, Snapshot } from '.
 import type { ErrorCode } from '../../shared/messages';
 
 export type RelationShortcut = {
-  type: RelationAction['type'];
+  type: RelationAction['type'] | 'merge';
   from: string;
   to: string;
   recommended?: boolean;
@@ -38,16 +38,21 @@ export function relationShortcuts(
   const sourceName = `${source.displayName || sourceRepo.name} · ${cardRefLabel(sourceRef)}`;
   const targetName = `${target.displayName || targetRepo.name} · ${cardRefLabel(targetRef)}`;
   if (sourceRepo.id !== targetRepo.id) {
-    if (!edge.localIntegration || !sourceRef.startsWith('refs/heads/') ||
+    if ((!edge.localIntegration && !edge.localMerge) || !sourceRef.startsWith('refs/heads/') ||
       !targetRef.startsWith('refs/heads/') ||
       (!cardUsesWorktree(targetRef, targetState) || targetState.head !== base.targetHead) ||
-      (refs.sourceRef === 'HEAD' && sourceState.head !== base.sourceHead) ||
-      result.state === 'integrated') return;
-    const shortcuts: RelationShortcut[] = [{
+      (refs.sourceRef === 'HEAD' && sourceState.head !== base.sourceHead)) return;
+    const merging = targetState.operation === 'merge';
+    const shortcuts: RelationShortcut[] = [];
+    if (edge.localIntegration && result.state !== 'integrated') shortcuts.push({
       type: 'integrate', from: sourceName, to: targetName,
       blocked: targetState.operation ? 'branchOperation' : targetState.changed ? 'dirtyPull' : undefined,
-    }];
-    return { base, repo: targetRepo, shortcuts };
+    });
+    if (edge.localMerge && (result.state !== 'integrated' || merging)) shortcuts.push({
+      type: 'merge', from: sourceName, to: targetName,
+      recommended: merging,
+    });
+    return shortcuts.length ? { base, repo: targetRepo, shortcuts } : undefined;
   }
   const sourceIsLocal = sourceRef.startsWith('refs/heads/');
   const localRef = sourceIsLocal ? sourceRef : targetRef;

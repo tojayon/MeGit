@@ -1,7 +1,72 @@
 import { test, expect } from './test';
 import { fixture, commitFile, git } from '../tests/fixtures';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+
+test('审阅本地分叉并在冲突解决后显式提交合并', async ({ page, request }) => {
+  test.setTimeout(90000);
+  const { root, repo, cleanup } = await fixture();
+  try {
+    await commitFile(repo, 'shared.txt', 'base\n');
+    const target = path.join(root, 'merge target');
+    await git(root, 'clone', '--', repo, target);
+    await git(target, 'remote', 'remove', 'origin');
+    await git(target, 'config', 'user.name', 'MeGit Test');
+    await git(target, 'config', 'user.email', 'test@example.invalid');
+    await git(target, 'config', 'commit.gpgsign', 'false');
+    const sourceHead = await commitFile(repo, 'shared.txt', 'source version\n');
+    const targetHead = await commitFile(target, 'shared.txt', 'target version\n');
+    const { token } = await (await request.get('/api/session')).json();
+    const headers = { 'X-MeGit-Token': token };
+    const workspace = await (await request.get('/api/workspace', { headers })).json();
+    workspace.repositories = [{ id: 'repo-a', name: 'A', path: repo }, { id: 'repo-b', name: 'B', path: target }];
+    Object.assign(workspace.boards[0], {
+      nodes: [
+        { id: 'a', repoId: 'repo-a', ref: 'refs/heads/main', position: { x: 0, y: 0 } },
+        { id: 'b', repoId: 'repo-b', ref: 'refs/heads/main', position: { x: 620, y: 0 } },
+      ],
+      edges: [{ id: 'merge', source: 'a', target: 'b', kind: 'integration', label: '', localMerge: true, localIntegration: true }],
+    });
+    expect((await request.put('/api/workspace', { headers, data: workspace })).ok()).toBe(true);
+    await page.goto('/');
+    const bridge = page.locator('.repository-relation-label');
+    const shortcut = page.getByRole('button', { name: '审阅并合并: A · main → B · main', exact: true });
+    const dialog = page.getByRole('dialog', { name: '审阅并合并', exact: true });
+    await expect(shortcut).toBeAttached();
+    await bridge.hover();
+    const fastForward = page.getByRole('button', { name: '整合到目标: A · main → B · main', exact: true });
+    await expect(fastForward).toBeVisible();
+    expect((await shortcut.boundingBox())!.x).toBeLessThan((await fastForward.boundingBox())!.x);
+    await shortcut.click();
+    await expect(dialog.getByRole('heading', { name: '来源独有 1' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: '目标独有 1' })).toBeVisible();
+    await dialog.getByText('查看来源改动', { exact: true }).click();
+    await expect(dialog.locator('pre')).toContainText('+source version');
+    expect(await git(target, 'status', '--porcelain')).toBe('');
+    await dialog.getByRole('button', { name: '准备合并', exact: true }).click();
+    await expect(dialog.getByRole('heading', { name: '冲突文件' })).toBeVisible();
+    await expect(dialog.getByText('shared.txt', { exact: true })).toBeVisible();
+    expect(await git(target, 'rev-parse', 'HEAD')).toBe(targetHead);
+    await dialog.getByRole('button', { name: '关闭窗口', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(await git(target, 'rev-parse', 'MERGE_HEAD')).toBe(sourceHead);
+    await writeFile(path.join(target, 'shared.txt'), 'resolved\n');
+    await git(target, 'add', '--', 'shared.txt');
+    await page.reload();
+    await expect(shortcut).toBeAttached();
+    await bridge.hover();
+    await shortcut.click();
+    await expect(dialog.locator('pre')).toContainText('+resolved');
+    await dialog.getByLabel('合并提交消息').fill('Merge both versions');
+    await dialog.getByRole('button', { name: '提交合并', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(await git(target, 'show', '-s', '--format=%P', 'HEAD')).toBe(`${targetHead} ${sourceHead}`);
+    expect(await git(target, 'show', 'HEAD:shared.txt')).toBe('resolved');
+    expect(await git(target, 'remote')).toBe('');
+  } finally {
+    await cleanup();
+  }
+});
 
 test('待推送拖动和保存视角期间保持亮蓝色，确认后才推送', async ({ page, request }) => {
   const { root, repo, cleanup } = await fixture();

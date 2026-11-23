@@ -45,3 +45,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
 3. 工作流测试并打包，保存安装包和 `SHA256.txt`，将 `v<版本>` 标签指向触发时的提交，并创建 **Release 草稿**。在运行摘要或 **Releases** 打开草稿，下载试装、审阅说明，再手动点击 **Publish release**。普通推送不会触发，也不会自动公开发布。当前自动构建不签名。
 
 版本不匹配、同版本已有 Release（包括草稿），或同名标签指向其他提交时，工作流会失败，不会覆盖。如果上传中断并留下不完整的草稿，用该次运行的 **Artifacts** 补齐附件；如需重跑，请先清理不完整的草稿。标签已指向同一提交时可复用。若创建草稿报权限错误，请检查仓库或组织是否允许 Actions 创建标签和 Release。
+
+推送修复后，请用 **Run workflow** 发起一次新的运行。旧失败记录里的 **Re-run jobs** 仍使用原来的提交，不会用上修复。

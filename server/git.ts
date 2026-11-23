@@ -43,6 +43,7 @@ async function run(
   remoteProbe = false,
   proxy?: GitProxy,
   localOnly = false,
+  alternateObjects?: string,
 ) {
   const proxyArgs = proxy
     ? [
@@ -73,7 +74,8 @@ async function run(
           LC_ALL: 'C',
           LANG: 'C',
           ...(proxy || remoteProbe ? { GIT_ALLOW_PROTOCOL: 'file:git:http:https:ssh' } : {}),
-          ...(localOnly ? { GIT_ALLOW_PROTOCOL: 'file' } : {}),
+          ...(localOnly ? { GIT_ALLOW_PROTOCOL: 'file', GIT_NO_LAZY_FETCH: '1' } : {}),
+          ...(alternateObjects ? { GIT_ALTERNATE_OBJECT_DIRECTORIES: alternateObjects } : {}),
           ...(remoteProbe
             ? {
                 GIT_ASKPASS: '',
@@ -150,9 +152,9 @@ async function readProxyRoutes(
   return { address: routes.some(([, address]) => !!address) ? proxy : '', routes };
 }
 
-async function optional(repo: string, args: string[]) {
+async function optional(repo: string, args: string[], localOnly = false) {
   try {
-    return (await run(repo, args)).stdout.trim();
+    return (await run(repo, args, false, false, undefined, false, undefined, localOnly)).stdout.trim();
   } catch {
     return null;
   }
@@ -170,23 +172,20 @@ export async function resolveRepository(input: string): Promise<string> {
   return (await realpath(root)).replaceAll('\\', '/');
 }
 
-export async function readRepository(repo: string, expandUntracked = false): Promise<RepoState> {
+export async function readRepository(repo: string, expandUntracked = false, localOnly = false): Promise<RepoState> {
+  const read = (args: string[]) => run(repo, args, false, false, undefined, false, undefined, localOnly);
+  const status = expandUntracked
+    ? statusArguments.map((arg) => arg === '--untracked-files=normal' ? '--untracked-files=all' : arg)
+    : statusArguments;
   const [raw, refResult, remoteResult, fetchFile] = await Promise.all([
-    run(
-      repo,
-      expandUntracked
-        ? statusArguments.map((arg) =>
-            arg === '--untracked-files=normal' ? '--untracked-files=all' : arg,
-          )
-        : statusArguments,
-    ),
-    run(repo, [
+    read(localOnly ? [...status, '--ignore-submodules=none'] : status),
+    read([
       'for-each-ref',
       '--format=%(refname)%09%(HEAD)%09%(objectname)%09%(if)%(worktreepath)%(then)1%(else)0%(end)%09%(symref)',
       'refs/heads',
       'refs/remotes',
     ]),
-    run(repo, ['remote']),
+    read(['remote']),
     optional(repo, ['rev-parse', '--git-path', 'FETCH_HEAD']),
   ]);
   const parts = raw.stdout.split('\0');
@@ -238,7 +237,7 @@ export async function readRepository(repo: string, expandUntracked = false): Pro
     const [remote, ref, tip, fullUpstream] = await Promise.all([
       optional(repo, ['config', '--get', `branch.${branch}.remote`]),
       optional(repo, ['config', '--get-all', `branch.${branch}.merge`]),
-      upstream ? optional(repo, ['rev-parse', '--verify', '@{upstream}^{commit}']) : null,
+      upstream ? optional(repo, ['rev-parse', '--verify', '@{upstream}^{commit}'], localOnly) : null,
       upstream ? optional(repo, ['rev-parse', '--symbolic-full-name', '@{upstream}']) : null,
     ]);
     trackingConfigured = !!(remote || ref);
@@ -287,6 +286,10 @@ export async function readRepository(repo: string, expandUntracked = false): Pro
         return { name, current: current === '*', remote, hash, inWorktree: occupied === '1' };
       }),
   };
+}
+
+export function currentBranchRef(repo: string) {
+  return optional(repo, ['symbolic-ref', '-q', 'HEAD'], true);
 }
 
 async function readOperation(gitDirectory: string): Promise<RepoState['operation']> {
@@ -671,7 +674,7 @@ export async function performAction(
   });
 }
 
-async function queueAction<T>(repo: string, operation: () => Promise<T>): Promise<T> {
+export async function queueAction<T>(repo: string, operation: () => Promise<T>): Promise<T> {
   const previous = queues.get(repo) || Promise.resolve();
   const next = previous.catch(() => {}).then(operation);
   queues.set(repo, next);
@@ -680,6 +683,14 @@ async function queueAction<T>(repo: string, operation: () => Promise<T>): Promis
   } finally {
     if (queues.get(repo) === next) queues.delete(repo);
   }
+}
+
+export async function fetchLocalCommit(source: string, target: string, hash: string) {
+  const address = (await run(target, ['ls-remote', '--get-url', '--', source])).stdout.trim();
+  if (address !== source) throw new AppError('relationActionChanged', 409);
+  await run(target, ['fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
+    '--no-auto-maintenance', '--no-write-commit-graph', '--refmap=', '--', source, hash],
+    true, false, undefined, false, undefined, true);
 }
 
 export function integrateLocalRelation(
@@ -702,11 +713,7 @@ export function integrateLocalRelation(
       if (state.changed) throw new AppError('dirtyPull', 409);
     };
     await verify();
-    const address = (await run(target, ['ls-remote', '--get-url', '--', source])).stdout.trim();
-    if (address !== source) throw new AppError('relationActionChanged', 409);
-    await run(target, ['fetch', '--no-tags', '--no-recurse-submodules', '--no-write-fetch-head',
-      '--no-auto-maintenance', '--no-write-commit-graph', '--refmap=', '--', source, action.sourceHead],
-    true, false, undefined, false, undefined, true);
+    await fetchLocalCommit(source, target, action.sourceHead);
     const ancestor = await run(target, ['merge-base', '--is-ancestor', action.targetHead, action.sourceHead], false, true);
     if ('failed' in ancestor) throw new AppError('relationNonFastForward', 409);
     await verify();

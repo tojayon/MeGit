@@ -7,6 +7,9 @@ import { relationPorts } from '../lib/relation-ports';
 import { usePreferences } from '../preferences/store';
 import { Field } from './Field';
 import { RelationActionConfirmation } from './RelationActionDialog';
+import { RelationMergePreview } from './RelationMergeDialog';
+import { Dialog } from './Dialogs';
+import { Button } from './Button';
 import type { RelationShortcut } from '../lib/relation-actions';
 import type { IntegrationState } from '../../shared/types';
 
@@ -93,7 +96,9 @@ export function RelationBridgeExample() {
       shortcuts: upstream ? [
         { type: 'pull', from: 'MeWiki · origin/main', to: 'MeWiki · main', recommended: sync === 'pendingPull' },
         { type: 'push', from: 'MeWiki · main', to: 'MeWiki · origin/main', recommended: sync === 'pendingPush' },
-      ] : sync === 'local' ? [{ type: 'integrate', from: 'MeWiki · main', to: 'MeWiki-Server · main' }] : undefined,
+      ] : sync === 'local' || sync === 'merge' ? [{
+        type: sync === 'local' ? 'integrate' : 'merge', from: 'MeWiki · main', to: 'MeWiki-Server · main',
+      }] : undefined,
       onShortcut: setShortcut,
     },
   };
@@ -129,6 +134,7 @@ export function RelationBridgeExample() {
           <option value="pendingPush">{t('relation.sync.pendingPush')}</option>
           <option value="pendingPull">{t('relation.sync.pendingPull')}</option>
           <option value="local">{t('relation.sync.integrate')}</option>
+          <option value="merge">{t('relation.sync.merge')}</option>
         </select>
       </Field>
       <div ref={container} style={{ height: 'var(--relation-bridge-example-height)' }}>
@@ -153,13 +159,28 @@ export function RelationBridgeExample() {
           onPaneClick={() => setSelected(false)}
         />
       </div>
-      {shortcut && (
+      {shortcut && (shortcut.type === 'merge' ? (
+        <Dialog title={t('relation.sync.merge')} onClose={() => setShortcut(null)} wide>
+          <div className="dialog-body relation-merge-body">
+            <p className="relation-action-direction">{t('relation.sync.direction', shortcut)}</p>
+            <RelationMergePreview result={{
+              phase: 'review', sourceTotal: 1, targetTotal: 1,
+              sourceCommits: [{ hash: 'bf26584e5d120bbcab9592ec10695a4822991180', subject: 'Update shared notes' }],
+              targetCommits: [{ hash: '132340ad59d164f0596b064e9ac320dd65511413', subject: 'Add service documentation' }],
+              diff: { text: '--- a/notes.md\n+++ b/notes.md\n@@ -1 +1,2 @@\n # Notes\n+Shared release notes', truncated: false },
+            }} />
+          </div>
+          <footer className="dialog-footer">
+            <Button data-dialog-initial-focus="true" onClick={() => setShortcut(null)}>{t('relation.merge.close')}</Button>
+          </footer>
+        </Dialog>
+      ) : (
         <RelationActionConfirmation
           shortcut={shortcut}
           onClose={() => setShortcut(null)}
           onConfirm={() => setShortcut(null)}
         />
-      )}
+      ))}
     </section>
   );
 }

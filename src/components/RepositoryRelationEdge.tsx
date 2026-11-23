@@ -177,7 +177,7 @@ export const RepositoryRelationEdge = memo(function RepositoryRelationEdge({
             const { type } = shortcut;
             const title = t(`relation.sync.${type}`);
             const direction = t('relation.sync.direction', shortcut);
-            const unavailable = type !== 'integrate' && !shortcut.recommended;
+            const unavailable = (type === 'pull' || type === 'push') && !shortcut.recommended;
             const disabled = !!shortcut.blocked || unavailable;
             const help = shortcut.blocked ? t(`errors.${shortcut.blocked}`) :
               unavailable ? t(`relation.sync.${type}Current`) : t(`relation.sync.${type}Help`);

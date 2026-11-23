@@ -78,37 +78,41 @@ export function LocalServiceCardControls({
   return (
     <>
       {revision && (
-        <div
-          ref={controls}
-          className="local-service-card-controls nodrag nopan"
-          role="group"
-          aria-label={t('localService.title')}
-          data-status={shownStatus}
-          onClick={(event) => event.stopPropagation()}
-          onDoubleClick={(event) => event.stopPropagation()}
-        >
-          <span id={statusId} className="local-service-card-status" role="status">
-            {statusLabel}
-          </span>
-          {running && service.runningSince !== undefined && (
-            <ServiceUptime key={service.runningSince} runningSince={service.runningSince} />
-          )}
-          <IconButton
-            size="small"
-            placement="right"
-            variant={running ? 'danger' : 'default'}
-            label={busy ? statusLabel : t(running ? 'localService.stop' : 'localService.cardStart')}
-            aria-describedby={busy ? undefined : statusId}
-            busy={busy}
-            disabled={!!readProblem}
-            onClick={(event) => void perform(running ? 'stop' : 'start', event.detail === 0)}
+        <div className="local-service-card-tray">
+          <div
+            ref={controls}
+            className="local-service-card-controls nodrag nopan"
+            role="group"
+            aria-label={t('localService.title')}
+            data-status={shownStatus}
+            onClick={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
           >
-            {running ? (
-              <Square size={13} aria-hidden="true" />
-            ) : (
-              <Play size={14} aria-hidden="true" />
+            <span id={statusId} className="local-service-card-status" role="status">
+              {statusLabel}
+            </span>
+            {running && service.runningSince !== undefined && (
+              <ServiceUptime key={service.runningSince} runningSince={service.runningSince} />
             )}
-          </IconButton>
+            <IconButton
+              size="small"
+              placement="right"
+              variant={running ? 'danger' : 'default'}
+              label={
+                busy ? statusLabel : t(running ? 'localService.stop' : 'localService.cardStart')
+              }
+              aria-describedby={busy ? undefined : statusId}
+              busy={busy}
+              disabled={!!readProblem}
+              onClick={(event) => void perform(running ? 'stop' : 'start', event.detail === 0)}
+            >
+              {running ? (
+                <Square size={13} aria-hidden="true" />
+              ) : (
+                <Play size={14} aria-hidden="true" />
+              )}
+            </IconButton>
+          </div>
         </div>
       )}
       {error != null && (

@@ -15,7 +15,7 @@ export function RelationActionDialog({
   action: RelationAction;
   shortcut: RelationShortcut;
   repo: Repository;
-  onRun: () => ReturnType<typeof api.relationAction>;
+  onRun: (action: RelationAction) => ReturnType<typeof api.relationAction>;
   onClose: () => void;
   onState: (state: RepoState) => void;
   onRefresh: () => Promise<void>;
@@ -34,7 +34,7 @@ export function RelationActionDialog({
       onConfirm={async () => {
         setSubmitting(true);
         try {
-          if (await executeRelationAction(action.type, onRun, shortcut.to)) onClose();
+          if (await executeRelationAction(action.type, () => onRun(action), shortcut.to)) onClose();
         } catch (failure) {
           setError(failure);
           await onRefresh();

@@ -51,6 +51,7 @@ export interface FlowEdge {
   sourceRef?: string;
   targetRef?: string;
   localIntegration?: boolean;
+  localMerge?: boolean;
   routing?: EdgeRouting;
   waypoints?: { x: number; y: number }[];
   sourcePort?: PortSide;
@@ -238,6 +239,36 @@ export interface RelationAction {
   sourceHead: string;
   targetHead: string;
 }
+export type RelationMergeSelection = Omit<RelationAction, 'type'>;
+
+export type RelationMergeRequest = RelationMergeSelection & (
+  | { step: 'review' }
+  | { step: 'prepare' }
+  | { step: 'abort'; session: string }
+  | { step: 'commit'; session: string; index: string; message: string }
+);
+
+export type RelationMergeResult =
+  | {
+      phase: 'review';
+      sourceTotal: number;
+      targetTotal: number;
+      sourceCommits: { hash: string; subject: string }[];
+      targetCommits: { hash: string; subject: string }[];
+      diff: DiffResult | null;
+      blocked?: 'branchOperation' | 'dirtyPull';
+    }
+  | {
+      phase: 'pending';
+      session: string;
+      sourceHead: string;
+      sourceRef: string;
+      index: string;
+      conflicts: string[];
+      ready: boolean;
+      diff: DiffResult;
+    }
+  | { phase: 'committed' | 'aborted'; state: RepoState };
 export interface IntegrationState {
   state: 'integrated' | 'pending' | 'unknown';
   sourceHead: string | null;

@@ -43,3 +43,5 @@ Add `-PrepareOnly` to stage the assets without generating an installer. Then use
 3. The workflow tests and builds the installer, saves it with `SHA256.txt`, points the `v<version>` tag at the dispatched commit, and creates a **Release draft**. Open the draft from the run summary or **Releases**, test the installer, review the notes, and click **Publish release** yourself. Normal pushes neither trigger the workflow nor publish releases. The automated build is unsigned.
 
 The workflow refuses version mismatches, existing releases (including drafts), and tags that point at a different commit. If an interrupted upload leaves an incomplete draft, recover the files from the run's **Artifacts**, or remove the incomplete draft before retrying. A tag already pointing to the same commit can be reused. If draft creation fails with a permissions error, check whether repository or organization policy allows Actions to create tags and releases.
+
+After pushing a fix, start a new run using **Run workflow**. **Re-run jobs** uses the original commit and will not pick up the fix.

@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import { RepositoryRelationEdge, type RelationEdge } from './RepositoryRelationEdge';
 import { RelationActionDialog } from './RelationActionDialog';
+import { RelationMergeDialog } from './RelationMergeDialog';
 import { relationShortcuts, type RelationShortcut } from '../lib/relation-actions';
 import { api } from '../lib/api';
 import { relationPorts } from '../lib/relation-ports';
@@ -74,7 +75,7 @@ import type {
   PortSide,
   RepoState,
   Repository,
-  RelationAction,
+  RelationMergeSelection,
   Snapshot,
 } from '../../shared/types';
 import { updatePreferences, usePreferences } from '../preferences/store';
@@ -476,7 +477,7 @@ function CanvasContents({
   const [exporting, setExporting] = useState(false);
   const [routeEditing, setRouteEditing] = useState<string | null>(null);
   const [relationAction, setRelationAction] = useState<{
-    id: string; action: RelationAction; shortcut: RelationShortcut; repo: Repository;
+    id: string; selection: RelationMergeSelection; shortcut: RelationShortcut; repo: Repository;
   } | null>(null);
   const [exportError, setExportError] = useState(false);
   const [dimensions, setDimensions] = useState<Record<string, Size>>({});
@@ -751,7 +752,7 @@ function CanvasContents({
         onOpen: onSelectEdge,
         shortcuts: sync?.shortcuts,
         onShortcut: sync ? (shortcut) => setRelationAction({
-          id: relation.id, action: { ...sync.base, type: shortcut.type }, shortcut, repo: sync.repo,
+          id: relation.id, selection: sync.base, shortcut, repo: sync.repo,
         }) : undefined,
         labelOffset: (siblings.indexOf(relation.id) - (siblings.length - 1) / 2) * 30,
       },
@@ -1718,18 +1719,28 @@ function CanvasContents({
           />
         )}
       </div>
-      {relationAction && (
+      {relationAction && (relationAction.shortcut.type === 'merge' ? (
+        <RelationMergeDialog
+          boardId={board.id}
+          edgeId={relationAction.id}
+          selection={relationAction.selection}
+          shortcut={relationAction.shortcut}
+          onClose={() => setRelationAction(null)}
+          onState={(state) => onRepositoryState(relationAction.repo.id, state)}
+          onRefresh={onRefresh}
+        />
+      ) : (
         <RelationActionDialog
-          action={relationAction.action}
+          action={{ ...relationAction.selection, type: relationAction.shortcut.type }}
           shortcut={relationAction.shortcut}
           repo={relationAction.repo}
-          onRun={() => api.relationAction(board.id, relationAction.id, relationAction.action)}
+          onRun={(action) => api.relationAction(board.id, relationAction.id, action)}
           onClose={() => setRelationAction(null)}
           onState={(state) => onRepositoryState(relationAction.repo.id, state)}
           onRefresh={onRefresh}
           onNotice={onNotice}
         />
-      )}
+      ))}
     </div>
   );
 }

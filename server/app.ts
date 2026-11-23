@@ -12,6 +12,7 @@ import {
   inspectIntegration,
   performAction,
   integrateLocalRelation,
+  currentBranchRef,
 } from './git.js';
 import type { GitAction, RepoState, Snapshot } from '../shared/types.js';
 import { listRepositoryImages, readRepositoryImage } from './repository-images.js';
@@ -25,10 +26,10 @@ import { readCommitContext } from './ai-commit.js';
 import { checkRemoteRead, githubLoginAvailable, loginRemoteGitHub } from './remote-access.js';
 import { NetworkSettings, testNetworkProxy, withProxyFetch } from './network-proxy.js';
 import { LocalServices } from './local-service.js';
+import { localRelationMerge } from './relation-merge.js';
 
 const hashSchema = z.string().regex(/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
-const relationActionSchema = z.strictObject({
-  type: z.enum(['pull', 'push', 'integrate']),
+const relationSelectionSchema = z.strictObject({
   source: z.string().min(1).max(100),
   target: z.string().min(1).max(100),
   sourceRepo: z.string().min(1).max(100),
@@ -38,6 +39,16 @@ const relationActionSchema = z.strictObject({
   sourceHead: hashSchema,
   targetHead: hashSchema,
 });
+const relationActionSchema = relationSelectionSchema.extend({ type: z.enum(['pull', 'push', 'integrate']) });
+const relationMergeSchema = z.discriminatedUnion('step', [
+  relationSelectionSchema.extend({ step: z.literal('review') }),
+  relationSelectionSchema.extend({ step: z.literal('prepare') }),
+  relationSelectionSchema.extend({ step: z.literal('abort'), session: z.uuid() }),
+  relationSelectionSchema.extend({
+    step: z.literal('commit'), session: z.uuid(), index: z.string().regex(/^[a-f0-9]{64}$/),
+    message: z.string().trim().min(1).max(10000),
+  }),
+]);
 const branchExpectationSchema = z.strictObject({
   branch: z.string().max(240),
   head: hashSchema.nullable(),
@@ -395,6 +406,47 @@ export function createApp(options: { dataDirectory: string }) {
       });
     }
     res.json({ state: await readRepository(targetPath) });
+  });
+  app.post('/api/boards/:boardId/relations/:edgeId/merge', async (req, res) => {
+    const parsed = relationMergeSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError('invalidAction');
+    const selection = {
+      ...parsed.data,
+      sourceHead: parsed.data.sourceHead.toLowerCase(),
+      targetHead: parsed.data.targetHead.toLowerCase(),
+    };
+    const { boardId, edgeId } = req.params;
+    if (selection.sourceRepo === selection.targetRepo ||
+      ![selection.sourceRef, selection.targetRef].every((ref) => ref.startsWith('refs/heads/')))
+      throw new AppError('relationActionChanged', 409);
+    async function resolveSelection() {
+      const workspace = await store.read();
+      const board = workspace.boards.find((item) => item.id === boardId);
+      const edge = board?.edges.find((item) => item.id === edgeId && item.kind === 'integration');
+      const source = board?.nodes.find((item) => item.id === edge?.source);
+      const target = board?.nodes.find((item) => item.id === edge?.target);
+      if (!board || !edge?.localMerge || source?.id !== selection.source || target?.id !== selection.target ||
+        source.repoId !== selection.sourceRepo || target.repoId !== selection.targetRepo)
+        throw new AppError('relationActionChanged', 409);
+      const [sourceRepo, targetRepo] = await Promise.all([repository(source.repoId), repository(target.repoId)]);
+      if (sourceRepo.path === targetRepo.path) throw new AppError('relationActionChanged', 409);
+      const refs = relationRefs(edge, board.nodes);
+      const [sourceRef, targetRef] = await Promise.all([
+        refs.sourceRef === 'HEAD' ? currentBranchRef(sourceRepo.path) : relationActionRef(refs.sourceRef),
+        refs.targetRef === 'HEAD' ? currentBranchRef(targetRepo.path) : relationActionRef(refs.targetRef),
+      ]);
+      if (sourceRef !== selection.sourceRef || targetRef !== selection.targetRef)
+        throw new AppError('relationActionChanged', 409);
+      return [sourceRepo.path, targetRepo.path] as const;
+    }
+    const [source, target] = await resolveSelection();
+    res.json(await localRelationMerge({
+      boardId, edgeId, source, target, dataDirectory: options.dataDirectory,
+      validate: async () => {
+        const [latestSource, latestTarget] = await resolveSelection();
+        if (latestSource !== source || latestTarget !== target) throw new AppError('relationActionChanged', 409);
+      },
+    }, selection));
   });
   app.get('/api/repositories/:id/images', async (req, res) => {
     const repo = await repository(req.params.id);

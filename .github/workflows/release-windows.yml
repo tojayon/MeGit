@@ -33,7 +33,10 @@ jobs:
       VITEST_MAX_WORKERS: '4'
     steps:
       - name: Preserve repository line endings on Windows
-        run: git config --global core.autocrlf false
+        run: |
+          git config --global core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git config --global core.eol lf
       - name: Check out the selected commit
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:

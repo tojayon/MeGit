@@ -5,6 +5,80 @@ import path from 'node:path';
 import { expect, test } from './test';
 import { commitFile, fixture } from '../tests/fixtures';
 
+test('服务小卡片默认收起，悬停后可从仓库卡片移到按钮', async ({ page }) => {
+  await page.goto('/design-system');
+  const section = page.getByRole('region', { name: '仓库卡片', exact: true });
+  const card = section.getByTestId('repository-node');
+  const controls = card.getByRole('group', { name: '本地服务', exact: true });
+  const start = controls.getByRole('button', { name: '开始运行', exact: true });
+  await section.scrollIntoViewIfNeeded();
+  const getGeometry = () =>
+    card.evaluate((node) => {
+      const { top, width, height } = node.getBoundingClientRect();
+      const controls = node.querySelector('.local-service-card-controls')!;
+      const button = controls.querySelector('button')!;
+      const bounds = button.getBoundingClientRect();
+      return {
+        size: { width, height },
+        peek: top - controls.getBoundingClientRect().top,
+        buttonAboveCard: bounds.bottom <= top,
+        buttonHit: button.contains(
+          document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2),
+        ),
+      };
+    });
+  const collapsed = await getGeometry();
+  expect(collapsed.peek).toBeGreaterThan(0);
+  expect(collapsed.peek).toBeLessThanOrEqual(8);
+  expect(collapsed.buttonHit).toBe(false);
+  await expect(controls).toHaveCSS('transition-duration', '0.15s');
+  await section.screenshot({ path: test.info().outputPath('tray-dark-collapsed.png') });
+  await card.locator('.repository-card-heading').hover();
+  await expect.poll(getGeometry).toMatchObject({ buttonAboveCard: true, buttonHit: true });
+  await section.screenshot({ path: test.info().outputPath('tray-dark-expanded.png') });
+  const openButton = (await start.boundingBox())!;
+  await page.mouse.move(openButton.x + openButton.width / 2, openButton.y + openButton.height / 2, {
+    steps: 6,
+  });
+  await expect(page.getByRole('tooltip', { name: '开始运行', exact: true })).toBeVisible();
+  await expect.poll(getGeometry).toMatchObject({ buttonAboveCard: true, buttonHit: true });
+  await start.click();
+  const stop = controls.getByRole('button', { name: '停止', exact: true });
+  await expect(controls.getByRole('timer')).toBeVisible();
+  await expect.poll(getGeometry).toMatchObject({ buttonAboveCard: true, buttonHit: true });
+  await page.mouse.move(1, 1);
+  await expect.poll(getGeometry).toEqual(collapsed);
+  await card.locator('.repository-card-heading').hover();
+  await expect.poll(getGeometry).toMatchObject({ buttonAboveCard: true, buttonHit: true });
+  await stop.click();
+  await expect(start).toBeEnabled();
+});
+
+test('无悬停的触屏可以直接点击服务按钮', async ({ browser, baseURL }) => {
+  const page = await browser.newPage({
+    baseURL,
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 850 },
+  });
+  try {
+    await page.goto('/design-system');
+    const section = page.getByRole('region', { name: '仓库卡片', exact: true });
+    const card = section.getByTestId('repository-node');
+    const controls = card.getByRole('group', { name: '本地服务', exact: true });
+    const start = controls.getByRole('button', { name: '开始运行', exact: true });
+    await section.scrollIntoViewIfNeeded();
+    const cardBox = (await card.boundingBox())!;
+    const startBox = (await start.boundingBox())!;
+    expect(startBox.y + startBox.height).toBeLessThanOrEqual(cardBox.y);
+    expect(startBox.height).toBeGreaterThanOrEqual(44);
+    await start.tap();
+    await expect(controls.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+  } finally {
+    await page.close();
+  }
+});
+
 test('从仓库详情配置、启动、重启和停止项目服务，并保留外部端口占用者', async ({
   baseURL,
   browser,
@@ -73,7 +147,10 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     await expect(dialog).not.toBeVisible();
     const start = cardControls.getByRole('button', { name: '开始运行', exact: true });
     await expect(start.locator('svg.lucide-play')).toBeVisible();
-    await start.hover();
+    await card.locator('.repository-card-heading').hover();
+    await expect(cardControls).toHaveCSS('transform', 'none');
+    const startBox = (await start.boundingBox())!;
+    await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
     await expect(page.getByRole('tooltip', { name: '开始运行', exact: true })).toBeVisible();
     await expect(
       page.locator('[data-id="service-branch-card"]').getByRole('group', { name: '本地服务' }),
@@ -85,7 +162,6 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
       { repoId: 'service-repo', revision: config.revision, status: 'stopped' },
     ]);
     const cardBox = (await card.boundingBox())!;
-    const startBox = (await start.boundingBox())!;
     const stoppedTab = (await cardControls.boundingBox())!;
     expect(startBox.width).toBeCloseTo(startBox.height, 0);
     expect(startBox.y + startBox.height).toBeLessThanOrEqual(cardBox.y + 1);
@@ -93,7 +169,7 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     expect(rightGap).toBeGreaterThanOrEqual(8);
     expect(rightGap).toBeLessThanOrEqual(20);
     await expect(card).toHaveCSS('border-top-right-radius', '8px');
-    expect(stoppedTab.y + stoppedTab.height).toBeGreaterThan(cardBox.y);
+    expect(stoppedTab.y + stoppedTab.height).toBeCloseTo(cardBox.y, 0);
     await expect(cardControls).toHaveCSS(
       'background-color',
       await card.evaluate((element) => getComputedStyle(element).backgroundColor),
@@ -170,6 +246,7 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     await expect(cardStatus).toHaveText('运行中');
     await expect(uptime).toHaveText(/^00:00:\d{2}$/);
     const cardStop = cardControls.getByRole('button', { name: '停止', exact: true });
+    await cardStop.focus();
     await expect(cardStop.locator('svg.lucide-square')).toBeVisible();
     const stopBox = (await cardStop.boundingBox())!;
     const uptimeBox = (await uptime.boundingBox())!;
@@ -179,7 +256,6 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     expect(runningTab.width).toBeGreaterThan(stoppedTab.width);
     expect(runningTab.height).toBeCloseTo(stoppedTab.height, 0);
     expect(runningTab.x + runningTab.width).toBeCloseTo(stoppedTab.x + stoppedTab.width, 0);
-    await cardStop.focus();
     await expect(page.getByRole('tooltip', { name: '停止', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('tooltip', { name: '停止', exact: true })).not.toBeVisible();
@@ -227,7 +303,14 @@ test('本地服务规范示例适配明亮英文窄屏', async ({ page }) => {
   const stoppedSize = await measure();
   const cardExample = page.getByRole('region', { name: 'Repository card', exact: true });
   await cardExample.screenshot({ path: test.info().outputPath('card-light-en-stopped.png') });
-  await cardStart.press('Enter');
+  await expect(controls).toHaveCSS('transition-property', 'none');
+  await card.locator('.repository-card-count.staged').focus();
+  await page.keyboard.press('Tab');
+  await expect(cardStart).toBeFocused();
+  await expect(controls).toHaveCSS('transform', 'none');
+  const startBox = (await cardStart.boundingBox())!;
+  expect(startBox.y + startBox.height).toBeLessThanOrEqual((await card.boundingBox())!.y);
+  await page.keyboard.press('Enter');
   await expect(controls.getByRole('status')).toHaveText('Running');
   const uptime = card.getByRole('timer', { name: 'Service uptime' });
   await expect(uptime).toBeVisible();
@@ -241,6 +324,8 @@ test('本地服务规范示例适配明亮英文窄屏', async ({ page }) => {
   await expect(controls.getByRole('button')).toHaveCount(1);
   const cardStop = controls.getByRole('button', { name: 'Stop', exact: true });
   await expect(cardStop).toBeFocused();
+  const stopBox = (await cardStop.boundingBox())!;
+  expect(stopBox.y + stopBox.height).toBeLessThanOrEqual((await card.boundingBox())!.y);
   await cardExample.screenshot({ path: test.info().outputPath('card-light-en.png') });
   await cardStop.press('Enter');
   await expect(cardStart).toBeFocused();

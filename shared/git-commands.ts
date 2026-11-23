@@ -9,6 +9,11 @@ export const gitExecutionOptions = [
   'core.quotepath=false',
 ];
 export const diffOptions = ['--no-ext-diff', '--no-textconv', '--no-color', '--unified=3'];
+export const prepareMergeArguments = (hash: string, marker?: string) => [
+  '-c', 'submodule.recurse=false', '-c', 'rerere.enabled=false',
+  'merge', '--no-ff', '--no-commit', '--no-squash', '--no-edit', '--no-autostash',
+  '--no-overwrite-ignore', ...(marker ? ['-m', marker] : []), '--', hash,
+];
 export function httpRemoteHasCredentials(address: string) {
   return /^https?:\/\/[^/\\?#]*@/i.test(address);
 }

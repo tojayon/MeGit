@@ -386,6 +386,11 @@ export function RelationDialog({
   const [sourceRef, setSourceRef] = useState(initial?.sourceRef ?? '');
   const [targetRef, setTargetRef] = useState(initial?.targetRef ?? '');
   const [localIntegration, setLocalIntegration] = useState(!!initial?.localIntegration);
+  const [localMerge, setLocalMerge] = useState(!!initial?.localMerge);
+  function resetLocalActions() {
+    setLocalIntegration(false);
+    setLocalMerge(false);
+  }
   const [appearance, setAppearance] = useState<
     Pick<FlowEdge, 'routing' | 'sourcePort' | 'targetPort'>
   >({
@@ -452,6 +457,7 @@ export function RelationDialog({
             sourceRef: sourceRef || undefined,
             targetRef: targetRef || undefined,
             localIntegration: canEnableLocalIntegration && localIntegration ? true : undefined,
+            localMerge: canEnableLocalIntegration && localMerge ? true : undefined,
           });
           onClose();
         }}
@@ -463,7 +469,7 @@ export function RelationDialog({
                 value={source}
                 onChange={(e) => {
                   setSource(e.target.value);
-                  setLocalIntegration(false);
+                  resetLocalActions();
                   setError(null);
                 }}
               >
@@ -483,7 +489,7 @@ export function RelationDialog({
                 value={target}
                 onChange={(e) => {
                   setTarget(e.target.value);
-                  setLocalIntegration(false);
+                  resetLocalActions();
                   setError(null);
                 }}
               >
@@ -548,7 +554,7 @@ export function RelationDialog({
                   placeholder={t('relation.inheritCardRef')}
                   onChange={(e) => {
                     setSourceRef(e.target.value);
-                    setLocalIntegration(false);
+                    resetLocalActions();
                     setError(null);
                   }}
                   maxLength={240}
@@ -568,7 +574,7 @@ export function RelationDialog({
                   placeholder={t('relation.inheritCardRef')}
                   onChange={(e) => {
                     setTargetRef(e.target.value);
-                    setLocalIntegration(false);
+                    resetLocalActions();
                     setError(null);
                   }}
                   maxLength={240}
@@ -581,6 +587,12 @@ export function RelationDialog({
             <label className="relation-local-integration">
               <input type="checkbox" checked={localIntegration} onChange={(event) => setLocalIntegration(event.target.checked)} />
               <span>{t('relation.sync.enableLocal')}</span>
+            </label>
+          )}
+          {canEnableLocalIntegration && (
+            <label className="relation-local-integration">
+              <input type="checkbox" checked={localMerge} onChange={(event) => setLocalMerge(event.target.checked)} />
+              <span>{t('relation.merge.enable')}</span>
             </label>
           )}
           <RelationAppearance
