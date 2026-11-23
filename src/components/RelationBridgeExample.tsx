@@ -7,7 +7,8 @@ import { relationPorts } from '../lib/relation-ports';
 import { usePreferences } from '../preferences/store';
 import { Field } from './Field';
 import { RelationActionConfirmation } from './RelationActionDialog';
-import { RelationMergePreview } from './RelationMergeDialog';
+import { RelationMergeHeader, RelationMergePreview } from './RelationMergeDialog';
+import { RelationMergeAi } from './RelationMergeAi';
 import { Dialog } from './Dialogs';
 import { Button } from './Button';
 import type { RelationShortcut } from '../lib/relation-actions';
@@ -160,15 +161,19 @@ export function RelationBridgeExample() {
         />
       </div>
       {shortcut && (shortcut.type === 'merge' ? (
-        <Dialog title={t('relation.sync.merge')} onClose={() => setShortcut(null)} wide>
+        <Dialog title={t('relation.sync.merge')} className="relation-merge-dialog" onClose={() => setShortcut(null)} wide>
           <div className="dialog-body relation-merge-body">
-            <p className="relation-action-direction">{t('relation.sync.direction', shortcut)}</p>
+            <RelationMergeHeader
+              source={{ name: 'MeWiki', ref: 'refs/heads/main', head: 'bf26584' }}
+              target={{ name: 'MeWiki-Server', ref: 'refs/heads/main', head: '132340a' }}
+            />
             <RelationMergePreview result={{
               phase: 'review', sourceTotal: 1, targetTotal: 1,
               sourceCommits: [{ hash: 'bf26584e5d120bbcab9592ec10695a4822991180', subject: 'Update shared notes' }],
               targetCommits: [{ hash: '132340ad59d164f0596b064e9ac320dd65511413', subject: 'Add service documentation' }],
               diff: { text: '--- a/notes.md\n+++ b/notes.md\n@@ -1 +1,2 @@\n # Notes\n+Shared release notes', truncated: false },
             }} />
+            <RelationMergeAi example review={async () => ({ text: t('relation.merge.ai.example') })} />
           </div>
           <footer className="dialog-footer">
             <Button data-dialog-initial-focus="true" onClick={() => setShortcut(null)}>{t('relation.merge.close')}</Button>

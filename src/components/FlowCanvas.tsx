@@ -1724,7 +1724,8 @@ function CanvasContents({
           boardId={board.id}
           edgeId={relationAction.id}
           selection={relationAction.selection}
-          shortcut={relationAction.shortcut}
+          sourceRepo={repositories.find((repo) => repo.id === relationAction.selection.sourceRepo)}
+          targetRepo={relationAction.repo}
           onClose={() => setRelationAction(null)}
           onState={(state) => onRepositoryState(relationAction.repo.id, state)}
           onRefresh={onRefresh}

@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { cardUsesWorktree } from '../shared/card-refs.js';
+import { z } from 'zod';
+import { cardUsesWorktree, isCardRef } from '../shared/card-refs.js';
 import { diffOptions, prepareMergeArguments } from '../shared/git-commands.js';
-import type { RelationMergeRequest, RelationMergeResult, RepoState } from '../shared/types.js';
+import type { RelationMergeRequest, RelationMergeResult, RelationMergeView, RepoState } from '../shared/types.js';
 import { AppError } from './errors.js';
 import { fetchLocalCommit, queueAction, readRepository, runGit } from './git.js';
 
@@ -27,6 +28,23 @@ type Session = {
 const diffLimit = 48_000;
 const commitLimit = 20;
 const mergeMarker = (session: Session) => `MeGit merge ${session.id}`;
+export const commitHashSchema = z.string().regex(/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
+export const relationSelectionSchema = z.strictObject({
+  source: z.string().min(1).max(100),
+  target: z.string().min(1).max(100),
+  sourceRepo: z.string().min(1).max(100),
+  targetRepo: z.string().min(1).max(100),
+  sourceRef: z.string().refine(isCardRef),
+  targetRef: z.string().refine(isCardRef),
+  sourceHead: commitHashSchema,
+  targetHead: commitHashSchema,
+});
+
+function identifyReview<View extends Omit<Extract<RelationMergeView, { phase: 'review' }>, 'reviewKey'> |
+  Omit<Extract<RelationMergeView, { phase: 'pending' }>, 'reviewKey'>>(view: View, ...commits: string[]) {
+  const reviewKey = createHash('sha256').update(JSON.stringify([commits, view])).digest('hex');
+  return { ...view, reviewKey };
+}
 
 function localGit(repo: string, args: string[], options: {
   alternating?: string;
@@ -81,7 +99,7 @@ async function review(context: Context, request: RelationMergeRequest, state: Re
       total: Number(count.stdout.trim()),
       commits: entries.stdout.split('\0').filter(Boolean).map((entry) => {
         const split = entry.indexOf('\x1f');
-        return { hash: entry.slice(0, split), subject: entry.slice(split + 1) };
+        return { hash: entry.slice(0, split), subject: entry.slice(split + 1, split + 241) };
       }),
     };
   }
@@ -90,11 +108,11 @@ async function review(context: Context, request: RelationMergeRequest, state: Re
     unique(sourceHead, targetHead),
     bases.length === 1 ? diff(context.target, [bases[0], sourceHead], alternating) : null,
   ]);
-  return {
+  return identifyReview({
     phase: 'review', sourceTotal: source.total, targetTotal: target.total,
     sourceCommits: source.commits, targetCommits: target.commits, diff: changes,
     blocked: state.operation ? 'branchOperation' : state.changed ? 'dirtyPull' : undefined,
-  };
+  }, sourceHead, targetHead);
 }
 
 async function pending(repo: string, session: Session, state: RepoState) {
@@ -102,7 +120,7 @@ async function pending(repo: string, session: Session, state: RepoState) {
   const before = await index();
   const changes = await diff(repo, ['--cached', session.targetHead]);
   if (before.stdout !== (await index()).stdout) throw new AppError('relationMergeIndexChanged', 409);
-  return {
+  return identifyReview({
     phase: 'pending' as const,
     session: session.id,
     sourceRef: session.sourceRef,
@@ -111,7 +129,7 @@ async function pending(repo: string, session: Session, state: RepoState) {
     conflicts: state.files.filter((file) => file.conflicted).map((file) => file.path),
     ready: !state.files.some((file) => file.conflicted || file.untracked || file.worktreeStatus !== '.'),
     diff: changes,
-  };
+  }, session.sourceHead, session.targetHead);
 }
 
 export function localRelationMerge(context: Context, request: RelationMergeRequest): Promise<RelationMergeResult> {

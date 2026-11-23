@@ -24,6 +24,7 @@ export const errorMessages = {
   connection: '无法连接 MeGit 本地服务。',
   aiInvalid: '请检查 AI 接口地址、模型及输入内容。',
   aiNotConfigured: '请先在「软件设置 → AI 服务」中配置接口地址和模型。',
+  aiMergeReviewChanged: '合并内容已变化，请刷新结果后重新发起 AI 审阅。',
   aiKeyRequired: '更换接口地址时，请重新输入密钥或明确清除旧密钥。',
   aiStorage: '无法读取或保存 AI 设置。API Key 的持久化需要 Windows 系统凭据保护。',
   aiUnavailable: 'AI 服务未返回有效回复。请检查接口地址、模型和密钥后重试。',

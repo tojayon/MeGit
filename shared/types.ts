@@ -251,6 +251,7 @@ export type RelationMergeRequest = RelationMergeSelection & (
 export type RelationMergeResult =
   | {
       phase: 'review';
+      reviewKey: string;
       sourceTotal: number;
       targetTotal: number;
       sourceCommits: { hash: string; subject: string }[];
@@ -260,6 +261,7 @@ export type RelationMergeResult =
     }
   | {
       phase: 'pending';
+      reviewKey: string;
       session: string;
       sourceHead: string;
       sourceRef: string;
@@ -269,6 +271,7 @@ export type RelationMergeResult =
       diff: DiffResult;
     }
   | { phase: 'committed' | 'aborted'; state: RepoState };
+export type RelationMergeView = Extract<RelationMergeResult, { phase: 'review' | 'pending' }>;
 export interface IntegrationState {
   state: 'integrated' | 'pending' | 'unknown';
   sourceHead: string | null;

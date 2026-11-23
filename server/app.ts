@@ -14,7 +14,7 @@ import {
   integrateLocalRelation,
   currentBranchRef,
 } from './git.js';
-import type { GitAction, RepoState, Snapshot } from '../shared/types.js';
+import type { GitAction, RelationMergeRequest, RepoState, Snapshot } from '../shared/types.js';
 import { listRepositoryImages, readRepositoryImage } from './repository-images.js';
 import { readBranchTree, compareBranches } from './branch-tree.js';
 import { readIntegrationHistory } from './integration-history.js';
@@ -26,19 +26,8 @@ import { readCommitContext } from './ai-commit.js';
 import { checkRemoteRead, githubLoginAvailable, loginRemoteGitHub } from './remote-access.js';
 import { NetworkSettings, testNetworkProxy, withProxyFetch } from './network-proxy.js';
 import { LocalServices } from './local-service.js';
-import { localRelationMerge } from './relation-merge.js';
+import { commitHashSchema as hashSchema, localRelationMerge, relationSelectionSchema } from './relation-merge.js';
 
-const hashSchema = z.string().regex(/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
-const relationSelectionSchema = z.strictObject({
-  source: z.string().min(1).max(100),
-  target: z.string().min(1).max(100),
-  sourceRepo: z.string().min(1).max(100),
-  targetRepo: z.string().min(1).max(100),
-  sourceRef: z.string().refine(isCardRef),
-  targetRef: z.string().refine(isCardRef),
-  sourceHead: hashSchema,
-  targetHead: hashSchema,
-});
 const relationActionSchema = relationSelectionSchema.extend({ type: z.enum(['pull', 'push', 'integrate']) });
 const relationMergeSchema = z.discriminatedUnion('step', [
   relationSelectionSchema.extend({ step: z.literal('review') }),
@@ -195,6 +184,11 @@ export function createApp(options: { dataDirectory: string }) {
       {
         repository,
         services,
+        mergeReview: async (boardId, edgeId, selection) => {
+          const view = await runRelationMerge(boardId, edgeId, { ...selection, step: 'review' });
+          if (!('reviewKey' in view)) throw new AppError('aiMergeReviewChanged', 409);
+          return view;
+        },
         proxy: () => network.proxy(),
         board: async (id) => {
           const workspace = await store.read();
@@ -407,15 +401,12 @@ export function createApp(options: { dataDirectory: string }) {
     }
     res.json({ state: await readRepository(targetPath) });
   });
-  app.post('/api/boards/:boardId/relations/:edgeId/merge', async (req, res) => {
-    const parsed = relationMergeSchema.safeParse(req.body);
-    if (!parsed.success) throw new AppError('invalidAction');
+  async function runRelationMerge(boardId: string, edgeId: string, request: RelationMergeRequest) {
     const selection = {
-      ...parsed.data,
-      sourceHead: parsed.data.sourceHead.toLowerCase(),
-      targetHead: parsed.data.targetHead.toLowerCase(),
+      ...request,
+      sourceHead: request.sourceHead.toLowerCase(),
+      targetHead: request.targetHead.toLowerCase(),
     };
-    const { boardId, edgeId } = req.params;
     if (selection.sourceRepo === selection.targetRepo ||
       ![selection.sourceRef, selection.targetRef].every((ref) => ref.startsWith('refs/heads/')))
       throw new AppError('relationActionChanged', 409);
@@ -440,13 +431,18 @@ export function createApp(options: { dataDirectory: string }) {
       return [sourceRepo.path, targetRepo.path] as const;
     }
     const [source, target] = await resolveSelection();
-    res.json(await localRelationMerge({
+    return localRelationMerge({
       boardId, edgeId, source, target, dataDirectory: options.dataDirectory,
       validate: async () => {
         const [latestSource, latestTarget] = await resolveSelection();
         if (latestSource !== source || latestTarget !== target) throw new AppError('relationActionChanged', 409);
       },
-    }, selection));
+    }, selection);
+  }
+  app.post('/api/boards/:boardId/relations/:edgeId/merge', async (req, res) => {
+    const parsed = relationMergeSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError('invalidAction');
+    res.json(await runRelationMerge(req.params.boardId, req.params.edgeId, parsed.data));
   });
   app.get('/api/repositories/:id/images', async (req, res) => {
     const repo = await repository(req.params.id);

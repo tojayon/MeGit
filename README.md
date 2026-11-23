@@ -25,6 +25,7 @@
 - **Review and merge locally** — Enable *Review and merge* on a connection between two local repositories to compare their unique commits before changing anything. Prepare the merge in the checked-out target, review the staged result, and explicitly commit or abort. If files conflict, resolve and stage them in the target, then reopen the connection to continue. No remote or push is needed.
 - **Git workbench** — Compare with the trunk or view the latest commit’s diff using the buttons beside each branch label. Stage changes, commit, and manage branches and remotes in the same workbench. Pull highlights in green when there are incoming commits, and Push highlights in blue when there are outgoing commits. Both show the sync direction and require confirmation. Fetch runs directly.
 - **Optional AI assistant** — Ask about selected repositories, draft commit messages, and review proposed actions before applying them.
+- **AI merge review** — From the merge panel, ask your configured AI service for a summary, possible risks, and suggested checks. Sending the displayed review content requires confirmation. Advice never modifies the repository or runs the merge.
 
 ## Quick start
 

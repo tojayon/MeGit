@@ -1,20 +1,48 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitMerge } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, FileDiff, FolderGit2, GitBranch, GitMerge, LoaderCircle, RefreshCw } from 'lucide-react';
 import { cardRefLabel } from '../../shared/card-refs';
 import { prepareMergeArguments } from '../../shared/git-commands';
-import type { DiffResult, RelationMergeRequest, RelationMergeResult, RelationMergeSelection, RepoState } from '../../shared/types';
+import type { DiffResult, RelationMergeRequest, RelationMergeView, RelationMergeSelection, Repository, RepoState } from '../../shared/types';
 import { api } from '../lib/api';
 import { formatError } from '../lib/messages';
-import type { RelationShortcut } from '../lib/relation-actions';
 import { Button } from './Button';
 import { Dialog } from './Dialogs';
 import { Field } from './Field';
 import { GitCommandPreview } from './GitCommandPreview';
+import { RepositoryAvatar } from './RepositoryAvatar';
+import { RelationMergeAi } from './RelationMergeAi';
 
-type MergeView = Extract<RelationMergeResult, { phase: 'review' | 'pending' }>;
+type MergeIdentity = { repo?: Repository; name: string; ref: string; head: string };
 
-export function RelationMergePreview({ result }: { result: Extract<MergeView, { phase: 'review' }> }) {
+export function RelationMergeHeader({ source, target }: { source: MergeIdentity; target: MergeIdentity }) {
+  const { t } = useTranslation();
+  function identity(side: 'source' | 'target', item: MergeIdentity) {
+    return (
+      <div className="relation-merge-repo">
+        <span className="relation-merge-role">{t(`relation.merge.${side}`)}</span>
+        <div className="relation-merge-repo-main">
+          {item.repo ? <RepositoryAvatar repo={item.repo} size="small" /> : <FolderGit2 size={18} aria-hidden="true" />}
+          <strong title={item.name}>{item.name}</strong>
+        </div>
+        <div className="relation-merge-ref">
+          <GitBranch size={14} aria-hidden="true" />
+          <span title={item.ref}>{cardRefLabel(item.ref)}</span>
+          <code title={item.head}>{item.head.slice(0, 7)}</code>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="relation-merge-repos">
+      {identity('source', source)}
+      <ArrowRight className="relation-merge-arrow" size={18} aria-hidden="true" />
+      {identity('target', target)}
+    </div>
+  );
+}
+
+export function RelationMergePreview({ result }: { result: Omit<Extract<RelationMergeView, { phase: 'review' }>, 'reviewKey'> }) {
   const { t, i18n } = useTranslation();
   const number = new Intl.NumberFormat(i18n.resolvedLanguage);
   return (
@@ -25,7 +53,7 @@ export function RelationMergePreview({ result }: { result: Extract<MergeView, { 
           const total = result[`${side}Total`];
           return (
             <section key={side}>
-              <h3>{t(`relation.merge.${side}Only`)} <span className="muted">{number.format(total)}</span></h3>
+              <h3>{t(`relation.merge.${side}Only`)} <span className="relation-merge-count">{number.format(total)}</span></h3>
               {commits.length ? (
                 <ul>{commits.map(({ hash, subject }) => <li key={hash}><code title={hash}>{hash.slice(0, 7)}</code> {subject}</li>)}</ul>
               ) : <p className="muted">{t('relation.merge.noCommits')}</p>}
@@ -36,7 +64,7 @@ export function RelationMergePreview({ result }: { result: Extract<MergeView, { 
       </div>
       {result.diff ? (
         <details className="relation-merge-diff">
-          <summary>{t('relation.merge.sourceDiff')}</summary>
+          <summary><FileDiff size={15} aria-hidden="true" />{t('relation.merge.sourceDiff')}</summary>
           <p className="muted">{t('relation.merge.sourceDiffHelp')}</p>
           <MergeDiff diff={result.diff} name={t('relation.merge.sourceDiff')} />
         </details>
@@ -49,23 +77,27 @@ function MergeDiff({ diff, name }: { diff: DiffResult; name?: string }) {
   const { t } = useTranslation();
   return (
     <>
-      {diff.text ? <pre className="relation-merge-patch" tabIndex={0} aria-label={name}>{diff.text}</pre> : <p className="muted">{t('relation.merge.noDiff')}</p>}
+      {diff.text ? <pre className="relation-merge-patch" tabIndex={0} aria-label={name}>{diff.text.split('\n').map((line, index) => (
+        <span key={index} className={line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ') ? 'diff-meta' :
+          line.startsWith('+') ? 'diff-add' : line.startsWith('-') ? 'diff-remove' : line.startsWith('@@') ? 'diff-hunk' : undefined}>{line}{'\n'}</span>
+      ))}</pre> : <p className="muted">{t('relation.merge.noDiff')}</p>}
       {diff.truncated && <p role="status">{t('relation.merge.truncated')}</p>}
     </>
   );
 }
 
-export function RelationMergeDialog({ boardId, edgeId, selection, shortcut, onClose, onState, onRefresh }: {
+export function RelationMergeDialog({ boardId, edgeId, selection, sourceRepo, targetRepo, onClose, onState, onRefresh }: {
   boardId: string;
   edgeId: string;
   selection: RelationMergeSelection;
-  shortcut: RelationShortcut;
+  sourceRepo?: Repository;
+  targetRepo: Repository;
   onClose: () => void;
   onState: (state: RepoState) => void;
   onRefresh: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [result, setResult] = useState<MergeView>();
+  const [result, setResult] = useState<RelationMergeView>();
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -94,7 +126,7 @@ export function RelationMergeDialog({ boardId, edgeId, selection, shortcut, onCl
     } catch (failure) {
       setError(failure);
     } finally {
-      if (action.step !== 'review') void onRefresh();
+      void onRefresh();
       setConfirmAbort(false);
       setBusy(false);
     }
@@ -104,18 +136,25 @@ export function RelationMergeDialog({ boardId, edgeId, selection, shortcut, onCl
   const review = result?.phase === 'review' ? result : undefined;
   const abort = pending ? { ...selection, step: 'abort' as const, session: pending.session } : null;
   return (
-    <Dialog title={t('relation.sync.merge')} titleIcon={<GitMerge size={18} />} onClose={onClose} wide busy={busy}>
-      <div className="dialog-body relation-merge-body">
-        <p className="relation-action-direction">{t('relation.sync.direction', shortcut)}</p>
-        <p className="relation-merge-tips">
-          <code title={pending?.sourceHead || selection.sourceHead}>{(pending?.sourceHead || selection.sourceHead).slice(0, 7)}</code>
-          <span aria-hidden="true">→</span><code title={selection.targetHead}>{selection.targetHead.slice(0, 7)}</code>
-        </p>
-        {!result && !error && <p role="status">{t('common.loading')}</p>}
+    <Dialog title={t('relation.sync.merge')} titleIcon={<GitMerge size={18} />} className="relation-merge-dialog" onClose={onClose} wide busy={busy}>
+      <div className="dialog-body relation-merge-body" aria-busy={busy || undefined}>
+        <RelationMergeHeader
+          source={{ repo: sourceRepo, name: sourceRepo?.name || t('relation.merge.source'), ref: pending?.sourceRef || selection.sourceRef, head: pending?.sourceHead || selection.sourceHead }}
+          target={{ repo: targetRepo, name: targetRepo.name, ref: selection.targetRef, head: selection.targetHead }}
+        />
+        {!result && !error && <div className="loading-region" role="status"><LoaderCircle size={18} className="spin" aria-hidden="true" />{t('common.loading')}</div>}
+        {result && (
+          <div className="relation-merge-phase" role="status" data-conflicts={!!pending?.conflicts.length}>
+            {pending?.conflicts.length ? <AlertTriangle size={18} aria-hidden="true" /> : pending ? <Check size={18} aria-hidden="true" /> : <FileDiff size={18} aria-hidden="true" />}
+            <div>
+              <strong>{t(pending?.conflicts.length ? 'relation.merge.needsResolution' : pending ? 'relation.merge.prepared' : 'relation.merge.readOnly')}</strong>
+              <p>{pending ? t('relation.merge.pending', { branch: cardRefLabel(pending.sourceRef) }) : t('relation.merge.prepareHelp')}</p>
+            </div>
+          </div>
+        )}
         {review && (
           <>
             <RelationMergePreview result={review} />
-            <p>{t('relation.merge.prepareHelp')}</p>
             {review.blocked && <p role="status" className="error-message">{t(`errors.${review.blocked}`)}</p>}
             <details className="relation-merge-diff">
               <summary>{t('gitCommands.title')}</summary>
@@ -125,7 +164,6 @@ export function RelationMergeDialog({ boardId, edgeId, selection, shortcut, onCl
         )}
         {pending && (
           <>
-            <p role="status">{t('relation.merge.pending', { branch: cardRefLabel(pending.sourceRef) })}</p>
             {pending.conflicts.length > 0 && (
               <section className="relation-merge-conflicts">
                 <h3>{t('relation.merge.conflicts')}</h3>
@@ -138,20 +176,22 @@ export function RelationMergeDialog({ boardId, edgeId, selection, shortcut, onCl
               <h3>{t('relation.merge.staged')}</h3>
               <MergeDiff diff={pending.diff} name={t('relation.merge.staged')} />
             </section>
-            {!confirmAbort && <Field label={t('relation.merge.message')}>
-              <textarea rows={2} maxLength={10000} value={message} onChange={(event) => setMessage(event.target.value)} disabled={busy} />
-            </Field>}
             {confirmAbort && <p role="alert" className="error-message">{t('relation.merge.abortHelp')}</p>}
           </>
         )}
+        {result && !confirmAbort && <RelationMergeAi key={result.reviewKey} disabled={busy}
+          review={(signal) => api.reviewMergeWithAi(boardId, edgeId, selection, result.reviewKey, signal)} />}
+        {pending && !confirmAbort && <Field label={t('relation.merge.message')}>
+          <textarea rows={2} maxLength={10000} value={message} onChange={(event) => setMessage(event.target.value)} disabled={busy} />
+        </Field>}
         {error != null && <p role="alert" className="error-message">{formatError(error)}</p>}
       </div>
       <footer className="dialog-footer">
         <Button data-dialog-initial-focus="true" disabled={busy} onClick={confirmAbort ? () => setConfirmAbort(false) : onClose}>
           {t(confirmAbort ? 'common.cancel' : 'relation.merge.close')}
         </Button>
-        {!confirmAbort && (pending || review?.blocked || error != null) && (
-          <Button disabled={busy} onClick={() => void run({ ...selection, step: 'review' })}>{t('relation.merge.refresh')}</Button>
+        {!confirmAbort && (result || error != null) && (
+          <Button icon={<RefreshCw size={15} />} disabled={busy} onClick={() => void run({ ...selection, step: 'review' })}>{t('relation.merge.refresh')}</Button>
         )}
         {abort && <Button variant={confirmAbort ? 'danger' : 'default'} disabled={busy} onClick={() => confirmAbort ? void run(abort) : setConfirmAbort(true)}>
           {t(confirmAbort ? 'relation.merge.confirmAbort' : 'relation.merge.abort')}

@@ -28,6 +28,11 @@ test('审阅本地分叉并在冲突解决后显式提交合并', async ({ page,
       edges: [{ id: 'merge', source: 'a', target: 'b', kind: 'integration', label: '', localMerge: true, localIntegration: true }],
     });
     expect((await request.put('/api/workspace', { headers, data: workspace })).ok()).toBe(true);
+    const aiRequests: Array<{ kind: string; approved: boolean; reviewKey: string }> = [];
+    await page.route('**/api/ai/assist', async (route) => {
+      aiRequests.push(route.request().postDataJSON());
+      await route.fulfill({ json: { kind: 'mergeReview', text: '建议核对 shared.txt 的内容。' } });
+    });
     await page.goto('/');
     const bridge = page.locator('.repository-relation-label');
     const shortcut = page.getByRole('button', { name: '审阅并合并: A · main → B · main', exact: true });
@@ -42,9 +47,21 @@ test('审阅本地分叉并在冲突解决后显式提交合并', async ({ page,
     await expect(dialog.getByRole('heading', { name: '目标独有 1' })).toBeVisible();
     await dialog.getByText('查看来源改动', { exact: true }).click();
     await expect(dialog.locator('pre')).toContainText('+source version');
+    const ai = dialog.getByRole('region', { name: 'AI 审阅' });
+    await ai.getByRole('button', { name: '请 AI 审阅', exact: true }).click();
+    await expect(ai.getByText(/会发送到你配置的 AI 服务/)).toBeVisible();
+    expect(aiRequests).toHaveLength(0);
+    await ai.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(ai.getByRole('button', { name: '请 AI 审阅', exact: true })).toBeFocused();
+    await ai.getByRole('button', { name: '请 AI 审阅', exact: true }).click();
+    await ai.getByRole('button', { name: '确认发送', exact: true }).click();
+    await expect(ai.getByRole('status')).toHaveText('建议核对 shared.txt 的内容。');
+    expect(aiRequests).toEqual([{ kind: 'mergeReview', approved: true, reviewKey: expect.stringMatching(/^[a-f0-9]{64}$/),
+      boardId: workspace.boards[0].id, edgeId: 'merge', selection: expect.any(Object), language: 'zh-CN' }]);
     expect(await git(target, 'status', '--porcelain')).toBe('');
     await dialog.getByRole('button', { name: '准备合并', exact: true }).click();
     await expect(dialog.getByRole('heading', { name: '冲突文件' })).toBeVisible();
+    await expect(ai.getByText('建议核对 shared.txt 的内容。')).toHaveCount(0);
     await expect(dialog.getByText('shared.txt', { exact: true })).toBeVisible();
     expect(await git(target, 'rev-parse', 'HEAD')).toBe(targetHead);
     await dialog.getByRole('button', { name: '关闭窗口', exact: true }).click();
@@ -66,6 +83,33 @@ test('审阅本地分叉并在冲突解决后显式提交合并', async ({ page,
   } finally {
     await cleanup();
   }
+});
+
+test('明亮英文窄屏的合并规范示例不请求真实 AI', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('megit.preferences', JSON.stringify({
+    version: 1, theme: 'light', language: 'en',
+  })));
+  let providerRequests = 0;
+  await page.route('**/api/ai/assist', async (route) => {
+    providerRequests++;
+    await route.abort();
+  });
+  await page.goto('/design-system');
+  const card = page.locator('.design-card').filter({ has: page.getByRole('heading', { name: 'Repository status bridge', exact: true }) });
+  await card.getByLabel('Connection shortcuts').selectOption('merge');
+  await card.locator('.repository-relation-label').focus();
+  await card.getByRole('button', { name: /^Review and merge:/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Review and merge', exact: true });
+  await expect(dialog.getByText('MeWiki-Server', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Ask AI to review' }).click();
+  await expect(dialog.getByText(/No data will be sent/)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Confirm and send' }).click();
+  await expect(dialog.getByRole('status')).toContainText('does not contact an AI service');
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(providerRequests).toBe(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 });
 
 test('待推送拖动和保存视角期间保持亮蓝色，确认后才推送', async ({ page, request }) => {

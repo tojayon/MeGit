@@ -5231,14 +5231,98 @@ code {
 .repository-relation-shortcut .icon-button {
   background: var(--surface-raised);
 }
+.dialog.wide.relation-merge-dialog {
+  width: min(var(--relation-merge-dialog-width), calc(100vw - 32px));
+}
+.relation-merge-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.relation-merge-dialog > :is(.dialog-header, .dialog-footer) {
+  flex: none;
+}
+.relation-merge-dialog > .relation-merge-body {
+  overflow: auto;
+  min-height: 0;
+}
 .relation-merge-body h3 {
   margin: 0;
   font-size: var(--text-dense);
 }
-.relation-merge-tips {
-  display: flex;
+.relation-merge-body p {
+  margin: 0;
+}
+.relation-merge-repos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
   gap: var(--space-2);
+}
+.relation-merge-repo {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+}
+.relation-merge-role,
+.relation-merge-ref,
+.relation-merge-arrow {
   color: var(--muted);
+}
+.relation-merge-role,
+.relation-merge-ref {
+  font-size: var(--text-caption);
+}
+.relation-merge-repo-main,
+.relation-merge-ref,
+.relation-merge-section-heading,
+.relation-merge-section-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.relation-merge-repo-main strong,
+.relation-merge-ref span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.relation-merge-ref {
+  flex-wrap: wrap;
+}
+.relation-merge-ref code {
+  margin-inline-start: auto;
+}
+.relation-merge-phase {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--accent-soft);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-dense);
+}
+.relation-merge-phase > svg {
+  flex: none;
+  color: var(--accent);
+}
+.relation-merge-phase p {
+  color: var(--text-secondary);
+  margin-block-start: var(--space-1);
+}
+.relation-merge-phase[data-conflicts='true'] {
+  background: var(--orange-soft);
+}
+.relation-merge-phase[data-conflicts='true'] > svg {
+  color: var(--orange);
+}
+.relation-merge-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: var(--space-1);
 }
 .relation-merge-sides > section,
 .relation-merge-conflicts {
@@ -5257,6 +5341,12 @@ code {
 }
 .relation-merge-diff > summary {
   cursor: pointer;
+  padding: var(--space-2) 0;
+}
+.relation-merge-diff > summary svg {
+  vertical-align: middle;
+  margin-inline-end: var(--space-2);
+  color: var(--muted);
 }
 .relation-merge-diff > :not(:first-child) {
   margin-block-start: var(--space-2);
@@ -5269,6 +5359,34 @@ code {
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface-raised);
+}
+.relation-merge-ai {
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-3);
+  font-size: var(--text-dense);
+}
+.relation-merge-section-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.relation-merge-section-heading h3 svg {
+  color: var(--accent);
+}
+.relation-merge-ai-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.relation-merge-ai-result {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  padding-block-start: var(--space-2);
+  border-top: 1px solid var(--border);
 }
 .relation-sync-button,
 .git-action-tone {

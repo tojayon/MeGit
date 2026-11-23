@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { once } from 'node:events';
-import { request, type Server } from 'node:http';
+import { createServer, request, type Server } from 'node:http';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -191,6 +191,37 @@ describe('本机 API 边界与端到端 Git 数据', () => {
     await save(true);
     const review = await (await merge('review')).json();
     expect(review).toMatchObject({ phase: 'review', sourceTotal: 1, targetTotal: 1, diff: { text: expect.stringContaining('+from source') } });
+    const calls: string[] = [];
+    let changeDuringReview = false;
+    const provider = createServer(async (req, res) => {
+      let raw = '';
+      for await (const chunk of req) raw += chunk;
+      calls.push(raw);
+      if (changeDuringReview) {
+        await writeFile(path.join(target, 'incoming.txt'), 'new staged content');
+        await git(target, 'add', '--', 'incoming.txt');
+      }
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ choices: [{ message: { content: 'Review fixture advice' } }] }));
+    }).listen(0, '127.0.0.1');
+    await once(provider, 'listening');
+    cleanups.push(() => new Promise((resolve, reject) => provider.close((error) => error ? reject(error) : resolve())));
+    const address = provider.address();
+    if (!address || typeof address === 'string') throw new Error('No provider port');
+    expect((await fetch(`${base}/api/ai/settings`, {
+      method: 'PUT', headers, body: JSON.stringify({ endpoint: `http://127.0.0.1:${address.port}/v1`, model: 'review-fixture' }),
+    })).ok).toBe(true);
+    await writeFile(path.join(repo, '.env'), 'LOCAL_SECRET_NEVER_SEND');
+    const aiReview = (reviewKey: string, approved = true) => fetch(`${base}/api/ai/assist`, {
+      method: 'POST', headers, body: JSON.stringify({ kind: 'mergeReview', boardId: board.id, edgeId: 'link',
+        selection: refs, reviewKey, approved, language: 'en' }),
+    });
+    expect((await aiReview(review.reviewKey, false)).status).toBe(400);
+    expect(calls).toHaveLength(0);
+    expect(await (await aiReview(review.reviewKey)).json()).toEqual({ kind: 'mergeReview', text: 'Review fixture advice' });
+    expect(calls[0]).toContain('from source');
+    expect(calls[0]).not.toContain('LOCAL_SECRET_NEVER_SEND');
+    expect(calls[0]).not.toContain('merge-target');
     await expect(git(target, 'cat-file', '-e', sourceHead)).rejects.toThrow();
     expect(await git(target, 'status', '--porcelain')).toBe('');
     expect((await merge('prepare', { sourceHead: targetHead })).status).toBe(409);
@@ -212,6 +243,12 @@ describe('本机 API 边界与端到端 Git 数据', () => {
     expect((await merge('abort', { session: prepared.session })).ok).toBe(true);
     expect(await git(target, 'status', '--porcelain')).toBe('');
     const afterAbort = await (await merge('prepare')).json();
+    expect((await aiReview(review.reviewKey)).status).toBe(409);
+    expect(calls).toHaveLength(1);
+    expect(await (await aiReview(afterAbort.reviewKey)).json()).toEqual({ kind: 'mergeReview', text: 'Review fixture advice' });
+    expect(calls[1]).toContain('pending');
+    changeDuringReview = true;
+    expect(await (await aiReview(afterAbort.reviewKey)).json()).toMatchObject({ code: 'aiMergeReviewChanged' });
     await git(target, 'merge', '--abort');
     await git(target, 'merge', '--no-ff', '--no-commit', sourceHead);
     expect((await merge('abort', { session: afterAbort.session })).status).toBe(409);

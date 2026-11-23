@@ -781,6 +781,23 @@ const en = {
       integrated: '{{target}}: Fast-forward integration completed',
     },
     merge: {
+      source: 'Source',
+      target: 'Target',
+      readOnly: 'Before merging · Read-only preview',
+      prepared: 'Merge prepared · Not committed',
+      needsResolution: 'Merge prepared · Conflicts to resolve',
+      ai: {
+        title: 'AI review',
+        start: 'Ask AI to review',
+        again: 'Review again',
+        help: 'Get a summary, possible risks, and suggested checks without changing the merge.',
+        consent: 'The commit summaries, diff, and any conflict paths shown here will be sent to your configured AI service. Make sure this content can be shared.',
+        send: 'Confirm and send',
+        working: 'AI is reviewing the current diff…',
+        stop: 'Stop review',
+        example: 'The source updates the release notes. Check that the notes still match the target after merging. This example does not contact an AI service.',
+        exampleConsent: 'This example shows a simulated response. No data will be sent.',
+      },
       enable: 'Enable review and merge on this connection',
       sourceOnly: 'Only in source',
       targetOnly: 'Only in target',
@@ -1121,6 +1138,7 @@ const en = {
     projectPlanMissing: 'This delivery plan has expired or was already used. Generate a new plan.',
     projectWrite: 'Not all changes could be saved. Check the list of files already written.',
     aiNotConfigured: 'Configure the endpoint and model in Settings → AI service first.',
+    aiMergeReviewChanged: 'The merge changed. Refresh the result before requesting another AI review.',
     aiKeyRequired:
       'Enter a new API Key or explicitly clear the saved key when changing the endpoint.',
     aiStorage:

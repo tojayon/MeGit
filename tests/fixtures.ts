@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -11,7 +11,8 @@ export const git = async (cwd: string, ...args: string[]) =>
   ).stdout.trim();
 
 export async function fixture() {
-  const root = await mkdtemp(path.join(tmpdir(), 'megit-test-'));
+  const temporaryDirectory = await realpath(tmpdir());
+  const root = await mkdtemp(path.join(temporaryDirectory, 'megit-test-'));
   const repo = path.join(root, '示例 repo');
   await mkdir(repo);
   await git(repo, 'init', '-b', 'main');
@@ -22,7 +23,10 @@ export async function fixture() {
     root,
     repo,
     cleanup: async () => {
-      if (!path.basename(root).startsWith('megit-test-') || path.dirname(root) !== tmpdir())
+      if (
+        !path.basename(root).startsWith('megit-test-') ||
+        path.dirname(root) !== temporaryDirectory
+      )
         throw new Error('Invalid cleanup root');
       await rm(root, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 });
     },
