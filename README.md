@@ -47,6 +47,10 @@ Open **[127.0.0.1:4317](http://127.0.0.1:4317)**. On Windows, you can also doubl
 
 Add two local repositories and connect them with a **Code integration** edge to compare their Git refs by commit ancestry.
 
+Hold **Shift** while dragging board cards, groups, or a selection to move only horizontally or vertically. The main drag direction sets the axis until you release Shift. Auto snap only adjusts positions along that axis; hold **Alt** to bypass snapping without unlocking it.
+
+Open a board under **My workflows**; the current workflow is highlighted as a dark card. To register or manage local repositories, open **Repository management** just above **Preferences** at the bottom of the sidebar.
+
 ## Product gallery
 
 ### AI assistant
@@ -54,6 +58,8 @@ Add two local repositories and connect them with a **Code integration** edge to 
 ![Floating AI chat with UI Library and Web App selected as references](docs/screenshots/ai-assistant.png)
 
 *Demo conversation: two repository references, a release-readiness question, and a suggested next step.*
+
+The reference picker is the first control in the reference row. The lower-left controls show what is sent and which capabilities are active. The model button opens Quick AI settings for the endpoint, model, and API key, next to the Send or Stop button in the message box’s lower-right cutout. Project delivery permissions remain in Software settings.
 
 | Branch map | Integration comparison |
 | :---: | :---: |
@@ -74,13 +80,13 @@ Add two local repositories and connect them with a **Code integration** edge to 
 
 ## Local by default
 
-**AI project delivery** is off by default. Enable it in **Settings → AI service**, then open **Project delivery** in the existing AI chat. Authorize one registered repository and the displayed AI provider, review the proposed new or modified text files, then confirm which action to take. A generated PowerShell entry can also be saved to that repository’s local startup settings after explicit trust. Saving does not run the script, stage changes, commit, or push.
+The bottom-left control in the AI composer shows the current conversation’s capabilities. **Default scope** reads referenced repository context and reads and edits the referenced workflow. For file changes, enable **AI project delivery** in **Settings → AI service**, reference exactly one repository in the chat, then choose **Default scope → Repository read/write**. There’s no second repository picker. **Learn more** shows the local path, AI provider, and file access rules. Send requests in the same chat and review proposals before saving. Ordinary questions and workflow edits still work. Changing repository references restores the default scope; new chats and page reloads do not inherit the authorization. A generated PowerShell entry can also be saved to local startup settings after explicit trust. Saving does not run the script, stage changes, commit, or push.
 
 MeGit binds to `127.0.0.1` and saves boards locally. Git uses your existing configuration and credentials. An AI provider receives task context only when you use a configured AI feature.
 
 On Windows, open **Local service** in a repository's details to approve an existing npm script or a repository PowerShell script. Start, stop, or restart the managed foreground service and read its output directly in the terminal panel. An optional TCP port enables readiness and conflict checks; MeGit does not stop unrelated listeners or launch services automatically.
 
-Once configured, use the play icon below the repository details button on the right of its current HEAD board card. While the service runs, the play icon becomes a Stop button and the card background shows a subtle green glow that gently pulses (static with reduced motion). Errors appear on the card; Restart, configuration, and full output stay in the Local service panel.
+Click the repository name on a board card to open its details. Once a local service is configured, use the play button on the current HEAD card’s raised top-right corner. While the service runs, the corner extends left to show elapsed time before the Stop button without resizing the card itself. It shows `02:03:04` until one full day has elapsed, then includes days (for example, `01d 02:03:04`). The timer updates every second, continues across page refreshes, and resets when the service restarts. Errors appear on the card; Restart, configuration, and full output stay in the Local service panel.
 
 See the [local service script specification](docs/LOCAL_SERVICE_SCRIPTS.md) for entry rules and working npm and PowerShell examples.
 

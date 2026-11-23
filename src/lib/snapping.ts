@@ -186,13 +186,20 @@ function guides(match: Match, moving: Rect, axis: Axis, zoom: number): SnapGuide
   ];
 }
 
-export function snapMove(scene: SnapScene, delta: Point, zoom: number, previous: SnapLocks = {}) {
+export function snapMove(
+  scene: SnapScene,
+  delta: Point,
+  zoom: number,
+  previous: SnapLocks = {},
+  movementAxis: Axis | null = null,
+) {
   const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   const moving = { ...scene.moving, x: scene.moving.x + delta.x, y: scene.moving.y + delta.y };
   const locks: SnapLocks = {};
   const matches: Partial<Record<Axis, Match>> = {};
   const corrected = { ...delta };
   for (const axis of ['x', 'y'] as const) {
+    if (movementAxis && axis !== movementAxis) continue;
     const choices = candidates(scene, moving, axis, scale);
     const held = choices.find(
       (choice) => choice.id === previous[axis] && Math.abs(choice.at - moving[axis]) * scale <= 10,

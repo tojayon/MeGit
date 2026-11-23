@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ArrowUpRight,
   CircleAlert,
   GitBranch,
   GitCommitHorizontal,
@@ -66,6 +65,9 @@ export function RepositoryCard({
   const blocked = !showWorktree || !!busy || !state || !!state.error;
   const canCommit = !blocked && !conflicts && staged > 0 && !!message.trim();
   const canGenerate = !blocked && !conflicts && staged > 0;
+  const openLabel = t('repository.viewNamed', {
+    name: reference ? `${repo.name} · ${reference}` : repo.name,
+  });
   async function generate() {
     if (!canGenerate) return;
     setError(null);
@@ -90,11 +92,25 @@ export function RepositoryCard({
       data-testid="repository-node"
     >
       {children}
-      <div className="repository-card-heading with-shortcuts">
+      <div className="repository-card-heading">
         <RepositoryAvatar repo={repo} size="large" />
         <div className="repository-card-identity">
           <div className="repository-card-title-row">
-            <h3 title={repo.name}>{repo.name}</h3>
+            <h3 aria-label={repo.name}>
+              <Tooltip content={openLabel}>
+                <button
+                  type="button"
+                  className="repository-card-title-button nodrag nopan"
+                  aria-label={openLabel}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpen();
+                  }}
+                >
+                  {repo.name}
+                </button>
+              </Tooltip>
+            </h3>
           </div>
           {state?.error ? (
             <p className="repository-card-status danger-text">
@@ -145,23 +161,8 @@ export function RepositoryCard({
             </div>
           )}
         </div>
-        <div className="repository-card-open nodrag nopan">
-          <IconButton
-            label={t('repository.viewNamed', {
-              name: reference ? `${repo.name} · ${reference}` : repo.name,
-            })}
-            size="small"
-            placement="right"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpen();
-            }}
-          >
-            <ArrowUpRight size={14} />
-          </IconButton>
-        </div>
-        {serviceControls}
       </div>
+      {serviceControls}
       {showWorktree && (
         <>
           <form

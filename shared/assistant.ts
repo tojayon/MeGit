@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ErrorInfo } from './messages.js';
 import { assistantGuideSchema, type AssistantGuide } from './assistant-guidance.js';
 import { boardOperationSchema, type AssistantBoardPlan } from './assistant-board.js';
+import { projectGrantSchema, type ProjectPlan } from './assistant-project.js';
 
 export const assistantInputSchema = z
   .strictObject({
@@ -12,6 +13,7 @@ export const assistantInputSchema = z
       .refine((ids) => new Set(ids).size === ids.length),
     language: z.enum(['zh-CN', 'en']),
     boardId: z.string().min(1).max(100).optional(),
+    projectGrant: projectGrantSchema.optional(),
     includeStagedDiff: z.boolean().default(false),
     planIds: z.array(z.string().max(128)).max(16).optional(),
     history: z
@@ -21,7 +23,7 @@ export const assistantInputSchema = z
       .max(16)
       .default([]),
   })
-  .refine((input) => input.repositoryIds.length > 0 || !!input.boardId);
+  .refine((input) => input.repositoryIds.length > 0 || !!input.boardId || !!input.projectGrant);
 export type AssistantInput = z.infer<typeof assistantInputSchema>;
 export const assistantOutputSchema = z.strictObject({
   text: z.string().trim().min(1).max(12000),
@@ -69,4 +71,5 @@ export interface AssistantReply {
   guides?: AssistantGuide[];
   plan?: AssistantPlan;
   boardPlan?: AssistantBoardPlan;
+  projectPlan?: ProjectPlan;
 }

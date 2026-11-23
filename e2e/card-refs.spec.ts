@@ -34,19 +34,22 @@ test('同仓库分支卡片各自代表自己的引用，工作区操作跟随�
     await expect(
       page.locator('[data-edge-id="compare"]').filter({ hasText: '目标领先 1' }),
     ).toBeVisible();
-    await remote.getByRole('heading', { name: 'MeWiki' }).click();
+    await remote.locator('.repository-avatar').click();
     await expect(remote).toHaveClass(/\bselected\b/);
     await expect(page.locator('.repository-inspector')).toHaveCount(0);
     const branchTree = page.waitForRequest(
       (entry) => new URL(entry.url()).searchParams.get('base') === 'refs/remotes/origin/main',
     );
-    await remote.locator('.repository-card-open').click();
+    const openRemote = remote
+      .getByRole('heading', { name: 'MeWiki' })
+      .getByRole('button', { name: '查看MeWiki · origin/main' });
+    await openRemote.click();
     await branchTree;
     await expect(page.locator('.repository-inspector')).toContainText('MeWiki · origin/main');
     await expect(
       page.locator('.tree-tip.on-trunk[data-ref="refs/remotes/origin/main"]'),
     ).toBeVisible();
-    await local.getByRole('heading', { name: 'MeWiki' }).click();
+    await local.locator('.repository-avatar').click();
     await expect(local).toHaveClass(/\bselected\b/);
     await expect(page.locator('.repository-inspector')).toContainText('MeWiki · origin/main');
     await git(fixtureRepo.repo, 'switch', 'dev');
@@ -63,7 +66,7 @@ test('同仓库分支卡片各自代表自己的引用，工作区操作跟随�
     await page.reload();
     await expect(remote).toContainText('绑定的分支已不可用');
     await expect(remote.locator('.repository-card-actions')).toHaveCount(0);
-    await remote.locator('.repository-card-open').click();
+    await openRemote.click();
     await expect(page.locator('.repository-inspector .panel-error')).toBeVisible();
     await page.getByRole('button', { name: '绑定卡片分支', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '绑定卡片分支' });

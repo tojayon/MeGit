@@ -79,6 +79,7 @@ export function useLocalServiceCards(boardId: string, enabled: boolean) {
                         repoId,
                         revision: next.config?.revision ?? null,
                         status: next.status,
+                        runningSince: next.runningSince,
                         error: next.error,
                       }
                     : card,

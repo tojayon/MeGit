@@ -10,7 +10,11 @@ export function RepositoryCardExample() {
   const [message, setMessage] = useState('');
   const [staged, setStaged] = useState(false);
   const [changed, setChanged] = useState(true);
-  const [serviceStatus, setServiceStatus] = useState<LocalServiceCardState['status']>('stopped');
+  const [service, setService] = useState<LocalServiceCardState>({
+    repoId: 'card-example',
+    revision: 'preview',
+    status: 'stopped',
+  });
   const state: RepoState = {
     branch: 'feature/repository-card-layout',
     head: 'a'.repeat(40),
@@ -47,8 +51,14 @@ export function RepositoryCardExample() {
         busy=""
         serviceControls={
           <LocalServiceCardControls
-            service={{ repoId: 'card-example', revision: 'preview', status: serviceStatus }}
-            onAction={async (action) => setServiceStatus(action === 'stop' ? 'stopped' : 'running')}
+            service={service}
+            onAction={async (action) =>
+              setService({
+                ...service,
+                status: action === 'stop' ? 'stopped' : 'running',
+                runningSince: action === 'stop' ? undefined : Date.now(),
+              })
+            }
           />
         }
         onGenerate={async () => {

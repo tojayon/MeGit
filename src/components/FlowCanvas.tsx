@@ -416,9 +416,7 @@ function CanvasContents({
   const selectionPublished = useRef(false);
   const selectionBatch = useRef<ReturnType<typeof createAnimationFrameBatch> | null>(null);
   const dragPreviewBatch = useRef<ReturnType<typeof createAnimationFrameBatch> | null>(null);
-  const previewDragRef = useRef<(raw: Point, bypass: boolean) => Record<string, Point> | null>(
-    () => null,
-  );
+  const previewDragRef = useRef<() => Record<string, Point> | null>(() => null);
   const shellRef = useRef<HTMLDivElement>(null);
   const reconnectingId = useRef<string | null>(null);
   const { x: viewportX, y: viewportY, zoom } = useViewport();
@@ -495,6 +493,8 @@ function CanvasContents({
     locks: SnapLocks;
     raw: Point;
     bypass: boolean;
+    shift: boolean;
+    axis: keyof Point | null;
   } | null>(null);
   const previousCount = useRef(board.nodes.length + (board.notes?.length || 0));
   const positioned = board.nodes.map((n) => ({
@@ -917,24 +917,50 @@ function CanvasContents({
     ],
   );
 
-  const previewDrag = useCallback(
-    (raw: Point, bypass: boolean) => {
-      const gesture = drag.current;
-      if (!gesture) return null;
-      gesture.raw = raw;
-      gesture.bypass = bypass;
-      const snapped =
-        preferences.snappingEnabled && !bypass && gesture.scene
-          ? snapMove(gesture.scene, raw, zoom, gesture.locks)
-          : { delta: raw, locks: {}, guides: [] };
-      gesture.locks = snapped.locks;
-      const next = moveSelection(gesture.board, gesture.ids, snapped.delta);
-      setPositions((current) => ({ ...current, ...next }));
-      setSnapGuides(snapped.guides);
-      return next;
-    },
-    [preferences.snappingEnabled, zoom, setPositions],
-  );
+  const updateDragModifiers = useCallback((event: Pick<MouseEvent, 'altKey' | 'shiftKey'>) => {
+    const gesture = drag.current;
+    if (!gesture || (gesture.bypass === event.altKey && gesture.shift === event.shiftKey))
+      return false;
+    gesture.bypass = event.altKey;
+    gesture.shift = event.shiftKey;
+    if (!gesture.shift) gesture.axis = null;
+    return true;
+  }, []);
+
+  const updateDragPosition = (node: CanvasNode) => {
+    const gesture = drag.current;
+    if (!gesture) return false;
+    gesture.raw = {
+      x: node.position.x - gesture.origin.x,
+      y: node.position.y - gesture.origin.y,
+    };
+    return true;
+  };
+
+  const previewDrag = useCallback(() => {
+    const gesture = drag.current;
+    if (!gesture) return null;
+    const { x, y } = gesture.raw;
+    const horizontal = Math.abs(x) >= Math.abs(y);
+    if (gesture.shift && !gesture.axis && (horizontal ? Math.abs(x) : Math.abs(y)) * zoom >= 4) {
+      gesture.axis = horizontal ? 'x' : 'y';
+    }
+    const delta = gesture.shift
+      ? { x: gesture.axis === 'x' ? x : 0, y: gesture.axis === 'y' ? y : 0 }
+      : gesture.raw;
+    const snapped =
+      preferences.snappingEnabled &&
+      !gesture.bypass &&
+      gesture.scene &&
+      (!gesture.shift || gesture.axis)
+        ? snapMove(gesture.scene, delta, zoom, gesture.locks, gesture.axis)
+        : { delta, locks: {}, guides: [] };
+    gesture.locks = snapped.locks;
+    const next = moveSelection(gesture.board, gesture.ids, snapped.delta);
+    setPositions((current) => ({ ...current, ...next }));
+    setSnapGuides(snapped.guides);
+    return next;
+  }, [preferences.snappingEnabled, zoom, setPositions]);
   useLayoutEffect(() => {
     selectionSyncRef.current = () => {
       if (pendingSelectionIds.current) onSelection([...pendingSelectionIds.current]);
@@ -943,10 +969,7 @@ function CanvasContents({
   }, [onSelection, previewDrag]);
   useLayoutEffect(() => {
     const selectionBatcher = createAnimationFrameBatch(() => selectionSyncRef.current());
-    const dragBatcher = createAnimationFrameBatch(() => {
-      const gesture = drag.current;
-      if (gesture) previewDragRef.current(gesture.raw, gesture.bypass);
-    });
+    const dragBatcher = createAnimationFrameBatch(() => previewDragRef.current());
     selectionBatch.current = selectionBatcher;
     dragPreviewBatch.current = dragBatcher;
     return () => {
@@ -975,10 +998,9 @@ function CanvasContents({
   }, [setPositions, flowStore]);
 
   useEffect(() => {
-    const handleAlt = (event: KeyboardEvent) => {
-      const gesture = drag.current;
-      if (event.key === 'Alt' && gesture && gesture.bypass !== event.altKey)
-        previewDrag(gesture.raw, event.altKey);
+    const handleDragModifier = (event: KeyboardEvent) => {
+      if ((event.key === 'Alt' || event.key === 'Shift') && updateDragModifiers(event))
+        previewDrag();
     };
     const hide = () => {
       if (document.hidden) cancelDrag();
@@ -1004,8 +1026,8 @@ function CanvasContents({
       cancelDrag();
       touchEnd(event);
     };
-    window.addEventListener('keydown', handleAlt);
-    window.addEventListener('keyup', handleAlt);
+    window.addEventListener('keydown', handleDragModifier, true);
+    window.addEventListener('keyup', handleDragModifier, true);
     window.addEventListener('blur', cancelDrag);
     window.addEventListener('focus', release);
     window.addEventListener('mouseup', release, true);
@@ -1015,8 +1037,8 @@ function CanvasContents({
     window.addEventListener('pointercancel', cancelDrag, true);
     document.addEventListener('visibilitychange', hide);
     return () => {
-      window.removeEventListener('keydown', handleAlt);
-      window.removeEventListener('keyup', handleAlt);
+      window.removeEventListener('keydown', handleDragModifier, true);
+      window.removeEventListener('keyup', handleDragModifier, true);
       window.removeEventListener('blur', cancelDrag);
       window.removeEventListener('focus', release);
       window.removeEventListener('mouseup', release, true);
@@ -1026,7 +1048,7 @@ function CanvasContents({
       window.removeEventListener('pointercancel', cancelDrag, true);
       document.removeEventListener('visibilitychange', hide);
     };
-  }, [previewDrag, cancelDrag, flowStore]);
+  }, [previewDrag, updateDragModifiers, cancelDrag, flowStore]);
 
   useEffect(
     () => () => {
@@ -1362,30 +1384,19 @@ function CanvasContents({
             ),
             locks: {},
             raw: { x: 0, y: 0 },
-            bypass: 'altKey' in event && event.altKey,
+            bypass: event.altKey,
+            shift: event.shiftKey,
+            axis: null,
           };
         }}
-        onNodeDrag={(event, node) => {
-          const gesture = drag.current;
-          if (!gesture) return;
-          gesture.raw = {
-            x: node.position.x - gesture.origin.x,
-            y: node.position.y - gesture.origin.y,
-          };
-          gesture.bypass = 'altKey' in event && event.altKey;
-          dragPreviewBatch.current?.schedule();
+        onNodeDrag={(_event, node) => {
+          if (updateDragPosition(node)) dragPreviewBatch.current?.schedule();
         }}
         onNodeDragStop={(event, node) => {
-          const gesture = drag.current;
-          if (!gesture) return;
+          if (!updateDragPosition(node)) return;
+          updateDragModifiers(event);
           dragPreviewBatch.current?.cancel();
-          const next = previewDrag(
-            {
-              x: node.position.x - gesture.origin.x,
-              y: node.position.y - gesture.origin.y,
-            },
-            'altKey' in event && event.altKey,
-          );
+          const next = previewDrag();
           drag.current = null;
           setSnapGuides([]);
           if (next) onMove(next);

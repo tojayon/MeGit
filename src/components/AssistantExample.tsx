@@ -94,7 +94,6 @@ export function AssistantExample() {
           initialRepositoryIds={[]}
           open={open}
           onClose={() => setOpen(false)}
-          onSettings={() => setOpen(false)}
           onRefresh={async () => {}}
         />
       )}

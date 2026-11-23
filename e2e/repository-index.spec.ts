@@ -7,8 +7,8 @@ test('registers and edits a repository independently of the board', async ({ pag
   const root = await mkdtemp(path.resolve('.megit', 'index-repo-'));
   execFileSync('git', ['init', root]);
   await page.goto('/');
-  await page.getByRole('button', { name: '仓库索引', exact: true }).click();
-  const categories = page.getByRole('dialog', { name: '仓库索引' }).getByRole('navigation');
+  await page.getByRole('button', { name: '仓库管理', exact: true }).click();
+  const categories = page.getByRole('dialog', { name: '仓库管理' }).getByRole('navigation');
   await expect(categories).toHaveCSS('flex-direction', 'column');
   await expect(categories.getByRole('button').locator('svg')).toHaveCount(2);
   await page.getByRole('button', { name: '登记仓库', exact: true }).click();

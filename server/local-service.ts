@@ -34,7 +34,7 @@ const active = (record: Runtime | undefined) =>
 
 type Saved = z.infer<typeof savedSchema>;
 type Supervisor = ReturnType<typeof startWindowsService>;
-type Runtime = Pick<LocalServiceState, 'status' | 'log' | 'error' | 'ownerPid'> & {
+type Runtime = Pick<LocalServiceState, 'status' | 'log' | 'error' | 'ownerPid' | 'runningSince'> & {
   supervisor?: Supervisor;
 };
 
@@ -186,6 +186,7 @@ export class LocalServices {
               repoId,
               revision: config.revision,
               status: record?.status ?? 'stopped',
+              runningSince: record?.status === 'running' ? record.runningSince : undefined,
               error: record?.error,
             } satisfies LocalServiceCardState;
           } catch (error) {
@@ -229,6 +230,7 @@ export class LocalServices {
       available,
       config,
       status: record?.status ?? 'stopped',
+      runningSince: record?.status === 'running' ? record.runningSince : undefined,
       log: cleanedLog(record?.log ?? ''),
       error: record?.error,
       ownerPid: record?.ownerPid,
@@ -343,8 +345,11 @@ export class LocalServices {
       target,
       (event) => {
         if (record.status === 'stopping') return;
-        if ('status' in event) record.status = event.status;
-        else {
+        if ('status' in event) {
+          if (event.status === 'running' && record.status !== 'running')
+            record.runningSince = Date.now();
+          record.status = event.status;
+        } else {
           record.status = 'failed';
           record.error = { code: event.error };
           record.ownerPid = event.ownerPid;

@@ -28,6 +28,7 @@ export function InfoPopover({
   panelClassName,
   titleIcon,
   titleDetail,
+  headerAction,
   placement = 'bottom',
   onOpen,
   onClose,
@@ -41,6 +42,7 @@ export function InfoPopover({
   panelClassName?: string;
   titleIcon?: ReactNode;
   titleDetail?: ReactNode;
+  headerAction?: ReactNode;
   placement?: 'top' | 'bottom' | 'right';
   onOpen?: () => void;
   onClose?: () => void;
@@ -190,9 +192,11 @@ export function InfoPopover({
             ) : (
               <h3 id={`${id}-title`}>{label}</h3>
             )}
-            <IconButton label={t('common.close', { name: label })} onClick={() => close(true)}>
-              <X size={16} />
-            </IconButton>
+            {headerAction ?? (
+              <IconButton label={t('common.close', { name: label })} onClick={() => close(true)}>
+                <X size={16} />
+              </IconButton>
+            )}
           </header>
           <div className="info-popover-body">{children}</div>
         </div>

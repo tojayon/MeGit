@@ -11,8 +11,6 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowDown,
   ArrowUp,
-  CircleHelp,
-  FilePenLine,
   FolderGit2,
   History,
   Plus,
@@ -25,8 +23,10 @@ import {
 import type { Board, Repository } from '../../shared/types';
 import type { AssistantBoardPlan as BoardPlan } from '../../shared/assistant-board';
 import { AssistantBoardPlan } from './AssistantBoardPlan';
-import { AssistantProject } from './AssistantProject';
+import { ProjectOutcome, ProjectReview } from './AssistantProject';
+import { AssistantCapability } from './AssistantCapability';
 import type { AiSettings } from '../../shared/ai';
+import type { ProjectGrant, ProjectPlan, ProjectResult } from '../../shared/assistant-project';
 import type { AssistantPlan as Plan, AssistantReply } from '../../shared/assistant';
 import { request } from '../lib/api';
 import { ApiError, formatError } from '../lib/messages';
@@ -44,6 +44,8 @@ import { IconButton } from './IconButton';
 import { AssistantAvatar } from './AssistantAvatar';
 import { Button } from './Button';
 import { InfoPopover } from './InfoPopover';
+import { Dialog } from './Dialogs';
+import { AiPanel } from './AiPanel';
 import { AssistantPlan } from './AssistantPlan';
 import { AssistantGuidance, guidanceForError } from './AssistantGuidance';
 import { AssistantFailureHelp } from './AssistantFailureHelp';
@@ -56,6 +58,21 @@ import {
 } from '../lib/assistant-layout';
 
 type Frame = { x: number; y: number; width: number; height: number };
+type ConversationGrant = {
+  permission: ProjectGrant;
+  repositoryId: string;
+  path: string;
+  revision?: string;
+};
+type ProjectReviewState = {
+  plan: ProjectPlan;
+  grantId: string;
+  conversationId: string;
+  repositoryName: string;
+  applied?: boolean;
+  result?: ProjectResult;
+  error?: unknown;
+};
 const isFrame = (v: unknown): v is Frame =>
   !!v &&
   typeof v === 'object' &&
@@ -70,7 +87,6 @@ export function AssistantPanel({
   initialRepositoryIds,
   open,
   onClose,
-  onSettings,
   onRefresh,
   settingsOpen = false,
   preview = false,
@@ -84,7 +100,6 @@ export function AssistantPanel({
   initialRepositoryIds: string[];
   open: boolean;
   onClose: () => void;
-  onSettings: () => void;
   onRefresh: () => Promise<void>;
   settingsOpen?: boolean;
   preview?: boolean;
@@ -110,7 +125,15 @@ export function AssistantPanel({
   const [planErrors, setPlanErrors] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<unknown>();
   const [settings, setSettings] = useState<AiSettings>();
-  const [projectMode, setProjectMode] = useState(false);
+  const [quickSettingsOpen, setQuickSettingsOpen] = useState(false);
+  const [quickSettingsBusy, setQuickSettingsBusy] = useState(false);
+  const showQuickSettings = () => setQuickSettingsOpen(true);
+  const [grants, setGrants] = useState<Record<string, ConversationGrant>>({});
+  const [projectReviews, setProjectReviews] = useState<Record<string, ProjectReviewState>>({});
+  const [scopeUpdating, setScopeUpdating] = useState(false);
+  const [projectApplying, setProjectApplying] = useState<string>();
+  const projectBusy = useRef(false);
+  const focusReview = useRef<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [executing, setExecuting] = useState<string | null>(null);
   const root = useRef<HTMLElement>(null);
@@ -132,13 +155,26 @@ export function AssistantPanel({
     sessionRef.current = session;
   }, [session]);
   const current = session.conversations.find((item) => item.id === session.activeId)!;
+  const unarchived = repositories.filter((repo) => !repo.archived);
+  const currentIds = current.repositoryIds.filter((id) =>
+    unarchived.some((repo) => repo.id === id),
+  );
+  const destination =
+    currentIds.length === 1 ? unarchived.find((repo) => repo.id === currentIds[0]) : undefined;
+  const savedGrant = grants[current.id];
+  const writeRepository =
+    !preview &&
+    settings?.projectDelivery &&
+    savedGrant?.revision === settings.projectRevision &&
+    destination?.id === savedGrant?.repositoryId &&
+    destination?.path === savedGrant?.path
+      ? destination
+      : undefined;
+  const grant = writeRepository ? savedGrant.permission : undefined;
   const selectedBoard = current.includeBoard === true ? board : undefined;
   const latestAssistantId = [...current.messages]
     .reverse()
     .find((message) => message.role === 'assistant')?.id;
-  const currentIds = current.repositoryIds.filter((id) =>
-    repositories.some((repo) => repo.id === id && !repo.archived),
-  );
   const planIds = [
     ...new Set(current.messages.flatMap((message) => (message.planId ? [message.planId] : []))),
   ];
@@ -157,7 +193,7 @@ export function AssistantPanel({
   );
 
   useEffect(() => {
-    if (!open || preview) return;
+    if (!open || preview || quickSettingsOpen) return;
     const controller = new AbortController();
     void request<AiSettings>('/ai/settings', { signal: controller.signal })
       .then((value) => {
@@ -167,7 +203,7 @@ export function AssistantPanel({
         if (!controller.signal.aborted) setError(failure);
       });
     return () => controller.abort();
-  }, [open, settingsOpen, preview]);
+  }, [open, settingsOpen, preview, quickSettingsOpen]);
   useEffect(() => {
     if (!open || scopeReady) return;
     setScopeReady(true);
@@ -320,8 +356,10 @@ export function AssistantPanel({
     if (
       pending.current ||
       executing ||
+      projectBusy.current ||
+      !settings?.model ||
       !current.draft.trim() ||
-      (!currentIds.length && !selectedBoard) ||
+      (!currentIds.length && !selectedBoard && !grant) ||
       (!!selectedBoard && !boardReady) ||
       current.messages.length >= 78
     )
@@ -371,6 +409,7 @@ export function AssistantPanel({
           prompt,
           repositoryIds: currentIds,
           ...(selectedBoard ? { boardId: selectedBoard.id } : {}),
+          ...(grant ? { projectGrant: grant } : {}),
           language: i18n.resolvedLanguage === 'en' ? 'en' : 'zh-CN',
           includeStagedDiff: current.includeStagedDiff,
           planIds: planIds.slice(-16),
@@ -381,9 +420,23 @@ export function AssistantPanel({
       });
       if (controller.signal.aborted || sessionRef.current.activeId !== conversationId) return;
       if (result.plan) setPlans((saved) => ({ ...saved, [result.plan!.id]: result.plan! }));
+      const messageId = crypto.randomUUID();
+      const projectPlan = result.projectPlan;
+      if (projectPlan && grant && writeRepository) {
+        focusReview.current = messageId;
+        setProjectReviews((saved) => ({
+          ...saved,
+          [messageId]: {
+            plan: projectPlan,
+            grantId: grant.id,
+            conversationId,
+            repositoryName: writeRepository.name,
+          },
+        }));
+      }
       changeCurrent((conversation) => {
         conversation.messages.push({
-          id: crypto.randomUUID(),
+          id: messageId,
           role: 'assistant',
           text: result.text,
           repositoryIds: currentIds,
@@ -394,6 +447,16 @@ export function AssistantPanel({
       });
     } catch (failure) {
       if (!controller.signal.aborted) {
+        if (
+          grant &&
+          failure instanceof ApiError &&
+          ['projectChanged', 'projectPermission', 'projectDisabled', 'repositoryMissing'].includes(
+            failure.code,
+          )
+        ) {
+          void revokeGrant(grant).catch(() => undefined);
+          forgetGrant(conversationId);
+        }
         setError(failure);
         restoreDraft();
       }
@@ -450,8 +513,133 @@ export function AssistantPanel({
     follow.current = false;
     setSession((saved) => ({ ...saved, activeId: id }));
   }
-  const activeRun = !!executing || Object.values(plans).some((plan) => plan.status === 'running');
-  const projectView = projectMode && !preview && settings?.projectDelivery;
+  const activeRun =
+    !!executing ||
+    !!projectApplying ||
+    scopeUpdating ||
+    Object.values(plans).some((plan) => plan.status === 'running');
+
+  function forgetGrant(id: string) {
+    setGrants((saved) => Object.fromEntries(Object.entries(saved).filter(([key]) => key !== id)));
+  }
+
+  function revokeGrant(permission: ProjectGrant) {
+    return request('/ai/project/grants/revoke', {
+      method: 'POST',
+      body: JSON.stringify(permission),
+    });
+  }
+
+  function changeRepositoryReferences(ids: string[]) {
+    if (savedGrant) {
+      forgetGrant(current.id);
+      void revokeGrant(savedGrant.permission).catch(setError);
+    }
+    changeCurrent((conversation) => {
+      conversation.repositoryIds = ids;
+    });
+  }
+
+  async function updateGrant(repo?: Repository) {
+    if (
+      preview ||
+      generating ||
+      activeRun ||
+      projectBusy.current ||
+      !settings?.projectDelivery ||
+      (repo && (repo.id !== destination?.id || repo.path !== destination.path))
+    )
+      return;
+    projectBusy.current = true;
+    setScopeUpdating(true);
+    try {
+      if (savedGrant) {
+        await revokeGrant(savedGrant.permission);
+        forgetGrant(current.id);
+      }
+      if (repo) {
+        const permission = await request<ProjectGrant>('/ai/project/grants', {
+          method: 'POST',
+          body: JSON.stringify({
+            conversationId: current.id,
+            repositoryId: repo.id,
+            repositoryPath: repo.path,
+            endpoint: settings.endpoint,
+            model: settings.model,
+            approved: true,
+          }),
+        });
+        setGrants((saved) => ({
+          ...saved,
+          [current.id]: {
+            permission,
+            repositoryId: repo.id,
+            path: repo.path,
+            revision: settings.projectRevision,
+          },
+        }));
+      }
+    } finally {
+      projectBusy.current = false;
+      setScopeUpdating(false);
+    }
+  }
+
+  async function applyProject(id: string, configure: boolean) {
+    const saved = projectReviews[id];
+    if (
+      !grant ||
+      !saved ||
+      saved.grantId !== grant.id ||
+      saved.applied ||
+      generating ||
+      activeRun ||
+      projectBusy.current
+    )
+      return;
+    projectBusy.current = true;
+    setProjectApplying(id);
+    setProjectReviews((reviews) => ({ ...reviews, [id]: { ...saved, applied: true } }));
+    try {
+      const result = await request<ProjectResult>(
+        `/ai/project/${encodeURIComponent(saved.plan.id)}/apply`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ grant, configure, ...(configure ? { trusted: true } : {}) }),
+        },
+      );
+      setProjectReviews((reviews) => ({ ...reviews, [id]: { ...reviews[id], result } }));
+    } catch (failure) {
+      setProjectReviews((reviews) => ({ ...reviews, [id]: { ...reviews[id], error: failure } }));
+      if (
+        failure instanceof ApiError &&
+        ['projectPermission', 'projectDisabled'].includes(failure.code)
+      )
+        forgetGrant(current.id);
+    } finally {
+      projectBusy.current = false;
+      setProjectApplying(undefined);
+    }
+  }
+
+  function removeConversation(id: string) {
+    const permission = grants[id]?.permission;
+    if (permission) void revokeGrant(permission).catch(() => undefined);
+    forgetGrant(id);
+    setProjectReviews((saved) =>
+      Object.fromEntries(
+        Object.entries(saved).filter(([, review]) => review.conversationId !== id),
+      ),
+    );
+    setSession((saved) => {
+      const conversations = saved.conversations.filter((item) => item.id !== id);
+      if (!conversations.length) conversations.push(newConversation(currentIds));
+      return {
+        conversations,
+        activeId: saved.activeId === id ? conversations[0].id : saved.activeId,
+      };
+    });
+  }
   function continueConversation() {
     changeCurrent((conversation) => {
       conversation.draft ||= t('assistantGuidance.continuePrompt');
@@ -495,7 +683,7 @@ export function AssistantPanel({
                 <button
                   type="button"
                   key={conversation.id}
-                  disabled={activeRun || projectView}
+                  disabled={activeRun}
                   aria-current={conversation.id === current.id ? 'true' : undefined}
                   onClick={() => selectConversation(conversation.id)}
                 >
@@ -506,20 +694,8 @@ export function AssistantPanel({
                   label={t('assistant.deleteConversation', {
                     name: conversation.title || t('assistant.newConversation'),
                   })}
-                  disabled={activeRun || generating || projectView}
-                  onClick={() =>
-                    setSession((saved) => {
-                      const conversations = saved.conversations.filter(
-                        (item) => item.id !== conversation.id,
-                      );
-                      if (!conversations.length) conversations.push(newConversation(currentIds));
-                      return {
-                        conversations,
-                        activeId:
-                          saved.activeId === conversation.id ? conversations[0].id : saved.activeId,
-                      };
-                    })
-                  }
+                  disabled={activeRun || generating}
+                  onClick={() => removeConversation(conversation.id)}
                 >
                   <Trash2 size={14} />
                 </IconButton>
@@ -530,7 +706,7 @@ export function AssistantPanel({
         <IconButton
           label={t('assistant.newConversation')}
           size="small"
-          disabled={activeRun || projectView || session.conversations.length >= 12}
+          disabled={activeRun || session.conversations.length >= 12}
           onClick={() => {
             pending.current?.abort();
             follow.current = true;
@@ -549,21 +725,7 @@ export function AssistantPanel({
           <X size={16} />
         </IconButton>
       </header>
-      {projectView && settings && (
-        <AssistantProject
-          key={JSON.stringify([settings.endpoint, settings.model])}
-          repositories={repositories.filter((repo) => !repo.archived)}
-          initialRepository={currentIds.length === 1 ? currentIds[0] : ''}
-          initialPrompt={current.draft}
-          settings={settings}
-          active={open}
-          onBack={() => {
-            setProjectMode(false);
-            requestAnimationFrame(() => focusWithoutTooltip(input.current));
-          }}
-        />
-      )}
-      <div className="assistant-history-shell" hidden={projectView}>
+      <div className="assistant-history-shell">
         <div
           className="assistant-messages"
           ref={history}
@@ -611,116 +773,148 @@ export function AssistantPanel({
               </div>
             </div>
           )}
-          {current.messages.map((message) => (
-            <article className="assistant-message" data-role={message.role} key={message.id}>
-              {message.role === 'assistant' && (
-                <div className="assistant-message-author">
-                  <AssistantAvatar size={24} />
-                  <strong>{t('assistant.name')}</strong>
-                </div>
-              )}
-              <div className="assistant-text">{message.text}</div>
-              {message.boardPlan && (
-                <AssistantBoardPlan
-                  plan={message.boardPlan}
-                  board={board}
-                  repositories={repositories}
-                  ready={boardReady}
-                  busy={generating || activeRun}
-                  status={message.boardStatus}
-                  onApply={() => {
-                    if (!onApplyBoard?.(message.boardPlan!)) {
-                      setError(new ApiError('assistantBoardChanged'));
-                      return;
-                    }
-                    changeCurrent((conversation) => {
-                      const saved = conversation.messages.find((item) => item.id === message.id);
-                      if (saved) saved.boardStatus = 'applied';
-                    });
-                  }}
-                  onDiscard={() =>
-                    changeCurrent((conversation) => {
-                      const saved = conversation.messages.find((item) => item.id === message.id);
-                      if (saved) saved.boardStatus = 'discarded';
-                    })
-                  }
-                />
-              )}
-              {open &&
-                !preview &&
-                message.role === 'assistant' &&
-                message.id === latestAssistantId && (
-                  <AssistantGuidance
-                    guides={[
-                      ...(message.guides || []),
-                      ...(message.planId
-                        ? (plans[message.planId]?.steps || []).flatMap((step) =>
-                            guidanceForError([step.repositoryId], step.error?.code),
-                          )
-                        : []),
-                    ]}
+          {current.messages.map((message) => {
+            const review = projectReviews[message.id];
+            return (
+              <article className="assistant-message" data-role={message.role} key={message.id}>
+                {message.role === 'assistant' && (
+                  <div className="assistant-message-author">
+                    <AssistantAvatar size={24} />
+                    <strong>{t('assistant.name')}</strong>
+                  </div>
+                )}
+                <div className="assistant-text">{message.text}</div>
+                {review && (
+                  <>
+                    <ProjectReview
+                      plan={review.plan}
+                      repositoryName={review.repositoryName}
+                      apply={(configure) => void applyProject(message.id, configure)}
+                      showSummary={false}
+                      busy={generating || activeRun}
+                      locked={review.applied === true || review.grantId !== grant?.id}
+                      reviewRef={(element) => {
+                        if (!element || focusReview.current !== message.id) return;
+                        focusReview.current = null;
+                        requestAnimationFrame(() => {
+                          if (element.isConnected) focusWithoutTooltip(element);
+                        });
+                      }}
+                    />
+                    {!review.applied && review.grantId !== grant?.id && (
+                      <p className="muted">{t('projectDelivery.revoked')}</p>
+                    )}
+                    <ProjectOutcome
+                      result={review.result}
+                      error={review.error}
+                      busy={projectApplying === message.id}
+                    />
+                  </>
+                )}
+                {message.boardPlan && (
+                  <AssistantBoardPlan
+                    plan={message.boardPlan}
+                    board={board}
                     repositories={repositories}
-                    disabled={generating || activeRun}
-                    onRefresh={onRefresh}
-                    onContinue={continueConversation}
-                    onRepositories={onRepositories}
-                    actionViewKey={actionViewKey}
+                    ready={boardReady}
+                    busy={generating || activeRun}
+                    status={message.boardStatus}
+                    onApply={() => {
+                      if (!onApplyBoard?.(message.boardPlan!)) {
+                        setError(new ApiError('assistantBoardChanged'));
+                        return;
+                      }
+                      changeCurrent((conversation) => {
+                        const saved = conversation.messages.find((item) => item.id === message.id);
+                        if (saved) saved.boardStatus = 'applied';
+                      });
+                    }}
+                    onDiscard={() =>
+                      changeCurrent((conversation) => {
+                        const saved = conversation.messages.find((item) => item.id === message.id);
+                        if (saved) saved.boardStatus = 'discarded';
+                      })
+                    }
                   />
                 )}
-              {message.role === 'user' && (
-                <div className="assistant-message-scope">
-                  {message.boardName && <span>{message.boardName} · </span>}
-                  {message.repositoryIds
-                    .map(
-                      (id) =>
-                        repositories.find((repo) => repo.id === id)?.name ||
-                        t('assistant.missingRepository'),
-                    )
-                    .join(' · ')}
-                </div>
-              )}
-              {message.planId &&
-                (planErrors[message.planId] ? (
-                  <div role="alert" className="error-message">
-                    {formatError(planErrors[message.planId])}
-                    <AssistantFailureHelp
-                      error={planErrors[message.planId]}
+                {open &&
+                  !preview &&
+                  message.role === 'assistant' &&
+                  message.id === latestAssistantId && (
+                    <AssistantGuidance
+                      guides={[
+                        ...(message.guides || []),
+                        ...(message.planId
+                          ? (plans[message.planId]?.steps || []).flatMap((step) =>
+                              guidanceForError([step.repositoryId], step.error?.code),
+                            )
+                          : []),
+                      ]}
+                      repositories={repositories}
                       disabled={generating || activeRun}
-                      onSettings={onSettings}
                       onRefresh={onRefresh}
                       onContinue={continueConversation}
+                      onRepositories={onRepositories}
+                      actionViewKey={actionViewKey}
                     />
+                  )}
+                {message.role === 'user' && (
+                  <div className="assistant-message-scope">
+                    {message.boardName && <span>{message.boardName} · </span>}
+                    {message.repositoryIds
+                      .map(
+                        (id) =>
+                          repositories.find((repo) => repo.id === id)?.name ||
+                          t('assistant.missingRepository'),
+                      )
+                      .join(' · ')}
                   </div>
-                ) : plans[message.planId] ? (
-                  <AssistantPlan
-                    plan={plans[message.planId]}
-                    busy={generating || activeRun}
-                    onExecute={() => void execute(message.planId!)}
-                    onStop={() => void stop(message.planId!)}
-                    onPrepare={continueConversation}
-                    onMessage={(stepId, text) => {
-                      changeCurrent((conversation) => {
-                        const saved = conversation.messages.find((item) => item.id === message.id)!;
-                        (saved.planMessages ??= {})[stepId] = text;
-                      });
-                      setPlans((saved) => ({
-                        ...saved,
-                        [message.planId!]: {
-                          ...saved[message.planId!],
-                          steps: saved[message.planId!].steps.map((step) =>
-                            step.id === stepId
-                              ? { ...step, message: text, commands: [['commit', '-m', text]] }
-                              : step,
-                          ),
-                        },
-                      }));
-                    }}
-                  />
-                ) : (
-                  <p role="status">{t('assistant.loadingPlan')}</p>
-                ))}
-            </article>
-          ))}
+                )}
+                {message.planId &&
+                  (planErrors[message.planId] ? (
+                    <div role="alert" className="error-message">
+                      {formatError(planErrors[message.planId])}
+                      <AssistantFailureHelp
+                        error={planErrors[message.planId]}
+                        disabled={generating || activeRun}
+                        onSettings={showQuickSettings}
+                        onRefresh={onRefresh}
+                        onContinue={continueConversation}
+                      />
+                    </div>
+                  ) : plans[message.planId] ? (
+                    <AssistantPlan
+                      plan={plans[message.planId]}
+                      busy={generating || activeRun}
+                      onExecute={() => void execute(message.planId!)}
+                      onStop={() => void stop(message.planId!)}
+                      onPrepare={continueConversation}
+                      onMessage={(stepId, text) => {
+                        changeCurrent((conversation) => {
+                          const saved = conversation.messages.find(
+                            (item) => item.id === message.id,
+                          )!;
+                          (saved.planMessages ??= {})[stepId] = text;
+                        });
+                        setPlans((saved) => ({
+                          ...saved,
+                          [message.planId!]: {
+                            ...saved[message.planId!],
+                            steps: saved[message.planId!].steps.map((step) =>
+                              step.id === stepId
+                                ? { ...step, message: text, commands: [['commit', '-m', text]] }
+                                : step,
+                            ),
+                          },
+                        }));
+                      }}
+                    />
+                  ) : (
+                    <p role="status">{t('assistant.loadingPlan')}</p>
+                  ))}
+              </article>
+            );
+          })}
           {generating && (
             <p role="status" className="muted">
               {t('assistant.thinking')}
@@ -742,7 +936,7 @@ export function AssistantPanel({
           </Button>
         )}
       </div>
-      <div className="assistant-composer-shell" hidden={projectView}>
+      <div className="assistant-composer-shell">
         {!!error && (
           <div className="error-message" role="alert">
             {formatError(error)}
@@ -760,7 +954,7 @@ export function AssistantPanel({
                 <AssistantFailureHelp
                   error={error}
                   disabled={generating || activeRun}
-                  onSettings={onSettings}
+                  onSettings={showQuickSettings}
                   onRefresh={onRefresh}
                   onContinue={continueConversation}
                 />
@@ -774,13 +968,53 @@ export function AssistantPanel({
             void send();
           }}
         >
-          {!settings?.model && (
-            <Button size="compact" onClick={onSettings}>
-              {t('assistant.configure')}
-            </Button>
-          )}
           <div className="assistant-composer">
             <div className="assistant-references">
+              <InfoPopover
+                label={t('assistant.scope')}
+                placement="top"
+                triggerContent={<FolderGit2 size={16} />}
+              >
+                <div className="assistant-repository-picker">
+                  {board && (
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={!!selectedBoard}
+                        disabled={generating || activeRun}
+                        onChange={(event) =>
+                          changeCurrent((conversation) => {
+                            conversation.includeBoard = event.target.checked;
+                          })
+                        }
+                      />
+                      <span>{t('assistant.board.scope', { name: board.name })}</span>
+                    </label>
+                  )}
+                  {unarchived.map((repo) => (
+                    <label key={repo.id}>
+                      <input
+                        type="checkbox"
+                        checked={currentIds.includes(repo.id)}
+                        disabled={
+                          generating ||
+                          activeRun ||
+                          (!currentIds.includes(repo.id) && currentIds.length >= 20)
+                        }
+                        onChange={(event) =>
+                          changeRepositoryReferences(
+                            event.target.checked
+                              ? [...currentIds, repo.id]
+                              : currentIds.filter((id) => id !== repo.id),
+                          )
+                        }
+                      />
+                      <RepositoryAvatar repo={repo} size="small" />
+                      <span>{repo.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </InfoPopover>
               {selectedBoard && (
                 <span>
                   <Workflow size={14} />
@@ -810,11 +1044,7 @@ export function AssistantPanel({
                       label={t('assistant.removeRepository', { name: repo.name })}
                       disabled={generating || activeRun}
                       onClick={() =>
-                        changeCurrent((conversation) => {
-                          conversation.repositoryIds = conversation.repositoryIds.filter(
-                            (item) => item !== id,
-                          );
-                        })
+                        changeRepositoryReferences(currentIds.filter((item) => item !== id))
                       }
                     >
                       <X size={12} />
@@ -842,54 +1072,8 @@ export function AssistantPanel({
                 }
               }}
             />
-            <div className="assistant-composer-controls">
-              <InfoPopover label={t('assistant.scope')} triggerContent={<FolderGit2 size={16} />}>
-                <div className="assistant-repository-picker">
-                  {board && (
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={!!selectedBoard}
-                        disabled={generating || activeRun}
-                        onChange={(event) =>
-                          changeCurrent((conversation) => {
-                            conversation.includeBoard = event.target.checked;
-                          })
-                        }
-                      />
-                      <span>{t('assistant.board.scope', { name: board.name })}</span>
-                    </label>
-                  )}
-                  {repositories
-                    .filter((repo) => !repo.archived)
-                    .map((repo) => (
-                      <label key={repo.id}>
-                        <input
-                          type="checkbox"
-                          checked={currentIds.includes(repo.id)}
-                          disabled={
-                            generating ||
-                            activeRun ||
-                            (!currentIds.includes(repo.id) && currentIds.length >= 20)
-                          }
-                          onChange={(event) =>
-                            changeCurrent((conversation) => {
-                              conversation.repositoryIds = event.target.checked
-                                ? [...currentIds, repo.id]
-                                : currentIds.filter((id) => id !== repo.id);
-                            })
-                          }
-                        />
-                        <RepositoryAvatar repo={repo} size="small" />
-                        <span>{repo.name}</span>
-                      </label>
-                    ))}
-                </div>
-              </InfoPopover>
-              <InfoPopover
-                label={t('assistant.dataScope')}
-                triggerContent={<CircleHelp size={16} />}
-              >
+            <div className="assistant-composer-footer">
+              <InfoPopover label={t('assistant.dataScope')} placement="top">
                 <p>{t('assistant.disclosure')}</p>
                 <label className="assistant-diff-option">
                   <input
@@ -905,19 +1089,32 @@ export function AssistantPanel({
                   {t('assistant.includeDiff')}
                 </label>
               </InfoPopover>
-              <span className="assistant-model" title={settings?.model}>
-                {settings?.model || t('assistant.noModel')}
-              </span>
-              {!preview && settings?.projectDelivery && (
-                <IconButton size="small" label={t('projectDelivery.title')} disabled={generating || activeRun} onClick={() => setProjectMode(true)}>
-                  <FilePenLine size={16} />
-                </IconButton>
-              )}
-              <IconButton size="small" label={t('settings.title')} onClick={onSettings}>
-                <Settings2 size={15} />
+              <AssistantCapability
+                key={current.id}
+                settings={settings}
+                repository={destination}
+                referenceCount={currentIds.length}
+                writable={!!grant}
+                busy={generating || activeRun}
+                onGrant={(repo) => updateGrant(repo)}
+                onRevoke={() => updateGrant()}
+              />
+              <IconButton
+                className="assistant-model-settings"
+                label={t('assistant.quickSettings')}
+                help={`${t('assistant.quickSettings')} · ${settings?.model || t('assistant.noModel')}`}
+                aria-haspopup="dialog"
+                disabled={generating || activeRun}
+                onClick={showQuickSettings}
+              >
+                <Settings2 size={15} aria-hidden="true" />
+                <span className="assistant-model">
+                  {settings?.model || t('assistant.noModel')}
+                </span>
               </IconButton>
               {generating ? (
                 <IconButton
+                  className="assistant-send"
                   label={t('assistant.stopGeneration')}
                   onClick={(event) => {
                     // Cancellation replaces this button with a submit button in the same click.
@@ -934,14 +1131,14 @@ export function AssistantPanel({
                   className="assistant-send"
                   disabled={
                     !current.draft.trim() ||
-                    (!currentIds.length && !selectedBoard) ||
+                    (!currentIds.length && !selectedBoard && !grant) ||
                     (!!selectedBoard && !boardReady) ||
                     activeRun ||
                     !settings?.model ||
                     current.messages.length >= 78
                   }
                 >
-                  <ArrowUp size={18} />
+                  <ArrowUp size={22} />
                 </IconButton>
               )}
             </div>
@@ -963,6 +1160,24 @@ export function AssistantPanel({
           )}
         </form>
       </div>
+      {open && quickSettingsOpen && (
+        <Dialog
+          title={t('assistant.quickSettings')}
+          busy={quickSettingsBusy}
+          onClose={() => setQuickSettingsOpen(false)}
+        >
+          <div className="dialog-body assistant-quick-settings">
+            <AiPanel
+              section="service"
+              repositories={[]}
+              quick
+              example={preview}
+              onSaved={setSettings}
+              onBusy={setQuickSettingsBusy}
+            />
+          </div>
+        </Dialog>
+      )}
       {assistantEdges.map((edge) => (
         <button
           key={edge}

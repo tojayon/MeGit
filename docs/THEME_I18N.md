@@ -6,7 +6,7 @@
 
 AI 项目交付使用 `projectDelivery` 双语文案和共享稳定错误码。仓库名称、路径、模型、代码和 AI 原文不翻译；文件数使用复数规则。授权、审阅和结果沿用聊天表面与既有表单 token，两主题复用同一组件。
 
-白板卡片的本地服务控件通过 `localService.cardStart`、`localService.cardRunning` 和共用状态／操作键显示双语文案，运行使用语义成功色，停止使用危险变体。倒梯形在明亮主题复用卡片表面色和阴影，暗黑主题复用抬升表面与边框色。卡片内显示双语错误，图标按钮使用键盘可访问的共用提示。
+白板卡片的本地服务控件使用 `localService.cardStart` 和共用状态／操作键显示双语文案，停止使用危险变体。运行时长使用两套主题共有的次级文字色；数字由 `Intl.NumberFormat` 格式化，未满一天仅显示时分秒，满一天后用 `localService.uptimeFormat` 加上本地化天数。卡片内显示双语错误，图标按钮使用键盘可访问的共用提示。
 
 AI 流程计划使用 `assistant.board` 双语资源，范围、操作、字段、审阅与保存说明同步翻译；步骤名称、原文和条件始终保持用户内容。新增 `assistantBoardInvalid/Changed/Locked/Capacity` 稳定错误，图形预览复用 surface、border、accent、edge-neutral 与 text，不新增色值。流程引用默认关闭，流程快捷问题显式开启；明暗、中英、390px与键盘确认使用同一组件，真实示例只修改内存。
 

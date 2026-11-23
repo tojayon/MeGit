@@ -75,12 +75,14 @@ async function expectFullyPainted(tooltip: Locator) {
 test('左上工具栏提示跨越导航边界时仍完整可见，暗黑中文与明亮英文', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: '选择', exact: true }).hover();
+  await expect(page.getByRole('tooltip')).toContainText('按住 Shift 拖动');
   await expectFullyPainted(page.getByRole('tooltip'));
   await page.getByRole('button', { name: '偏好设置', exact: true }).click();
   await page.getByRole('button', { name: '明亮', exact: true }).click();
   await page.getByLabel('界面语言').selectOption('en');
   await page.getByRole('button', { name: 'Close Preferences', exact: true }).click();
   await page.getByRole('button', { name: 'Select', exact: true }).hover();
+  await expect(page.getByRole('tooltip')).toContainText('Hold Shift while dragging');
   await expectFullyPainted(page.getByRole('tooltip'));
   await page.screenshot({
     path: '.megit/verification/snapping/tooltip-light-en.png',
@@ -198,6 +200,65 @@ test('按下和松开 Alt 即时切换吸附，松手以实际预览保存', asy
   await expect(page.locator('.snap-guides')).toHaveCount(0);
 });
 
+test('按住 Shift 拖动锁定主轴，吸附不改变另一轴，松开按键立即恢复', async ({
+  page,
+  request,
+}) => {
+  await seed(request, 1, {
+    notes: [
+      { id: 'a', title: '对齐目标', text: '', position: { x: 700, y: 344 } },
+      { id: 'b', title: '移动对象', text: '', position: { x: 580, y: 340 } },
+    ],
+  });
+  await page.goto('/');
+  const moving = node(page, 'b');
+  await page.keyboard.down('Shift');
+  const start = await beginDrag(page, moving);
+  await page.mouse.move(start.x + 1, start.y + 2);
+  await expect.poll(() => position(moving)).toEqual({ x: 580, y: 340 });
+  await page.mouse.move(start.x + 116, start.y + 20, { steps: 8 });
+  await expect.poll(() => position(moving)).toEqual({ x: 700, y: 340 });
+  await expect(page.locator('.snap-guides line')).toHaveCount(1);
+  await page.mouse.move(start.x + 116, start.y - 145, { steps: 8 });
+  await expect.poll(() => position(moving)).toEqual({ x: 700, y: 340 });
+  await page.keyboard.down('Alt');
+  await expect.poll(() => position(moving)).toEqual({ x: 696, y: 340 });
+  await expect(page.locator('.snap-guides')).toHaveCount(0);
+  await page.keyboard.up('Shift');
+  await expect.poll(() => position(moving)).toEqual({ x: 696, y: 195 });
+  await page.keyboard.down('Shift');
+  await expect.poll(() => position(moving)).toEqual({ x: 580, y: 195 });
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+  await page.keyboard.up('Alt');
+  await expect
+    .poll(async () => (await readWorkspace(request)).boards[0].notes![1].position)
+    .toEqual({ x: 580, y: 195 });
+  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await expect.poll(() => position(moving)).toEqual({ x: 580, y: 340 });
+});
+
+test('指针停在白板边缘自动平移时仍可切换 Shift 锁轴', async ({ page, request }) => {
+  await seed(request, 1, {
+    notes: [{ id: 'b', title: '移动对象', text: '', position: { x: 580, y: 340 } }],
+  });
+  await page.goto('/');
+  const moving = node(page, 'b');
+  const start = await beginDrag(page, moving);
+  const canvas = (await page.getByRole('application', { name: '开发流程白板' }).boundingBox())!;
+  await page.mouse.move(canvas.x + canvas.width - 18, start.y + 40, { steps: 8 });
+  await expect.poll(async () => (await position(moving)).y).toBe(380);
+  const beforeLock = await position(moving);
+  await page.keyboard.down('Shift');
+  await expect.poll(async () => (await position(moving)).x).toBeGreaterThan(beforeLock.x + 25);
+  await expect.poll(async () => (await position(moving)).y).toBe(340);
+  const beforeUnlock = await position(moving);
+  await page.keyboard.up('Shift');
+  await expect.poll(async () => (await position(moving)).x).toBeGreaterThan(beforeUnlock.x + 25);
+  await expect.poll(async () => (await position(moving)).y).toBe(380);
+  await page.mouse.up();
+});
+
 test('Escape 取消正在吸附的拖动并回到原位，不创建历史，下一次拖动可正常保存', async ({
   page,
   request,
@@ -287,6 +348,37 @@ test('多选按整体外框吸附，保持相对位置，整次移动只需一�
   await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
 });
 
+test('缩放后的多选框可用 Shift 整体纵移并保持相对位置', async ({ page, request }) => {
+  await seed(request, 0.8, {
+    notes: [
+      { id: 'b', title: '左', text: '', position: { x: 460, y: 360 } },
+      { id: 'c', title: '右', text: '', position: { x: 780, y: 400 } },
+    ],
+  });
+  await page.setViewportSize({ width: 1520, height: 980 });
+  await page.goto('/');
+  const b = (await node(page, 'b').boundingBox())!;
+  const c = (await node(page, 'c').boundingBox())!;
+  await page.mouse.move(b.x - 12, b.y - 12);
+  await page.mouse.down();
+  await page.mouse.move(c.x + c.width + 12, c.y + c.height + 12, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator('.selection-count')).toHaveText('已选 2 项');
+  await page.keyboard.down('Shift');
+  const start = await beginDrag(page, page.locator('.react-flow__nodesselection-rect'), {
+    x: 20,
+    y: 20,
+  });
+  await page.mouse.move(start.x + 32, start.y - 80, { steps: 8 });
+  await expect.poll(() => position(node(page, 'b'))).toEqual({ x: 460, y: 260 });
+  await expect.poll(() => position(node(page, 'c'))).toEqual({ x: 780, y: 300 });
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+  await expect
+    .poll(async () => (await readWorkspace(request)).boards[0].notes!.map((note) => note.position))
+    .toEqual([{ x: 460, y: 260 }, { x: 780, y: 300 }]);
+});
+
 test('横向等间距吸附显示两段参考线；明亮英文和窄屏开关可访问', async ({ page, request }) => {
   await seed(request, 1, {
     notes: [
@@ -324,7 +416,7 @@ test('横向等间距吸附显示两段参考线；明亮英文和窄屏开关�
 });
 
 for (const collapsed of [true, false]) {
-  test(`${collapsed ? '折叠' : '展开'}分组以外框吸附，成员共同移动，锁定布局后禁止拖动`, async ({
+  test(`${collapsed ? '折叠' : '展开'}分组以外框吸附和 Shift 锁轴，锁定布局后禁止拖动`, async ({
     page,
     request,
   }) => {
@@ -369,6 +461,19 @@ for (const collapsed of [true, false]) {
         ]);
       await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
       await expect.poll(() => position(moving)).toEqual({ x: 476, y: 344 });
+
+      await page.keyboard.down('Shift');
+      const constrained = await beginDrag(page, moving, { x: 75, y: 22 });
+      await page.mouse.move(constrained.x + 20, constrained.y - 160, { steps: 8 });
+      await expect.poll(() => position(moving)).toEqual({ x: 476, y: 180 });
+      await page.mouse.up();
+      await page.keyboard.up('Shift');
+      await expect
+        .poll(async () => (await readWorkspace(request)).boards[0].nodes.map((n) => n.position))
+        .toEqual([{ x: 500, y: 236 }, { x: 820, y: 276 }]);
+      await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+      await expect.poll(() => position(moving)).toEqual({ x: 476, y: 344 });
+
       await page.getByRole('button', { name: '锁定布局', exact: true }).click();
       const lockedStart = await beginDrag(page, moving, { x: 75, y: 22 });
       await page.mouse.move(lockedStart.x + 30, lockedStart.y - 160, { steps: 5 });

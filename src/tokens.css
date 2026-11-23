@@ -6,6 +6,8 @@
   --assistant-width: 424px;
   --assistant-height: 660px;
   --assistant-composer-height: 88px;
+  --assistant-send-size: var(--control-default);
+  --assistant-send-notch: calc(var(--assistant-send-size) + var(--space-1) + 1px);
   --assistant-picker-height: 280px;
   --repository-index-card-width: 300px;
   --settings-width: 760px;
@@ -34,7 +36,6 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --motion-explain: 600ms;
-  --motion-service-glow: 6s;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
@@ -79,6 +80,10 @@
   --navigation-flyout-max-height: 480px;
   --ribbon-width: 56px;
   --navigation-gutter: var(--space-2);
+  --navigation-toggle-inset: var(--space-1);
+  --navigation-trailing-size: calc(
+    var(--canvas-control-size) - 2 * (var(--navigation-gutter) - var(--navigation-toggle-inset))
+  );
   --navigation-bottom-inset: var(--space-3);
   --navigation-icon-size: 20px;
   --navigation-action-inset: calc(
@@ -127,6 +132,7 @@
 
 @media (pointer: coarse) {
   :root {
+    --assistant-send-size: var(--control-touch);
     --canvas-control-size: var(--control-touch);
     --panel-heading-control-size: var(--control-touch);
   }

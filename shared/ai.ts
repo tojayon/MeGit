@@ -5,6 +5,7 @@ export interface AiSettings {
   model: string;
   hasApiKey: boolean;
   projectDelivery?: boolean;
+  projectRevision?: string;
 }
 
 export const aiDiagramSchema = z

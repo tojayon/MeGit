@@ -1,25 +1,26 @@
-import { useEffect, useRef, useState, type Ref } from 'react';
+import { useState, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AiSettings } from '../../shared/ai';
 import type { ProjectPlan, ProjectResult } from '../../shared/assistant-project';
-import type { Repository } from '../../shared/types';
-import { request } from '../lib/api';
 import { formatError } from '../lib/messages';
 import { Button } from './Button';
-import { Field } from './Field';
+import { AssistantCapability } from './AssistantCapability';
 
-function ProjectReview({
+export function ProjectReview({
   plan,
   apply,
   busy,
   locked,
   reviewRef,
+  showSummary = true,
+  repositoryName,
 }: {
   plan: ProjectPlan;
   apply: (configure: boolean) => void;
   busy: boolean;
   locked: boolean;
   reviewRef?: Ref<HTMLElement>;
+  showSummary?: boolean;
+  repositoryName?: string;
 }) {
   const { t } = useTranslation();
   const [trusted, setTrusted] = useState(false);
@@ -31,7 +32,12 @@ function ProjectReview({
       aria-label={t('projectDelivery.review')}
     >
       <h3>{t('projectDelivery.review')}</h3>
-      <p>{plan.summary}</p>
+      {repositoryName && (
+        <p>
+          {t('projectDelivery.repository')}: <strong>{repositoryName}</strong>
+        </p>
+      )}
+      {showSummary && <p>{plan.summary}</p>}
       {plan.read.length > 0 && (
         <details>
           <summary>{t('projectDelivery.sentFiles', { count: plan.read.length })}</summary>
@@ -114,242 +120,68 @@ function ProjectReview({
   );
 }
 
-export function AssistantProject({
-  repositories,
-  initialRepository,
-  initialPrompt,
-  settings,
-  active,
-  onBack,
+export function ProjectOutcome({
+  result,
+  busy,
+  error,
 }: {
-  repositories: Repository[];
-  initialRepository: string;
-  initialPrompt: string;
-  settings: AiSettings;
-  active: boolean;
-  onBack: () => void;
+  result?: ProjectResult;
+  busy: boolean;
+  error?: unknown;
 }) {
   const { t } = useTranslation();
-  const [repoId, setRepoId] = useState(initialRepository);
-  const [prompt, setPrompt] = useState(initialPrompt);
-  const [authorized, setAuthorized] = useState(false);
-  const [plan, setPlan] = useState<ProjectPlan>();
-  const [result, setResult] = useState<ProjectResult>();
-  const [problem, setProblem] = useState<unknown>();
-  const [busy, setBusy] = useState<'prepare' | 'apply'>();
-  const [locked, setLocked] = useState(false);
-  const pending = useRef<AbortController | null>(null);
-  const applying = useRef(false);
-  const top = useRef<HTMLHeadingElement>(null);
-  const review = useRef<HTMLElement>(null);
-  const repo = repositories.find((item) => item.id === repoId);
-
-  useEffect(() => () => pending.current?.abort(), []);
-  useEffect(() => {
-    if (!active) pending.current?.abort();
-    else (plan ? review.current : top.current)?.focus();
-  }, [active, plan]);
-
-  async function prepare() {
-    if (!authorized || !repo || !prompt.trim() || pending.current || applying.current) return;
-    const controller = new AbortController();
-    pending.current = controller;
-    setBusy('prepare');
-    setProblem(undefined);
-    try {
-      const prepared = await request<ProjectPlan>('/ai/project/prepare', {
-        method: 'POST',
-        signal: controller.signal,
-        body: JSON.stringify({
-          repositoryId: repo.id,
-          repositoryPath: repo.path,
-          prompt,
-          endpoint: settings.endpoint,
-          model: settings.model,
-          approved: true,
-        }),
-      });
-      if (!controller.signal.aborted) setPlan(prepared);
-    } catch (error) {
-      if (!controller.signal.aborted) setProblem(error);
-    } finally {
-      pending.current = null;
-      setAuthorized(false);
-      setBusy(undefined);
-    }
-  }
-
-  async function apply(configure: boolean) {
-    if (!plan || !repo || applying.current || locked) return;
-    applying.current = true;
-    setBusy('apply');
-    setProblem(undefined);
-    setLocked(true);
-    try {
-      setResult(
-        await request<ProjectResult>(`/ai/project/${encodeURIComponent(plan.id)}/apply`, {
-          method: 'POST',
-          body: JSON.stringify({ configure, ...(configure ? { trusted: true } : {}) }),
-        }),
-      );
-    } catch (error) {
-      setProblem(error);
-    } finally {
-      applying.current = false;
-      setBusy(undefined);
-    }
-  }
-
   return (
-    <div
-      className="assistant-project"
-      onKeyDown={(event) => {
-        if (busy === 'apply' && event.key === 'Escape') event.stopPropagation();
-      }}
-    >
-      <div className="assistant-project-title">
-        <h3 ref={top} tabIndex={-1}>
-          {t('projectDelivery.title')}
-        </h3>
-        <Button size="compact" disabled={busy === 'apply'} onClick={onBack}>
-          {t('projectDelivery.back')}
-        </Button>
-      </div>
-      {!plan ? (
-        <form
-          className="settings-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void prepare();
-          }}
-        >
-          <Field label={t('projectDelivery.repository')}>
-            <select
-              value={repoId}
-              disabled={!!busy}
-              onChange={(event) => {
-                setRepoId(event.target.value);
-                setAuthorized(false);
-              }}
-            >
-              <option value="">{t('ai.selectRepository')}</option>
-              {repositories.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          {repo && <code className="muted">{repo.path}</code>}
-          <Field label={t('projectDelivery.task')}>
-            <textarea
-              value={prompt}
-              disabled={!!busy}
-              maxLength={4000}
-              rows={3}
-              onChange={(event) => setPrompt(event.target.value)}
-            />
-          </Field>
-          <div className="assistant-project-config">
-            <p>
-              {t('projectDelivery.recipient', {
-                endpoint: settings.endpoint,
-                model: settings.model,
-              })}
-            </p>
-            <label className="assistant-diff-option">
-              <input
-                type="checkbox"
-                checked={authorized}
-                disabled={!!busy || !repo}
-                onChange={(event) => setAuthorized(event.target.checked)}
-              />
-              <span>{t('projectDelivery.disclosure')}</span>
-            </label>
-          </div>
-          <div className="settings-actions">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={!repo || !authorized || !prompt.trim()}
-              busy={busy === 'prepare'}
-            >
-              {t('projectDelivery.prepare')}
-            </Button>
-            {busy === 'prepare' && (
-              <Button onClick={() => pending.current?.abort()}>
-                {t('assistant.stopGeneration')}
-              </Button>
-            )}
-          </div>
-        </form>
-      ) : (
-        <>
-          <p className="assistant-project-task">
-            <strong>{repo?.name}</strong> · {prompt}
-          </p>
-          <ProjectReview
-            plan={plan}
-            reviewRef={review}
-            locked={locked || !repo}
-            busy={!!busy}
-            apply={(configure) => void apply(configure)}
-          />
-          {!repo && (
-            <p role="alert" className="error-message">
-              {t('errors.repositoryMissing')}
-            </p>
+    <>
+      {busy && <p role="status">{t('projectDelivery.applying')}</p>}
+      {result && (result.written.length > 0 || result.configured) && (
+        <div role="status" className="assistant-project-config">
+          {result.written.length > 0 && (
+            <>
+              <strong>{t('projectDelivery.written', { count: result.written.length })}</strong>
+              <ul>
+                {result.written.map((name) => (
+                  <li key={name}>
+                    <code>{name}</code>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
-          {busy === 'apply' && <p role="status">{t('projectDelivery.applying')}</p>}
-          {result && (
-            <div role="status" className="assistant-project-config">
-              {result.written.length > 0 && (
-                <>
-                  <strong>{t('projectDelivery.written', { count: result.written.length })}</strong>
-                  <ul>
-                    {result.written.map((name) => (
-                      <li key={name}>
-                        <code>{name}</code>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {result.configured && <p>{t('projectDelivery.configured')}</p>}
-            </div>
-          )}
-          {!busy && (
-            <div className="settings-actions">
-              <Button
-                onClick={() => {
-                  setPlan(undefined);
-                  setResult(undefined);
-                  setProblem(undefined);
-                  setLocked(false);
-                }}
-              >
-                {t('projectDelivery.startOver')}
-              </Button>
-            </div>
-          )}
-        </>
+          {result.configured && <p>{t('projectDelivery.configured')}</p>}
+        </div>
       )}
-      {!!(problem || result?.error) && (
+      {!!(error || result?.error) && (
         <p role="alert" className="error-message">
-          {formatError(problem || result?.error)}
+          {formatError(error || result?.error)}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
 export function AssistantProjectExample() {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<boolean>();
+  const [writeEnabled, setWriteEnabled] = useState(false);
+  const repository = { id: 'example', name: 'Example Wiki', path: 'C:\\Projects\\Example-Wiki' };
   const entry = 'scripts/start.ps1';
   return (
     <section className="design-card">
       <h2>{t('projectDelivery.title')}</h2>
+      <AssistantCapability
+        settings={{
+          endpoint: 'http://127.0.0.1:8080/v1/chat/completions',
+          model: 'local-model',
+          hasApiKey: false,
+          projectDelivery: true,
+        }}
+        repository={repository}
+        referenceCount={1}
+        writable={writeEnabled}
+        busy={false}
+        onGrant={async () => setWriteEnabled(true)}
+        onRevoke={async () => setWriteEnabled(false)}
+      />
       <ProjectReview
         plan={{
           id: 'example',

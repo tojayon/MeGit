@@ -175,6 +175,7 @@ describe.skipIf(process.platform !== 'win32')('本地服务', () => {
       error: { code: 'localServicePortBusy' },
       ownerPid: process.pid,
     });
+    expect(await status()).not.toHaveProperty('runningSince');
     expect(server.listening).toBe(true);
     server.close();
     await once(server, 'close');
@@ -182,14 +183,18 @@ describe.skipIf(process.platform !== 'win32')('本地服务', () => {
     await expect
       .poll(status, { timeout: 15000 })
       .toMatchObject({ status: 'running', log: expect.stringContaining('fixture online') });
+    const firstRunningSince = (await status()).runningSince;
+    expect(firstRunningSince).toEqual(expect.any(Number));
     const first = await readPid(port);
     await writeFile(path.join(repo, 'package.json'), '{"scripts":{"dev":"node launcher.cjs"}}\n');
     expect((await action('restart')).data.code).toBe('localServiceReview');
     expect(await readPid(port)).toBe(first);
+    expect((await status()).runningSince).toBe(firstRunningSince);
     await writeFile(path.join(repo, 'package.json'), '{"scripts":{"dev":"node launcher.cjs"}}');
     expect((await action('restart')).status).toBe(200);
     await expect.poll(() => readPid(port).catch(() => first), { timeout: 15000 }).not.toBe(first);
     await expect.poll(status).toMatchObject({ status: 'running' });
+    expect((await status()).runningSince).toBeGreaterThan(firstRunningSince);
     await close();
     await expect(readPid(port)).rejects.toThrow();
   }, 45000);

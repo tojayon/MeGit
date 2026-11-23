@@ -210,8 +210,8 @@ test('配置错误可直达设置，计划失效可刷新和重新准备且不�
     await panel.getByRole('textbox', { name: '给 AI 助手的消息' }).fill('检查仓库');
     await panel.getByRole('button', { name: '发送消息', exact: true }).click();
     await panel.getByRole('button', { name: '配置 AI 服务', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: '软件设置', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: '关闭软件设置', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'AI 快捷设置', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
     code = 'assistantPlanExpired';
     await panel.getByRole('button', { name: '发送消息', exact: true }).click();
     await expect(panel.getByRole('button', { name: '刷新状态', exact: true })).toBeVisible();

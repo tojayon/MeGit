@@ -43,6 +43,9 @@
   --accent-hover: #26b6f5;
   --accent-soft: #002a3d;
   --on-accent: #000d1f;
+  --workflow-tab-active-bg: var(--accent-soft);
+  --workflow-tab-active-text: var(--text);
+  --workflow-tab-active-hover: var(--hover);
   --brand-wordmark: #e9edf3;
   --brand-symbol-outline: #e9edf3cc;
   --brand-icon-surface: #ffffff;
@@ -130,6 +133,9 @@
   --accent-hover: #012557;
   --accent-soft: #f0f3f7;
   --on-accent: #ffffff;
+  --workflow-tab-active-bg: var(--accent-solid);
+  --workflow-tab-active-text: var(--on-accent);
+  --workflow-tab-active-hover: var(--accent-hover);
   --brand-wordmark: #01357c;
   --brand-symbol-outline: #ffffff00;
   --brand-icon-surface: #ffffff;

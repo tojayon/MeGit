@@ -593,11 +593,6 @@ export default function App() {
           switchWorkflow(id);
         }}
         onSelectRepo={(id) => openRepo(id, undefined, true)}
-        onCanvas={() => {
-          reopenTab(board.id);
-          setModal(null);
-          clearSelection();
-        }}
         onRepositories={() => setModal('repositories')}
         onCreate={() => setModal('new-board')}
         onPreferences={() => setModal('preferences')}
@@ -636,7 +631,6 @@ export default function App() {
         initialRepositoryIds={[...new Set(board.nodes.map((node) => node.repoId))]}
         open={assistantOpen}
         onClose={() => setAssistantOpen(false)}
-        onSettings={() => setModal('settings')}
         onRefresh={refresh}
         settingsOpen={modal === 'settings'}
         onRepositories={() => setModal('repositories')}

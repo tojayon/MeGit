@@ -1,9 +1,11 @@
 import { link, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ProjectDelivery } from '../server/assistant-project.js';
 import { fixture, git } from './fixtures.js';
 import { LocalServices } from '../server/local-service.js';
+import type { ProjectGrant } from '../shared/assistant-project.js';
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -13,8 +15,8 @@ afterEach(async () => {
 const model = { endpoint: 'http://127.0.0.1:8888/v1/chat/completions', model: 'fixture' };
 const input = {
   repositoryId: 'repo',
+  conversationId: randomUUID(),
   ...model,
-  prompt: 'Generate a local launch script',
   approved: true,
 };
 const newFile = { path: 'scripts/dev.ps1', content: "& node 'server.js'\nexit $LASTEXITCODE\n" };
@@ -33,7 +35,7 @@ async function setup(outputs: unknown[], onRequest?: () => void) {
   const requests: string[] = [];
   const settings = { ...model, key: 'revision-one', enabled: true };
   const repository = { id: 'repo', path: repo, name: 'Example', archived: false };
-  const delivery = new ProjectDelivery({
+  const project = new ProjectDelivery({
     repository: async () => repository,
     settings: async () => settings,
     complete: async (_settings, messages) => {
@@ -43,8 +45,63 @@ async function setup(outputs: unknown[], onRequest?: () => void) {
     },
     services,
   });
-  return { repo, root, delivery, services, requests, settings, approval, repository };
+  const messages = [{ role: 'user' as const, content: 'Generate a local launch script' }];
+  const grants = new Map<string, ProjectGrant>();
+  const delivery = {
+    async prepare(body: unknown) {
+      const grant = await project.authorize(body);
+      const { plan } = await project.respond(grant, messages);
+      if (!plan) throw new Error('Missing fixture plan');
+      grants.set(plan.id, grant);
+      return plan;
+    },
+    apply(id: string, body: { configure: boolean; trusted?: boolean }) {
+      return project.apply(id, { ...body, grant: grants.get(id) });
+    },
+  };
+  return {
+    repo,
+    root,
+    delivery,
+    project,
+    messages,
+    services,
+    requests,
+    settings,
+    approval,
+    repository,
+  };
 }
+
+it('requires the same conversation grant to read or apply, and invalidates plans after revoke', async () => {
+  const { repo, project, approval, messages, requests } = await setup([
+    { summary: 'Ready', files: [newFile] },
+  ]);
+  const grant = await project.authorize(approval);
+  expect(() => project.checkReference(grant, ['repo'])).not.toThrow();
+  for (const ids of [[], ['other'], ['repo', 'other']]) {
+    expect(() => project.checkReference(grant, ids)).toThrow(
+      expect.objectContaining({ code: 'projectPermission' }),
+    );
+  }
+  await expect(
+    project.respond({ ...grant, conversationId: randomUUID() }, messages),
+  ).rejects.toMatchObject({ code: 'projectPermission' });
+  expect(requests).toHaveLength(0);
+  const { plan } = await project.respond(grant, messages);
+  const other = await project.authorize({ ...approval, conversationId: randomUUID() });
+  await expect(project.apply(plan!.id, { configure: false, grant: other })).rejects.toMatchObject({
+    code: 'projectPermission',
+  });
+  project.revoke(grant);
+  await expect(project.apply(plan!.id, { configure: false, grant })).rejects.toMatchObject({
+    code: 'projectPermission',
+  });
+  await expect(project.respond(grant, messages)).rejects.toMatchObject({
+    code: 'projectPermission',
+  });
+  await expect(readFile(path.join(repo, newFile.path))).rejects.toMatchObject({ code: 'ENOENT' });
+});
 
 it('does not disclose more content after the selected repository is archived', async () => {
   const archive = vi.fn();

@@ -4,6 +4,7 @@ import { RepositoryAvatar } from './RepositoryAvatar';
 import {
   ArrowUpRight,
   CircleHelp,
+  FolderCog,
   FolderGit2,
   Group,
   Network,
@@ -12,7 +13,6 @@ import {
   Plus,
   Settings2,
   Palette,
-  Workflow,
   X,
 } from 'lucide-react';
 import type { Board, FlowNode, Repository, Snapshot, Workspace } from '../../shared/types';
@@ -49,7 +49,6 @@ export function WorkspaceNavigation({
   onSelectBoard,
   onSelectRepo,
   onSelectGroup,
-  onCanvas,
   onRepositories,
   onCreate,
   onPreferences,
@@ -68,7 +67,6 @@ export function WorkspaceNavigation({
   onSelectBoard: (id: string) => void;
   onSelectRepo: (id: string) => void;
   onSelectGroup: (id: string) => void;
-  onCanvas: () => void;
   onRepositories: () => void;
   onCreate: () => void;
   onPreferences: () => void;
@@ -127,13 +125,12 @@ export function WorkspaceNavigation({
     }
   }
 
-  function action(label: string, icon: ReactNode, onClick: () => void, active = false) {
+  function action(label: string, icon: ReactNode, onClick: () => void) {
     return (
       <Tooltip content={label} placement="right">
         <button
-          className={`navigation-action ${active ? 'active' : ''}`}
+          className="navigation-action"
           aria-label={label}
-          aria-current={active ? 'page' : undefined}
           onClick={onClick}
         >
           {icon}
@@ -164,7 +161,9 @@ export function WorkspaceNavigation({
           />
         </span>
         <span>{node.ref ? `${repo.name} · ${cardRefLabel(node.ref)}` : repo.name}</span>
-        <ArrowUpRight size={13} />
+        <span className="navigation-trailing outline-repo-link" aria-hidden="true">
+          <ArrowUpRight size={13} />
+        </span>
       </button>
     );
   }
@@ -184,7 +183,7 @@ export function WorkspaceNavigation({
           >
             <Network size={16} />
             <span>{item.name}</span>
-            <small>{item.nodes.length}</small>
+            <small className="navigation-trailing">{item.nodes.length}</small>
           </button>
         ))}
       </div>
@@ -206,7 +205,7 @@ export function WorkspaceNavigation({
             >
               <Group size={14} />
               <span>{group.name}</span>
-              <small>{group.nodeIds.length}</small>
+              <small className="navigation-trailing">{group.nodeIds.length}</small>
             </button>
             {board.nodes.filter((node) => group.nodeIds.includes(node.id)).map(repositoryItem)}
           </div>
@@ -261,19 +260,6 @@ export function WorkspaceNavigation({
             </div>
           )}
         </header>
-        <nav className="navigation-actions navigation-primary" aria-label={t('nav.main')}>
-          {action(
-            t('nav.canvas'),
-            <Workflow size={20} />,
-            () => {
-              if (collapsed) updatePreferences({ navigationCollapsed: false });
-              onCanvas();
-              if (narrow) onMobileClose();
-            },
-            true,
-          )}
-          {action(t('nav.repositories'), <FolderGit2 size={20} />, onRepositories)}
-        </nav>
         {collapsed && (
           <div className="navigation-actions navigation-collapsed-sections">
             <NavigationFlyout
@@ -304,7 +290,7 @@ export function WorkspaceNavigation({
         >
           <div className="sidebar-section-heading">
             <span>{t('nav.workflows')}</span>
-            <Tooltip content={t('nav.create')}>
+            <Tooltip content={t('nav.create')} className="navigation-trailing">
               <button className="icon-button small" aria-label={t('nav.create')} onClick={onCreate}>
                 <Plus size={16} />
               </button>
@@ -315,7 +301,9 @@ export function WorkspaceNavigation({
             <section className="flow-outline">
               <div className="sidebar-section-heading">
                 <span>{t('nav.onBoard')}</span>
-                <FolderGit2 size={13} />
+                <span className="navigation-trailing" aria-hidden="true">
+                  <FolderGit2 size={13} />
+                </span>
               </div>
               {repositoryList()}
             </section>
@@ -323,8 +311,9 @@ export function WorkspaceNavigation({
         </div>
         <div className="navigation-bottom">
           <div className="navigation-actions">
-            {!narrow && (
-              <div className="navigation-collapse-control">
+            <div className="navigation-collapse-control">
+              <span className="navigation-divider" aria-hidden="true" />
+              {!narrow && (
                 <IconButton
                   label={t(collapsed ? 'nav.expand' : 'nav.collapse')}
                   placement="right"
@@ -335,8 +324,9 @@ export function WorkspaceNavigation({
                 >
                   {collapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
                 </IconButton>
-              </div>
-            )}
+              )}
+            </div>
+            {action(t('nav.repositories'), <FolderCog size={20} />, onRepositories)}
             {action(t('preferences.title'), <Palette size={20} />, onPreferences)}
             {action(t('nav.help'), <CircleHelp size={20} />, onHelp)}
             {action(t('settings.title'), <Settings2 size={20} />, onSettings)}

@@ -138,28 +138,45 @@ test('助手配置保存后立即更新，停止生成保留草稿，范围帮�
     workspace.boards[0].nodes = [{ id: 'n', repoId: 'one', position: { x: 0, y: 0 } }];
     await request.put('/api/workspace', { headers, data: workspace });
     let configured = false;
+    const saves: unknown[] = [];
     await page.route('**/api/ai/settings', async (route) => {
-      if (route.request().method() === 'PUT') configured = true;
+      if (route.request().method() === 'PUT') {
+        configured = true;
+        saves.push(route.request().postDataJSON());
+      }
       await route.fulfill({
         json: configured
           ? {
               endpoint: 'https://example.invalid/v1/chat/completions',
               model: 'new-model',
-              hasApiKey: false,
+              hasApiKey: true,
+              projectDelivery: true,
             }
-          : { endpoint: '', model: '', hasApiKey: false },
+          : { endpoint: '', model: '', hasApiKey: false, projectDelivery: true },
       });
     });
     await page.goto('/');
     await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
     const panel = page.getByRole('complementary', { name: 'MeGit AI 助手' });
-    await panel.getByRole('button', { name: '配置 AI 服务' }).click();
-    const settings = page.getByRole('dialog', { name: '软件设置' });
+    await expect(panel.getByRole('button', { name: '软件设置', exact: true })).toHaveCount(0);
+    const quick = panel.getByRole('button', { name: 'AI 快捷设置', exact: true });
+    await quick.click();
+    const settings = page.getByRole('dialog', { name: 'AI 快捷设置' });
+    await expect(settings.getByRole('checkbox', { name: '启用 AI 项目交付' })).toHaveCount(0);
     await settings.getByLabel('接口地址').fill('https://example.invalid/v1');
     await settings.getByLabel('模型', { exact: true }).fill('new-model');
+    await settings.getByLabel('API Key', { exact: true }).fill('fake-api-key');
     await settings.getByRole('button', { name: '保存 AI 设置' }).click();
     await expect(settings.getByText('AI 设置已保存。')).toBeVisible();
-    await settings.getByRole('button', { name: '关闭软件设置' }).click();
+    expect(saves).toEqual([
+      { endpoint: 'https://example.invalid/v1', model: 'new-model', apiKey: 'fake-api-key' },
+    ]);
+    await expect(settings.getByLabel('API Key（已保存）', { exact: true })).toHaveValue('');
+    await page.route('**/api/ai/test', (route) => route.fulfill({ json: { ok: true } }));
+    await settings.getByRole('button', { name: '测试连接' }).click();
+    await expect(settings.getByText('模型连接成功。')).toBeVisible();
+    await settings.getByRole('button', { name: '关闭AI 快捷设置' }).click();
+    await expect(quick).toBeFocused();
     await expect(panel.getByText('new-model', { exact: true })).toBeVisible();
     await panel.getByRole('button', { name: '发送范围与能力' }).focus();
     await expect(page.getByRole('tooltip')).toContainText('发送范围');
@@ -168,7 +185,41 @@ test('助手配置保存后立即更新，停止生成保留草稿，范围帮�
     await expect(panel.getByLabel('本次允许发送已暂存差异')).not.toBeChecked();
     await page.keyboard.press('Escape');
     const draft = panel.getByRole('textbox', { name: '给 AI 助手的消息' });
+    const send = panel.getByRole('button', { name: '发送消息', exact: true });
+    const scope = panel.getByRole('button', { name: '发送范围与能力' });
+    const capability = panel.getByRole('button', { name: '默认范围', exact: true });
+    const picker = panel.getByRole('button', { name: '选择引用内容' });
+    await picker.click();
+    await panel.getByRole('checkbox', { name: 'One', exact: true }).check();
+    await page.keyboard.press('Escape');
+    const composer = (await panel.locator('.assistant-composer').boundingBox())!;
+    const sendBox = (await send.boundingBox())!;
+    const draftBox = (await draft.boundingBox())!;
+    const referencesBox = (await picker.boundingBox())!;
+    const chipBox = (await panel
+      .locator('.assistant-references')
+      .getByText('One', { exact: true })
+      .boundingBox())!;
+    expect(sendBox.x + sendBox.width).toBe(composer.x + composer.width);
+    expect(sendBox.y + sendBox.height).toBe(composer.y + composer.height);
+    await expect(send.locator('svg')).toHaveCSS('width', '22px');
+    await expect(capability).toHaveCSS('border-top-width', '0px');
+    const footer = await Promise.all(
+      [scope, capability, quick, send].map(async (button) => (await button.boundingBox())!),
+    );
+    for (const [index, box] of footer.entries()) {
+      expect(box.y).toBeGreaterThanOrEqual(draftBox.y + draftBox.height);
+      const previous = footer[index - 1];
+      if (previous) expect(box.x).toBeGreaterThanOrEqual(previous.x + previous.width);
+    }
+    expect(referencesBox.y + referencesBox.height).toBeLessThanOrEqual(draftBox.y);
+    expect(referencesBox.x + referencesBox.width).toBeLessThanOrEqual(chipBox.x);
+    expect(chipBox.y).toBeGreaterThanOrEqual(referencesBox.y);
+    expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(referencesBox.y + referencesBox.height);
     await draft.fill('检查所选仓库');
+    await panel
+      .locator('.assistant-composer')
+      .screenshot({ path: test.info().outputPath('composer-dark-zh.png') });
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -181,6 +232,8 @@ test('助手配置保存后立即更新，停止生成保留草稿，范围帮�
     });
     await panel.getByRole('button', { name: '发送消息', exact: true }).click();
     await expect(panel.getByRole('button', { name: '停止生成' })).toBeVisible();
+    const stopBox = (await panel.getByRole('button', { name: '停止生成' }).boundingBox())!;
+    expect(stopBox).toEqual(sendBox);
     await expect.poll(() => calls).toBe(1);
     await panel.getByRole('button', { name: '停止生成' }).click();
     await expect(draft).toHaveValue('检查所选仓库');

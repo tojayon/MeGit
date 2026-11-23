@@ -1,5 +1,9 @@
+import { z } from 'zod';
 import type { LocalServiceTarget } from './local-service.js';
 import type { ErrorInfo } from './messages.js';
+
+export const projectGrantSchema = z.strictObject({ id: z.uuid(), conversationId: z.uuid() });
+export type ProjectGrant = z.infer<typeof projectGrantSchema>;
 
 export interface ProjectPlan {
   id: string;

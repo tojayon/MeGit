@@ -305,7 +305,7 @@ test('白板弹窗保存名称和说明，关闭重开后保留且不创建 Git 
   await expect(page.locator('.dock-card')).toHaveCount(0);
 });
 
-test('仓库索引跨白板跳转时展开目标仓库的折叠组', async ({ page, request }) => {
+test('仓库管理跨白板跳转时展开目标仓库的折叠组', async ({ page, request }) => {
   const f = await fixture();
   try {
     const workspace = await readWorkspace(request);
@@ -328,9 +328,9 @@ test('仓库索引跨白板跳转时展开目标仓库的折叠组', async ({ pa
       ).ok(),
     ).toBe(true);
     await page.goto('/');
-    await page.getByRole('button', { name: '仓库索引', exact: true }).click();
+    await page.getByRole('button', { name: '仓库管理', exact: true }).click();
     await page
-      .getByRole('dialog', { name: '仓库索引' })
+      .getByRole('dialog', { name: '仓库管理' })
       .getByRole('article').filter({ hasText: '隐藏的仓库' })
       .getByRole('button', { name: '在白板中打开' })
       .click();

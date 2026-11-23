@@ -22,6 +22,7 @@ export interface LocalServiceCardState {
   repoId: string;
   revision: string | null;
   status: LocalServiceState['status'];
+  runningSince?: number;
   error?: ErrorInfo;
 }
 
@@ -29,6 +30,7 @@ export interface LocalServiceState {
   config: LocalServiceConfig | null;
   available: boolean;
   status: 'stopped' | 'starting' | 'running' | 'stopping' | 'failed';
+  runningSince?: number;
   error?: ErrorInfo;
   ownerPid?: number;
   log: string;

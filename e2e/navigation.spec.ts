@@ -1,6 +1,7 @@
 import { test, expect } from './test';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import packageInfo from '../package.json' with { type: 'json' };
+import { commitFile, fixture } from '../tests/fixtures';
 
 const { version } = packageInfo;
 
@@ -8,6 +9,53 @@ async function expectControlsAligned(page: Page) {
   await expect(page.locator('.navigation-toggle:visible')).toHaveCount(1);
   await expect(page.locator('.workspace-canvas .navigation-toggle')).toHaveCount(0);
 }
+
+async function horizontalCenter(locator: Locator) {
+  const bounds = (await locator.boundingBox())!;
+  return bounds.x + bounds.width / 2;
+}
+
+test('侧栏的右侧按钮、计数和图标共享同一对齐线', async ({ page, request }) => {
+  const sample = await fixture();
+  try {
+    await commitFile(sample.repo);
+    const { token } = await (await request.get('/api/session')).json();
+    const headers = { 'X-MeGit-Token': token };
+    const workspace = await (await request.get('/api/workspace', { headers })).json();
+    workspace.repositories = [{ id: 'repo-alignment', name: '技术示例', path: sample.repo }];
+    workspace.boards[0].nodes = [
+      { id: 'node-alignment', repoId: 'repo-alignment', position: { x: 80, y: 80 } },
+    ];
+    workspace.boards[0].groups = [
+      { id: 'group-alignment', name: '示例分组', nodeIds: ['node-alignment'], collapsed: false },
+    ];
+    workspace.boards.push({
+      id: 'review-alignment',
+      name: '审核流程',
+      description: '',
+      nodes: [],
+      edges: [],
+    });
+    expect((await request.put('/api/workspace', { headers, data: workspace })).ok()).toBe(true);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    const navigation = page.locator('#workspace-navigation');
+    const create = navigation.getByRole('button', { name: '新建流程', exact: true });
+    const collapse = navigation.getByRole('button', { name: '收起流程导航', exact: true });
+    const sectionIcon = navigation.locator('.flow-outline .sidebar-section-heading svg');
+    const repoArrow = navigation.locator('.outline-repo:not(.outline-group-title) svg').last();
+    const workflowCounts = await navigation.locator('.board-item small').all();
+    const groupCount = navigation.locator('.outline-group-title small');
+    await expect(groupCount).toHaveText('1');
+    expect(workflowCounts).toHaveLength(2);
+    for (const item of [sectionIcon, repoArrow, groupCount, ...workflowCounts]) {
+      expect(await horizontalCenter(item)).toBeCloseTo(await horizontalCenter(create), 0);
+    }
+    expect(await horizontalCenter(collapse)).toBeCloseTo(await horizontalCenter(create), 0);
+  } finally {
+    await sample.cleanup();
+  }
+});
 
 test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折叠选择', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -47,7 +95,10 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expect(page.getByRole('tooltip', { name: '使用帮助', exact: true })).toHaveCount(0);
   await expect(page.locator('.workspace-header')).toHaveCount(0);
   await expect(page.getByRole('main', { name: '开发流程', exact: true })).toBeVisible();
-  await expect(navigation.locator('.board-item[aria-current]')).toContainText('开发流程');
+  const selectedWorkflow = navigation.locator('.board-item[aria-current]');
+  await expect(selectedWorkflow).toContainText('开发流程');
+  await expect(navigation.getByRole('button', { name: '流程白板', exact: true })).toHaveCount(0);
+  await expect(selectedWorkflow).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const statusbar = page.locator('.workflow-panel .workspace-statusbar');
   await expect(statusbar.getByText('已保存', { exact: true })).toHaveCount(0);
   const statusButton = statusbar.getByRole('button', { name: '状态信息', exact: true });
@@ -90,12 +141,27 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   const collapse = navigation.getByRole('button', { name: '收起流程导航', exact: true });
   await expect(collapse).toHaveAttribute('aria-expanded', 'true');
   const preferences = navigation.getByRole('button', { name: '偏好设置', exact: true });
-  expect((await collapse.boundingBox())!.y).toBeLessThan((await preferences.boundingBox())!.y);
-  await expect(collapse).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  const sharedIcons = navigation.locator(
-    '.navigation-primary .navigation-action > svg, .navigation-bottom .navigation-action > svg',
+  const management = navigation.getByRole('button', { name: '仓库管理', exact: true });
+  await expect(navigation.locator('.navigation-bottom').getByRole('button').nth(1)).toHaveText(
+    '仓库管理',
   );
-  await expect(sharedIcons).toHaveCount(5);
+  const divider = navigation.locator('.navigation-collapse-control');
+  const line = divider.locator('.navigation-divider');
+  await expect(line).toHaveCSS('border-top-width', '1px');
+  const dividerBox = (await divider.boundingBox())!;
+  const lineBox = (await line.boundingBox())!;
+  const collapseBox = (await collapse.boundingBox())!;
+  expect(dividerBox.x).toBe(sidebarBox.x);
+  expect(dividerBox.width).toBeCloseTo(sidebarBox.width - 1, 1);
+  expect(lineBox.x).toBe(sidebarBox.x);
+  expect(lineBox.x + lineBox.width).toBeCloseTo(collapseBox.x, 0);
+  expect(lineBox.y + lineBox.height / 2).toBeCloseTo(collapseBox.y + collapseBox.height / 2, 0);
+  expect(dividerBox.x + dividerBox.width - collapseBox.x - collapseBox.width).toBeLessThan(8);
+  expect(collapseBox.y).toBeLessThan((await management.boundingBox())!.y);
+  expect((await management.boundingBox())!.y).toBeLessThan((await preferences.boundingBox())!.y);
+  await expect(collapse).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const sharedIcons = navigation.locator('.navigation-bottom .navigation-action > svg');
+  await expect(sharedIcons).toHaveCount(4);
   const iconPositions = () =>
     sharedIcons.evaluateAll((icons) =>
       icons.map((icon) => {
@@ -120,10 +186,19 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expectControlsAligned(page);
   const expand = navigation.getByRole('button', { name: '展开流程导航' });
   await expect(expand).toBeFocused();
+  await expect(line).toBeHidden();
+  const ribbonBox = (await divider.boundingBox())!;
+  const expandBox = (await expand.boundingBox())!;
+  expect(expandBox.x - ribbonBox.x).toBeCloseTo(4, 0);
+  expect(ribbonBox.x + ribbonBox.width - expandBox.x - expandBox.width).toBeCloseTo(4, 0);
   await page.getByRole('button', { name: /^关闭工作流面板：/ }).click();
   await expect(page.locator('.workspace-canvas')).toBeHidden();
   await expand.click();
+  await expect(line).toBeVisible();
   await expect.poll(iconPositions).toEqual(expandedIcons);
+  await selectedWorkflow.click();
+  await expect(canvas).toBeVisible();
+  await page.getByRole('button', { name: /^关闭工作流面板：/ }).click();
   await collapse.click();
   await page.getByRole('button', { name: '重新打开工作流', exact: true }).click();
   expect((await page.locator('.main-workspace').boundingBox())?.x).toBe(56);
@@ -141,9 +216,9 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: '关闭认识 MeGit', exact: true }).click();
 
-  await navigation.getByRole('button', { name: '仓库索引', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '仓库索引' })).toBeVisible();
-  await page.getByRole('button', { name: '关闭仓库索引' }).click();
+  await management.click();
+  await expect(page.getByRole('dialog', { name: '仓库管理' })).toBeVisible();
+  await page.getByRole('button', { name: '关闭仓库管理' }).click();
   await navigation.getByRole('button', { name: '偏好设置', exact: true }).click();
   await page.getByRole('button', { name: '明亮', exact: true }).click();
   await page.getByLabel('界面语言').selectOption('en');
@@ -157,6 +232,10 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await navigation.getByRole('button', { name: 'Expand workflow navigation' }).click();
   await expect(navigation).toHaveAttribute('data-collapsed', 'false');
   await expect(navigation.locator('.workspace-logo')).toBeVisible();
+  await expect(selectedWorkflow).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+  await expect(
+    navigation.getByRole('button', { name: 'Repository management', exact: true }),
+  ).toBeVisible();
   await expect(
     navigation.locator('.navigation-bottom').getByRole('button', { name: 'Help', exact: true }),
   ).toBeVisible();
@@ -269,7 +348,10 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(navigation).toHaveAttribute('data-collapsed', 'true');
   await expect(navigation).not.toHaveAttribute('inert', '');
-  await navigation.getByRole('button', { name: 'Workflow board', exact: true }).click();
+  await expect(navigation.getByRole('button', { name: 'Workflow board', exact: true })).toHaveCount(
+    0,
+  );
+  await navigation.getByRole('button', { name: 'Expand workflow navigation', exact: true }).click();
   await expect(navigation).toHaveAttribute('data-collapsed', 'false');
 });
 

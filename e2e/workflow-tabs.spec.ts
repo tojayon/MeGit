@@ -34,6 +34,8 @@ test('多个工作流标签可切换、独立关闭并在刷新后恢复', async
   await nav.getByRole('button', { name: /审查流程/ }).click();
   await nav.getByRole('button', { name: /发布流程/ }).click();
   await nav.getByRole('button', { name: /发布流程/ }).click();
+  await expect(nav.getByRole('button', { name: /发布流程/ })).toHaveAttribute('aria-current', 'true');
+  await expect(nav.getByRole('button', { name: /审查流程/ })).not.toHaveAttribute('aria-current');
   await expect(tabs.getByRole('tab')).toHaveCount(3);
   await expect(tabs.getByRole('tab', { name: '发布流程' })).toHaveAttribute(
     'aria-selected',
@@ -148,3 +150,53 @@ test('窄桌面窗口的长标签独立滚动，原生控件始终在同一行�
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: '.megit/verification/workflow-tabs/desktop-light-en.png' });
 });
+for (const [theme, language, background, foreground, serviceName] of [
+  ['light', 'en', 'rgb(1, 53, 124)', 'rgb(255, 255, 255)', 'Local service: MeGit'],
+  ['dark', 'zh-CN', 'rgb(0, 42, 61)', 'rgb(215, 220, 229)', '本地服务：MeGit'],
+]) {
+  test(`${theme}：工作流与本地服务共用卡片样式，深色选中状态随切换更新`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript(({ theme, language }) => {
+      localStorage.setItem('megit.preferences', JSON.stringify({ version: 1, theme, language }));
+    }, { theme, language });
+    await page.goto('/design-system');
+    const example = page.locator('.design-workflow-example');
+    const first = example.getByRole('tab').first();
+    const second = example.getByRole('tab', { name: 'MeGit / release', exact: true });
+    const firstCard = first.locator('..');
+    const secondCard = second.locator('..');
+    const service = page.getByRole('button', { name: serviceName, exact: true });
+    await expect(service).toBeVisible();
+    const cardStyle = await service.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        background: style.backgroundColor,
+        border: style.borderTopColor,
+        borderWidth: style.borderTopWidth,
+        radius: style.borderRadius,
+        fontSize: style.fontSize,
+      };
+    });
+    await expect(secondCard).toHaveCSS('background-color', cardStyle.background);
+    await expect(secondCard).toHaveCSS('border-top-color', cardStyle.border);
+    await expect(secondCard).toHaveCSS('border-top-width', cardStyle.borderWidth);
+    await expect(secondCard).toHaveCSS('border-radius', cardStyle.radius);
+    await expect(second).toHaveCSS('font-size', cardStyle.fontSize);
+    await expect(firstCard).toHaveCSS('background-color', background);
+    await second.click();
+    await expect(second).toHaveAttribute('aria-selected', 'true');
+    await expect(secondCard).toHaveCSS('background-color', background);
+    await expect(firstCard).toHaveCSS('background-color', cardStyle.background);
+    await expect(second).toHaveCSS('color', foreground);
+    for (const action of await secondCard.getByRole('button').all()) {
+      await action.hover();
+      await expect(action).toHaveCSS('color', foreground);
+    }
+    await second.press('Home');
+    await expect(first).toBeFocused();
+    await expect(first).toHaveCSS('outline-color', foreground);
+    await page.mouse.move(0, 0);
+    await example.screenshot({ path: testInfo.outputPath(`workflow-tab-cards-${theme}.png`) });
+  });
+}

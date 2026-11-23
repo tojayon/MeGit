@@ -8,6 +8,11 @@ import { Button } from './Button';
 import { Field } from './Field';
 
 type AiResult = { kind: 'diagram'; diagram: AiDiagram } | { kind: 'repository'; text: string };
+const exampleSettings: AiSettings = {
+  endpoint: 'https://example.invalid/v1',
+  model: 'example-model',
+  hasApiKey: false,
+};
 
 export function AiPanel({
   repositories,
@@ -15,17 +20,27 @@ export function AiPanel({
   applyDiagram,
   canApply,
   section,
+  quick = false,
+  example = false,
+  onSaved,
+  onBusy,
 }: {
   repositories: Repository[];
   selectedRepo?: string | null;
   applyDiagram?: (diagram: AiDiagram) => boolean;
   canApply?: boolean;
   section: 'service' | 'assistant';
+  quick?: boolean;
+  example?: boolean;
+  onSaved?: (settings: AiSettings) => void;
+  onBusy?: (busy: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const [settings, setSettings] = useState<AiSettings>();
-  const [endpoint, setEndpoint] = useState('');
-  const [model, setModel] = useState('');
+  const [settings, setSettings] = useState<AiSettings | undefined>(
+    example ? exampleSettings : undefined,
+  );
+  const [endpoint, setEndpoint] = useState(example ? exampleSettings.endpoint : '');
+  const [model, setModel] = useState(example ? exampleSettings.model : '');
   const [key, setKey] = useState('');
   const [clearKey, setClearKey] = useState(false);
   const [projectDelivery, setProjectDelivery] = useState(false);
@@ -40,10 +55,11 @@ export function AiPanel({
     model !== settings?.model ||
     Boolean(key) ||
     clearKey ||
-    projectDelivery !== (settings?.projectDelivery === true);
+    (!quick && projectDelivery !== (settings?.projectDelivery === true));
   const ready = Boolean(settings?.model) && !dirty && !busy;
 
   useEffect(() => {
+    if (example) return;
     const controller = new AbortController();
     void request<AiSettings>('/ai/settings', { signal: controller.signal })
       .then((value) => {
@@ -57,10 +73,12 @@ export function AiPanel({
         if (!controller.signal.aborted) setError(failure);
       });
     return () => controller.abort();
-  }, []);
+  }, [example]);
 
   async function run(action: 'save' | 'test' | 'repository' | 'diagram') {
+    if (busy || example) return;
     setBusy(true);
+    onBusy?.(true);
     setError(undefined);
     setNotice(undefined);
     setResult(undefined);
@@ -72,7 +90,7 @@ export function AiPanel({
           body: JSON.stringify({
             endpoint,
             model,
-            projectDelivery,
+            projectDelivery: quick ? undefined : projectDelivery,
             apiKey: clearKey ? '' : key || undefined,
           }),
         });
@@ -82,6 +100,7 @@ export function AiPanel({
         setKey('');
         setClearKey(false);
         setNotice('saved');
+        onSaved?.(value);
       } else if (action === 'test') {
         await request('/ai/test', { method: 'POST' });
         setNotice('connected');
@@ -101,6 +120,7 @@ export function AiPanel({
       setError(failure);
     } finally {
       setBusy(false);
+      onBusy?.(false);
     }
   }
 
@@ -110,7 +130,7 @@ export function AiPanel({
         <fieldset
           className="theme-fieldset settings-form"
           aria-label={t('ai.service')}
-          disabled={!settings || busy}
+          disabled={!settings || busy || example}
         >
           <Field label={t('ai.endpoint')}>
             <input
@@ -132,7 +152,7 @@ export function AiPanel({
             />
           </Field>
           {settings?.hasApiKey && (
-            <label>
+            <label className="ai-clear-key">
               <input
                 type="checkbox"
                 checked={clearKey}
@@ -141,14 +161,16 @@ export function AiPanel({
               {t('ai.clearKey')}
             </label>
           )}
-          <label>
-            <input
-              type="checkbox"
-              checked={projectDelivery}
-              onChange={(event) => setProjectDelivery(event.target.checked)}
-            />
-            {t('projectDelivery.enable')}
-          </label>
+          {!quick && (
+            <label>
+              <input
+                type="checkbox"
+                checked={projectDelivery}
+                onChange={(event) => setProjectDelivery(event.target.checked)}
+              />
+              {t('projectDelivery.enable')}
+            </label>
+          )}
           <div className="settings-actions">
             <Button
               variant="primary"

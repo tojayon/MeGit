@@ -178,6 +178,7 @@ export function aiRouter(
       model: config?.model ?? '',
       hasApiKey: Boolean(config?.secret),
       projectDelivery: config?.projectDelivery === true,
+      projectRevision,
     };
   }
   async function credentials(config: Awaited<ReturnType<typeof load>>) {
@@ -199,29 +200,25 @@ export function aiRouter(
         .digest('hex'),
     };
   }
-  if (assistant?.services) {
-    router.use(
-      '/project',
-      projectDeliveryRouter(
-        new ProjectDelivery({
-          repository: assistant.repository,
-          settings: async () => projectSettings(await load()),
-          services: assistant.services,
-          complete: async (approved, messages, signal) => {
-            const transport = await getTransport();
-            const config = await load();
-            const current = projectSettings(config);
-            if (!current?.enabled) throw new AppError('projectDisabled', 403);
-            if (current.key !== approved.key) throw new AppError('projectChanged', 409);
-            const auth = await credentials(config);
-            if (projectSettings(await load())?.key !== approved.key)
-              throw new AppError('projectChanged', 409);
-            return completeAi(auth, messages, transport, signal);
-          },
-        }),
-      ),
-    );
-  }
+  const project = assistant?.services
+    ? new ProjectDelivery({
+        repository: assistant.repository,
+        settings: async () => projectSettings(await load()),
+        services: assistant.services,
+        complete: async (approved, messages, signal) => {
+          const transport = await getTransport();
+          const config = await load();
+          const current = projectSettings(config);
+          if (!current?.enabled) throw new AppError('projectDisabled', 403);
+          if (current.key !== approved.key) throw new AppError('projectChanged', 409);
+          const auth = await credentials(config);
+          if (projectSettings(await load())?.key !== approved.key)
+            throw new AppError('projectChanged', 409);
+          return completeAi(auth, messages, transport, signal);
+        },
+      })
+    : undefined;
+  if (project) router.use('/project', projectDeliveryRouter(project));
   if (assistant)
     router.use(
       '/assistant',
@@ -231,6 +228,7 @@ export function aiRouter(
           complete: async (messages, signal) =>
             completeAi(await configForRequest(), messages, await getTransport(), signal),
         }),
+        project,
       ),
     );
   router.get('/settings', async (_req, res) => res.json(summary(await load())));
@@ -266,6 +264,7 @@ export function aiRouter(
       await writeFile(temporary, JSON.stringify(next), { flag: 'wx', mode: 0o600 });
       await rename(temporary, filename);
       projectRevision = randomUUID();
+      project?.invalidate();
       res.json(summary(next));
     } catch (error) {
       throw error instanceof AppError ? error : new AppError('aiStorage', 503);

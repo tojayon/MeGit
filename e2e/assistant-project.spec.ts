@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { once } from 'node:events';
+import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from './test';
@@ -15,8 +16,26 @@ test('在现有助手中授权读取、预览文件、写入及配置信任，�
     let raw = '';
     for await (const chunk of req) raw += chunk;
     calls.push(raw);
-    const output =
-      calls.length === 1
+    const messages = JSON.parse(raw).messages.map(
+      (message: { content: string }) => message.content,
+    );
+    const output = messages.some((message: string) => message.includes('新增验收环节'))
+      ? {
+          text: '已准备工作流修改',
+          operations: [],
+          boardOperations: [
+            {
+              type: 'addStep',
+              id: 'review-step',
+              title: '验收环节',
+              text: '',
+              summary: '',
+              kind: 'process',
+              position: { x: 260, y: 80 },
+            },
+          ],
+        }
+      : !messages.some((message: string) => message.startsWith('{"fileData":'))
         ? { read: ['README.md'] }
         : {
             summary: '已准备启动脚本',
@@ -27,7 +46,10 @@ test('在现有助手中授权读取、预览文件、写入及配置信任，�
             service: { directory: '.', kind: 'powershell', entry, port: 8090 },
           };
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(output) } }] }));
+    const reply = messages.at(-1)?.includes('默认范围文件提案')
+      ? { summary: '不可应用', files: [{ path: 'scripts/forbidden.ps1', content }] }
+      : output;
+    res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(reply) } }] }));
   });
   upstream.listen(0, '127.0.0.1');
   await once(upstream, 'listening');
@@ -51,19 +73,19 @@ test('在现有助手中授权读取、预览文件、写入及配置信任，�
     ];
     expect((await request.put('/api/workspace', { headers, data: workspace })).ok()).toBe(true);
     const payload = {
+      conversationId: randomUUID(),
       repositoryId: 'delivery-repo',
       repositoryPath: example.repo,
       endpoint: `${endpoint}/chat/completions`,
       model: 'delivery',
-      prompt: '准备脚本',
       approved: true,
     };
-    const disabled = await request.post('/api/ai/project/prepare', { headers, data: payload });
+    const disabled = await request.post('/api/ai/project/grants', { headers, data: payload });
     expect((await disabled.json()).code).toBe('projectDisabled');
-    expect((await request.post('/api/ai/project/prepare', { data: payload })).status()).toBe(403);
+    expect((await request.post('/api/ai/project/grants', { data: payload })).status()).toBe(403);
     expect(
       (
-        await request.post('/api/ai/project/prepare', {
+        await request.post('/api/ai/project/grants', {
           headers,
           data: { ...payload, approved: false },
         })
@@ -72,8 +94,8 @@ test('在现有助手中授权读取、预览文件、写入及配置信任，�
     await page.goto('/');
     await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
     const panel = page.getByRole('complementary', { name: 'MeGit AI 助手' });
-    await expect(panel.getByRole('button', { name: '项目交付', exact: true })).toHaveCount(0);
-    await panel.getByRole('button', { name: '软件设置', exact: true }).click();
+    await expect(panel.getByRole('button', { name: '默认范围', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '软件设置', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '软件设置' });
     const enable = dialog.getByRole('checkbox', { name: '启用 AI 项目交付' });
     await expect(enable).not.toBeChecked();
@@ -84,13 +106,30 @@ test('在现有助手中授权读取、预览文件、写入及配置信任，�
     await panel
       .getByRole('textbox', { name: '给 AI 助手的消息' })
       .fill('生成本地启动脚本并配置启动设置');
-    await panel.getByRole('button', { name: '项目交付', exact: true }).click();
-    await panel.getByLabel('目标仓库').selectOption('delivery-repo');
-    await expect(panel.getByLabel('交付要求')).toHaveValue('生成本地启动脚本并配置启动设置');
-    const prepare = panel.getByRole('button', { name: '授权并生成计划' });
-    await expect(prepare).toBeDisabled();
-    await panel.getByRole('checkbox', { name: /允许本次任务读取/ }).check();
-    await prepare.click();
+    await panel.getByRole('button', { name: '取消引用 示例 Wiki' }).click();
+    await panel.getByRole('button', { name: '默认范围', exact: true }).click();
+    const scope = panel.getByRole('dialog', { name: 'AI 能力范围' });
+    await expect(scope.getByRole('combobox')).toHaveCount(0);
+    await expect(scope.getByRole('button', { name: '仓库读写', exact: true })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await panel.getByRole('button', { name: '选择引用内容', exact: true }).click();
+    await panel.getByRole('checkbox', { name: '示例 Wiki' }).check();
+    await page.keyboard.press('Escape');
+    await panel.getByRole('button', { name: '默认范围', exact: true }).click();
+    await scope.getByRole('button', { name: '了解更多', exact: true }).click();
+    const permissionDetails = panel.getByRole('dialog', { name: 'AI 能力范围说明' });
+    await expect(permissionDetails).toContainText('127.0.0.1');
+    await expect(permissionDetails).toContainText('示例 Wiki');
+    await page.keyboard.press('Escape');
+    await expect(panel.getByRole('button', { name: '默认范围', exact: true })).toBeFocused();
+    await panel.getByRole('button', { name: '默认范围', exact: true }).click();
+    expect(calls).toHaveLength(0);
+    await scope.getByRole('button', { name: '仓库读写', exact: true }).click();
+    await expect(panel.getByRole('button', { name: '仓库读写：示例 Wiki' })).toBeVisible();
+    await expect(panel.getByRole('textbox', { name: '给 AI 助手的消息' })).toHaveValue(
+      '生成本地启动脚本并配置启动设置',
+    );
+    await panel.getByRole('button', { name: '发送消息', exact: true }).click();
     const plan = panel.getByRole('region', { name: '审阅项目变更' });
     await expect(plan).toBeFocused();
     await plan.getByText('README.md', { exact: true }).last().click();
@@ -114,6 +153,57 @@ test('在现有助手中授权读取、预览文件、写入及配置信任，�
     });
     expect(await readFile(path.join(example.repo, entry), 'utf8')).toBe(content);
     expect(await git(example.repo, 'rev-parse', 'HEAD')).toBe(head);
+    await panel.getByRole('button', { name: '选择引用内容', exact: true }).click();
+    await panel.getByRole('checkbox', { name: /当前流程图/ }).check();
+    await page.keyboard.press('Escape');
+    await panel.getByRole('textbox', { name: '给 AI 助手的消息' }).fill('新增验收环节');
+    await panel.getByRole('button', { name: '发送消息', exact: true }).click();
+    await expect(panel.getByRole('button', { name: '确认应用到白板' })).toBeEnabled();
+    await panel.getByRole('button', { name: '确认应用到白板' }).click();
+    await expect(
+      panel.getByText('已应用到白板，可使用白板撤销恢复。保存状态见页面底部。'),
+    ).toBeVisible();
+    await panel.getByRole('button', { name: '新建对话', exact: true }).click();
+    await expect(panel.getByRole('button', { name: '默认范围', exact: true })).toBeVisible();
+    await panel.getByRole('button', { name: '对话历史', exact: true }).click();
+    await panel
+      .getByRole('button', { name: '生成本地启动脚本并配置启动设置', exact: true })
+      .click();
+    const activePermission = panel.getByRole('button', { name: '仓库读写：示例 Wiki' });
+    await expect(activePermission).toBeVisible();
+    await activePermission.click();
+    await scope.getByRole('button', { name: '默认范围', exact: true }).click();
+    await expect(panel.getByRole('button', { name: '默认范围', exact: true })).toBeVisible();
+    await panel.getByRole('button', { name: '默认范围', exact: true }).click();
+    await scope.getByRole('button', { name: '仓库读写', exact: true }).click();
+    await expect(activePermission).toBeVisible();
+    await panel.getByRole('button', { name: '取消引用 示例 Wiki' }).click();
+    await expect(panel.getByRole('button', { name: '默认范围', exact: true })).toBeVisible();
+    await panel.getByRole('button', { name: '选择引用内容', exact: true }).click();
+    await panel.getByRole('checkbox', { name: '示例 Wiki' }).check();
+    await page.keyboard.press('Escape');
+    await expect(panel.getByRole('button', { name: '默认范围', exact: true })).toBeVisible();
+    const totalCalls = calls.length;
+    const invalidGrant = await request.post('/api/ai/assistant/chat', {
+      headers,
+      data: {
+        prompt: '生成脚本',
+        repositoryIds: ['delivery-repo'],
+        language: 'zh-CN',
+        projectGrant: { id: randomUUID(), conversationId: payload.conversationId },
+      },
+    });
+    expect((await invalidGrant.json()).code).toBe('projectPermission');
+    expect(calls).toHaveLength(totalCalls);
+    const withoutGrant = await request.post('/api/ai/assistant/chat', {
+      headers,
+      data: { prompt: '默认范围文件提案', repositoryIds: ['delivery-repo'], language: 'zh-CN' },
+    });
+    expect((await withoutGrant.json()).code).toBe('assistantOutput');
+    expect(calls.at(-1)).not.toContain('writableRepository');
+    await expect(readFile(path.join(example.repo, 'scripts/forbidden.ps1'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
     await page.getByRole('button', { name: '偏好设置', exact: true }).click();
     await page.getByRole('button', { name: '明亮', exact: true }).click();
     await page.getByLabel('界面语言').selectOption('en');
