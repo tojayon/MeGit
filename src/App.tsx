@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { editedRoute } from './lib/edge-route';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   Check,
   CircleAlert,
@@ -30,7 +30,7 @@ import type {
 } from '../shared/types';
 import { FlowConnectionDialog } from './components/FlowConnectionDialog';
 import { useWorkspace } from './lib/use-workspace';
-import { api, timeAgo } from './lib/api';
+import { api } from './lib/api';
 import { createRefreshQueue } from './lib/refresh-queue';
 import { FlowCanvas } from './components/FlowCanvas';
 import { AddRepositoryDialog, Dialog, RelationDialog, TextDialog } from './components/Dialogs';
@@ -40,6 +40,7 @@ import { relationRefs } from '../shared/card-refs';
 import { RelationPanel } from './components/RelationPanel';
 import { PreferencesDialog } from './components/PreferencesDialog';
 import { SettingsDialog } from './components/SettingsDialog';
+import { DesktopWindowControls } from './components/DesktopWindow';
 import { AssistantPanel } from './components/AssistantPanel';
 import { AssistantLauncher } from './components/AssistantLauncher';
 import { applyBoardOperations, boardSignature } from '../shared/assistant-board';
@@ -71,7 +72,8 @@ import { focusWithoutTooltip } from './lib/overlays';
 import { GitLearningDialog } from './components/GitLearningDialog';
 import { RepositoryIndex } from './components/RepositoryIndex';
 import { RepositoryAvatarDialog } from './components/RepositoryAvatarDialog';
-import { WorkflowHeader } from './components/WorkflowHeader';
+import { WorkflowHeader, workflowPanelId, workflowTabId } from './components/WorkflowHeader';
+import { WorkspaceStatusbar } from './components/WorkspaceStatusbar';
 import { useViewState, useViewIssue, viewStorage } from './lib/use-view-state';
 import { isBoolean, isNullableText, isStrings, viewKey } from './lib/view-storage';
 
@@ -104,12 +106,16 @@ const restorableModal = (value: unknown): value is Modal =>
     'note-details',
   ].includes(value as string);
 
+const isWorkflowTabList = (value: unknown): value is string[] | null =>
+  value === null || (isStrings(value) && new Set(value).size === value.length);
+
 export default function App() {
   const { t } = useTranslation();
   const { issue, preferences } = usePreferences();
   const {
     workspace,
     update,
+    selectBoard,
     updateViewport,
     error: workspaceError,
     saveStatus,
@@ -146,7 +152,10 @@ export default function App() {
   const [groupMembers, setGroupMembers] = useState<string[]>([]);
   const [notice, setNotice] = useState<{ text: NoticeMessage; error: boolean } | null>(null);
   const [sidebar, setSidebar] = useViewState('app.sidebar', false, isBoolean);
-  const [closedBoardId, setClosedBoardId] = useViewState('app.closed-board', null, isNullableText);
+  const [savedTabs, setSavedTabs] = useViewState('app.workflow-tabs', null, isWorkflowTabList);
+  const [legacyClosedBoard] = useState(() => viewStorage.read('app.closed-board'));
+  const workflowTabsId = useId();
+  const workflowReopenId = `${workflowTabsId}-reopen`;
   const closeSidebar = useCallback(() => setSidebar(false), [setSidebar]);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boardIdRef = useRef('');
@@ -154,6 +163,20 @@ export default function App() {
   const savedRef = useRef(false);
   const refreshQueue = useRef<(() => Promise<void>) | null>(null);
   const board = workspace?.boards.find((b) => b.id === workspace.activeBoardId);
+  const boardClosed =
+    savedTabs?.length === 0 || (savedTabs === null && !!board && legacyClosedBoard === board.id);
+  const reopenTab = useCallback(
+    (id: string) => {
+      setSavedTabs((previous) => {
+        if (previous?.includes(id)) return previous;
+        const tabs = previous === null
+          ? board && !boardClosed ? [board.id] : []
+          : previous.filter((tab) => workspace?.boards.some((item) => item.id === tab));
+        return tabs.includes(id) ? tabs : [...tabs, id];
+      });
+    },
+    [board, boardClosed, setSavedTabs, workspace],
+  );
   useLayoutEffect(() => {
     if (board) viewStorage.write('app.board', board.id);
   }, [board]);
@@ -209,7 +232,7 @@ export default function App() {
     setSelectedGroup,
     setSelectedIds,
   ]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     boardIdRef.current = board?.id || '';
     savedRef.current = saveStatus === 'saved';
   }, [board?.id, saveStatus]);
@@ -264,8 +287,8 @@ export default function App() {
         ? targetBoard?.nodes.find((n) => n.id === id)
         : (targetBoard?.nodes.find((n) => n.repoId === id && !n.ref) ??
           targetBoard?.nodes.find((n) => n.repoId === id));
-      if (!node) return;
-      setClosedBoardId(null);
+      if (!targetBoard || !node) return;
+      reopenTab(targetBoard.id);
       setSelectedRepo(node.repoId);
       setSelectedEdge(null);
       setSelectedGroup(null);
@@ -276,7 +299,7 @@ export default function App() {
       );
       if (group)
         update((draft) => {
-          const current = draft.boards.find((b) => b.id === targetBoard!.id)!;
+          const current = draft.boards.find((b) => b.id === targetBoard.id)!;
           current.groups!.find((g) => g.id === group.id)!.collapsed = false;
         });
     },
@@ -285,7 +308,7 @@ export default function App() {
       workspace,
       update,
       openDetails,
-      setClosedBoardId,
+      reopenTab,
       setSelectedRepo,
       setSelectedEdge,
       setSelectedGroup,
@@ -304,14 +327,14 @@ export default function App() {
   );
   const openGroup = useCallback(
     (id: string) => {
-      setClosedBoardId(null);
+      if (board) reopenTab(board.id);
       setSelectedIds([id]);
       setSelectedRepo(null);
       setSelectedEdge(null);
       setSelectedGroup(id);
       setModal('group-details');
     },
-    [setClosedBoardId, setSelectedIds, setSelectedRepo, setSelectedEdge, setSelectedGroup],
+    [board, reopenTab, setSelectedIds, setSelectedRepo, setSelectedEdge, setSelectedGroup],
   );
   const selectBackground = useCallback(() => {
     setSelectedIds([]);
@@ -347,7 +370,7 @@ export default function App() {
     const handleHistory = (event: KeyboardEvent) => {
       if (
         modal ||
-        closedBoardId === board?.id ||
+        boardClosed ||
         !(event.ctrlKey || event.metaKey) ||
         event.altKey ||
         (event.target instanceof HTMLElement &&
@@ -361,7 +384,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleHistory);
     return () => window.removeEventListener('keydown', handleHistory);
-  }, [modal, historyAction, closedBoardId, board?.id]);
+  }, [modal, historyAction, boardClosed]);
 
   function openRelation(draft?: Partial<FlowEdge>) {
     setRelationDraft(draft);
@@ -439,6 +462,9 @@ export default function App() {
   if (!workspace || !board)
     return (
       <div className="boot-screen">
+        <div className="boot-window-header">
+          <DesktopWindowControls />
+        </div>
         <button
           className="icon-button boot-preferences"
           aria-label={t('preferences.title')}
@@ -493,7 +519,47 @@ export default function App() {
     );
   }
 
-  const boardClosed = closedBoardId === board.id;
+  const tabs = boardClosed
+    ? []
+    : (savedTabs ?? [board.id]).flatMap(
+        (id) => workspace.boards.find((item) => item.id === id) ?? [],
+      );
+  if (!boardClosed && !tabs.some((item) => item.id === board.id)) tabs.push(board);
+  const adjacentTab = (id: string) => {
+    const index = tabs.findIndex((item) => item.id === id);
+    return tabs[index + 1] ?? (index > 0 ? tabs[index - 1] : undefined);
+  };
+  function focusWorkflowTab(id: string) {
+    requestAnimationFrame(() =>
+      focusWithoutTooltip(document.getElementById(workflowTabId(workflowTabsId, id))),
+    );
+  }
+  function switchWorkflow(id: string) {
+    if (id === board!.id) return;
+    clearSelection();
+    setDock(emptyDock);
+    setSnapshot(null);
+    selectBoard(id);
+  }
+  function closeWorkflow(id: string) {
+    setSavedTabs(tabs.filter((item) => item.id !== id).map((item) => item.id));
+    const next = id === board!.id ? adjacentTab(id) : board;
+    if (next) {
+      switchWorkflow(next.id);
+      focusWorkflowTab(next.id);
+    } else {
+      requestAnimationFrame(() => focusWithoutTooltip(document.getElementById(workflowReopenId)));
+    }
+  }
+  const statusbar = (
+    <WorkspaceStatusbar
+      board={board}
+      repositories={workspace.repositories}
+      saveStatus={saveStatus}
+      refreshing={refreshing}
+      checkedAt={snapshot?.checkedAt}
+    />
+  );
   const navigationControl = (
     <div className="navigation-edge mobile-only" inert={sidebar || undefined}>
       <button
@@ -523,18 +589,12 @@ export default function App() {
         mobileOpen={sidebar}
         onMobileClose={closeSidebar}
         onSelectBoard={(id) => {
-          setClosedBoardId(null);
-          if (id === board.id) return;
-          clearSelection();
-          if (id !== board.id) setDock(emptyDock);
-          setSnapshot(null);
-          update((draft) => {
-            draft.activeBoardId = id;
-          });
+          reopenTab(id);
+          switchWorkflow(id);
         }}
         onSelectRepo={(id) => openRepo(id, undefined, true)}
         onCanvas={() => {
-          setClosedBoardId(null);
+          reopenTab(board.id);
           setModal(null);
           clearSelection();
         }}
@@ -623,19 +683,31 @@ export default function App() {
           </div>
         )}
         <div className="workspace-body">
-          <section className="workflow-panel" hidden={boardClosed}>
+          <section className="workflow-panel">
             <WorkflowHeader
-              board={board}
-              onClose={() => {
-                setClosedBoardId(board.id);
-                requestAnimationFrame(() =>
-                  focusWithoutTooltip(
-                    document.querySelector<HTMLElement>('[data-workflow-reopen]'),
-                  ),
-                );
-              }}
+              boards={tabs}
+              activeId={boardClosed ? undefined : board.id}
+              id={workflowTabsId}
+              onSelect={switchWorkflow}
+              onClose={closeWorkflow}
+              desktop
             />
-            <div className="workspace-canvas">
+            {tabs.filter((item) => item.id !== board.id).map((item) => (
+              <div
+                key={item.id}
+                id={workflowPanelId(workflowTabsId, item.id)}
+                role="tabpanel"
+                aria-labelledby={workflowTabId(workflowTabsId, item.id)}
+                hidden
+              />
+            ))}
+            <div
+              className="workspace-canvas"
+              hidden={boardClosed}
+              role={boardClosed ? undefined : 'tabpanel'}
+              id={workflowPanelId(workflowTabsId, board.id)}
+              aria-labelledby={boardClosed ? undefined : workflowTabId(workflowTabsId, board.id)}
+            >
               <div className="workspace-action-rail" role="group" aria-label={t('board.actions')}>
                 <Tooltip content={t('board.add')}>
                   <button
@@ -893,27 +965,24 @@ export default function App() {
                 onClear={selectBackground}
               />
             </div>
-          </section>
-          {boardClosed && (
-            <div className="workflow-panel-closed">
-              <div className="workflow-panel-reopen">
-                <p>{t('board.panelClosed')}</p>
-                <Button
-                  data-workflow-reopen
-                  onClick={() => {
-                    setClosedBoardId(null);
-                    requestAnimationFrame(() =>
-                      focusWithoutTooltip(
-                        document.querySelector<HTMLElement>('.workflow-panel [data-panel-close]'),
-                      ),
-                    );
-                  }}
-                >
-                  {t('board.reopen')}
-                </Button>
+            {boardClosed && (
+              <div className="workflow-panel-closed">
+                <div className="workflow-panel-reopen">
+                  <p>{t('board.panelClosed')}</p>
+                  <Button
+                    id={workflowReopenId}
+                    onClick={() => {
+                      reopenTab(board.id);
+                      focusWorkflowTab(board.id);
+                    }}
+                  >
+                    {t('board.reopen')}
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            {statusbar}
+          </section>
           {!!visibleDock.items.length && (
             <InspectorDock
               viewKey={viewKey(board.id, 'dock')}
@@ -995,42 +1064,6 @@ export default function App() {
             </InspectorDock>
           )}
         </div>
-        <footer className="workspace-statusbar">
-          <span className="workspace-status-summary">
-            <span className={'save-state ' + saveStatus} role="status">
-              {saveStatus === 'saving' ? (
-                <LoaderCircle className="spin" size={13} />
-              ) : saveStatus === 'failed' ? (
-                <CircleAlert size={13} />
-              ) : (
-                <Check size={13} />
-              )}
-              {t(
-                saveStatus === 'failed'
-                  ? 'board.failed'
-                  : saveStatus === 'saving'
-                    ? 'board.saving'
-                    : 'board.saved',
-              )}
-            </span>
-            <span className="statusbar-dot">·</span>
-            {t('board.repositories', { count: board.nodes.length })}
-            <span className="statusbar-dot">·</span>
-            {t('board.relations', { count: board.edges.length })}
-            {!!board.connections?.length && (
-              <> · {t('flowchart.connections', { count: board.connections.length })}</>
-            )}
-          </span>
-          <span data-mobile-label={t('nav.service')}>
-            {refreshing
-              ? t('board.reading')
-              : snapshot
-                ? t('board.checked', { time: timeAgo(snapshot.checkedAt) })
-                : t('board.waiting')}
-            <span className="statusbar-dot">·</span>
-            {t('board.autoCheck')}
-          </span>
-        </footer>
       </main>
       {modal === 'preferences' && (
         <PreferencesDialog viewKey="app.preferences" onClose={() => setModal(null)} />
@@ -1249,6 +1282,7 @@ export default function App() {
           title={t('nav.newBoard')}
           label={t('board.name')}
           onSubmit={(name) => {
+            if (saveStatus === 'failed') return;
             const id = crypto.randomUUID();
             update((draft) => {
               draft.boards.push({ id, name, description: '', nodes: [], edges: [] });
@@ -1256,7 +1290,7 @@ export default function App() {
             });
             clearSelection();
             setDock(emptyDock);
-            setClosedBoardId(null);
+            reopenTab(id);
           }}
           onClose={() => setModal(null)}
         />
@@ -1269,15 +1303,24 @@ export default function App() {
             setRemovalTarget(null);
           }}
           onConfirm={() => {
+            if (saveStatus === 'failed') return;
+            const next = adjacentTab(removalTarget.id)?.id;
             update((draft) => {
               if (draft.boards.length <= 1) return;
               draft.boards = draft.boards.filter((b) => b.id !== removalTarget.id);
               if (draft.activeBoardId === removalTarget.id)
-                draft.activeBoardId = draft.boards[0].id;
+                draft.activeBoardId = next ?? draft.boards[0].id;
             });
+            if (tabs.some((item) => item.id === removalTarget.id)) {
+              const remaining = tabs
+                .filter((item) => item.id !== removalTarget.id)
+                .map((item) => item.id);
+              setSavedTabs(remaining.length ? remaining : null);
+            }
             if (board.id === removalTarget.id) {
               clearSelection();
               setDock(emptyDock);
+              setSnapshot(null);
             }
             setModal(null);
             setRemovalTarget(null);
@@ -1374,13 +1417,11 @@ export default function App() {
               item.nodes.some((node) => node.repoId === repo.id),
             );
             if (found) {
-              update((draft) => {
-                draft.activeBoardId = found.id;
-              });
+              switchWorkflow(found.id);
               openRepo(repo.id, found.id);
             } else {
               if (board.layoutLocked) return;
-              setClosedBoardId(null);
+              reopenTab(board.id);
               addRepository(repo);
             }
             setModal(null);

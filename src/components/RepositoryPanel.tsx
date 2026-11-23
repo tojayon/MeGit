@@ -12,6 +12,7 @@ import {
   Minus,
   Plus,
   RefreshCw,
+  Terminal,
 } from 'lucide-react';
 import type {
   ChangedFile,
@@ -47,6 +48,7 @@ import { CommitEvent } from './CommitEvent';
 import { useViewState, useScrollMemory, viewStorage } from '../lib/use-view-state';
 import { isText, isFiniteNumber } from '../lib/view-storage';
 import { useRepositoryActions } from '../lib/use-repository-actions';
+import { LocalServiceDialog } from './LocalServiceDialog';
 
 type DiffSelection = { title: string; query: DiffQuery };
 const isDiffSelection = (value: unknown): value is DiffSelection | null => {
@@ -705,6 +707,7 @@ export function RepositoryPanel({
 }) {
   const { t } = useTranslation();
   const showWorktree = cardUsesWorktree(cardRef, state);
+  const [showLocalService, setShowLocalService] = useState(false);
   const { message, setMessage, busy, executeAction, generateCommit } = useRepositoryActions({
     repo,
     worktreeRef: cardRef,
@@ -761,7 +764,14 @@ export function RepositoryPanel({
         }
         closeLabel={t('repository.close')}
         onClose={onClose}
-        actions={<RepositoryInfo repo={repo} state={state} />}
+        actions={
+          <>
+            <IconButton label={t('localService.title')} onClick={() => setShowLocalService(true)}>
+              <Terminal size={16} />
+            </IconButton>
+            <RepositoryInfo repo={repo} state={state} />
+          </>
+        }
       />
       {state?.error ? (
         <div className="panel-error" role="alert">
@@ -844,6 +854,9 @@ export function RepositoryPanel({
           selection={diff}
           onClose={() => setDiff(null)}
         />
+      )}
+      {showLocalService && (
+        <LocalServiceDialog key={repo.id} repo={repo} onClose={() => setShowLocalService(false)} />
       )}
     </aside>
   );

@@ -1,5 +1,7 @@
 /* MeGit palette v1: see public/brand/palette.json and docs/COLOR_GUIDELINES.md. */
 :root,
+.local-service-console,
+.local-service-preview,
 :root[data-theme='dark'] {
   color-scheme: dark;
   --surface: #1d2024;

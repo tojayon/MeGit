@@ -1,0 +1,7 @@
+{
+  "identifier": "desktop-window",
+  "local": false,
+  "remote": { "urls": ["http://127.0.0.1:43217/*"] },
+  "webviews": ["main"],
+  "permissions": ["allow-desktop-window"]
+}

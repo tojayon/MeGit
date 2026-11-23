@@ -12,6 +12,7 @@ import {
   ArrowDown,
   ArrowUp,
   CircleHelp,
+  FilePenLine,
   FolderGit2,
   History,
   Plus,
@@ -24,6 +25,7 @@ import {
 import type { Board, Repository } from '../../shared/types';
 import type { AssistantBoardPlan as BoardPlan } from '../../shared/assistant-board';
 import { AssistantBoardPlan } from './AssistantBoardPlan';
+import { AssistantProject } from './AssistantProject';
 import type { AiSettings } from '../../shared/ai';
 import type { AssistantPlan as Plan, AssistantReply } from '../../shared/assistant';
 import { request } from '../lib/api';
@@ -108,6 +110,7 @@ export function AssistantPanel({
   const [planErrors, setPlanErrors] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<unknown>();
   const [settings, setSettings] = useState<AiSettings>();
+  const [projectMode, setProjectMode] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [executing, setExecuting] = useState<string | null>(null);
   const root = useRef<HTMLElement>(null);
@@ -448,6 +451,7 @@ export function AssistantPanel({
     setSession((saved) => ({ ...saved, activeId: id }));
   }
   const activeRun = !!executing || Object.values(plans).some((plan) => plan.status === 'running');
+  const projectView = projectMode && !preview && settings?.projectDelivery;
   function continueConversation() {
     changeCurrent((conversation) => {
       conversation.draft ||= t('assistantGuidance.continuePrompt');
@@ -491,7 +495,7 @@ export function AssistantPanel({
                 <button
                   type="button"
                   key={conversation.id}
-                  disabled={activeRun}
+                  disabled={activeRun || projectView}
                   aria-current={conversation.id === current.id ? 'true' : undefined}
                   onClick={() => selectConversation(conversation.id)}
                 >
@@ -502,7 +506,7 @@ export function AssistantPanel({
                   label={t('assistant.deleteConversation', {
                     name: conversation.title || t('assistant.newConversation'),
                   })}
-                  disabled={activeRun || generating}
+                  disabled={activeRun || generating || projectView}
                   onClick={() =>
                     setSession((saved) => {
                       const conversations = saved.conversations.filter(
@@ -526,7 +530,7 @@ export function AssistantPanel({
         <IconButton
           label={t('assistant.newConversation')}
           size="small"
-          disabled={activeRun || session.conversations.length >= 12}
+          disabled={activeRun || projectView || session.conversations.length >= 12}
           onClick={() => {
             pending.current?.abort();
             follow.current = true;
@@ -545,7 +549,21 @@ export function AssistantPanel({
           <X size={16} />
         </IconButton>
       </header>
-      <div className="assistant-history-shell">
+      {projectView && settings && (
+        <AssistantProject
+          key={JSON.stringify([settings.endpoint, settings.model])}
+          repositories={repositories.filter((repo) => !repo.archived)}
+          initialRepository={currentIds.length === 1 ? currentIds[0] : ''}
+          initialPrompt={current.draft}
+          settings={settings}
+          active={open}
+          onBack={() => {
+            setProjectMode(false);
+            requestAnimationFrame(() => focusWithoutTooltip(input.current));
+          }}
+        />
+      )}
+      <div className="assistant-history-shell" hidden={projectView}>
         <div
           className="assistant-messages"
           ref={history}
@@ -724,7 +742,7 @@ export function AssistantPanel({
           </Button>
         )}
       </div>
-      <div className="assistant-composer-shell">
+      <div className="assistant-composer-shell" hidden={projectView}>
         {!!error && (
           <div className="error-message" role="alert">
             {formatError(error)}
@@ -890,6 +908,11 @@ export function AssistantPanel({
               <span className="assistant-model" title={settings?.model}>
                 {settings?.model || t('assistant.noModel')}
               </span>
+              {!preview && settings?.projectDelivery && (
+                <IconButton size="small" label={t('projectDelivery.title')} disabled={generating || activeRun} onClick={() => setProjectMode(true)}>
+                  <FilePenLine size={16} />
+                </IconButton>
+              )}
               <IconButton size="small" label={t('settings.title')} onClick={onSettings}>
                 <Settings2 size={15} />
               </IconButton>

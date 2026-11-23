@@ -28,6 +28,7 @@ export function AiPanel({
   const [model, setModel] = useState('');
   const [key, setKey] = useState('');
   const [clearKey, setClearKey] = useState(false);
+  const [projectDelivery, setProjectDelivery] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const [notice, setNotice] = useState<'saved' | 'connected' | 'applied'>();
@@ -35,7 +36,11 @@ export function AiPanel({
   const [prompt, setPrompt] = useState('');
   const [result, setResult] = useState<AiResult>();
   const dirty =
-    endpoint !== settings?.endpoint || model !== settings?.model || Boolean(key) || clearKey;
+    endpoint !== settings?.endpoint ||
+    model !== settings?.model ||
+    Boolean(key) ||
+    clearKey ||
+    projectDelivery !== (settings?.projectDelivery === true);
   const ready = Boolean(settings?.model) && !dirty && !busy;
 
   useEffect(() => {
@@ -46,6 +51,7 @@ export function AiPanel({
         setSettings(value);
         setEndpoint(value.endpoint);
         setModel(value.model);
+        setProjectDelivery(value.projectDelivery === true);
       })
       .catch((failure: unknown) => {
         if (!controller.signal.aborted) setError(failure);
@@ -63,7 +69,12 @@ export function AiPanel({
       if (action === 'save') {
         const value = await request<AiSettings>('/ai/settings', {
           method: 'PUT',
-          body: JSON.stringify({ endpoint, model, apiKey: clearKey ? '' : key || undefined }),
+          body: JSON.stringify({
+            endpoint,
+            model,
+            projectDelivery,
+            apiKey: clearKey ? '' : key || undefined,
+          }),
         });
         setSettings(value);
         setEndpoint(value.endpoint);
@@ -130,6 +141,14 @@ export function AiPanel({
               {t('ai.clearKey')}
             </label>
           )}
+          <label>
+            <input
+              type="checkbox"
+              checked={projectDelivery}
+              onChange={(event) => setProjectDelivery(event.target.checked)}
+            />
+            {t('projectDelivery.enable')}
+          </label>
           <div className="settings-actions">
             <Button
               variant="primary"

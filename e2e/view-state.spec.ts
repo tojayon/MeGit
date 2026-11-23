@@ -60,7 +60,7 @@ test('刷新恢复打开的详情、地图视角、横向位置及白板关闭�
     const dock = page.locator('.dock-panels');
     await dock.evaluate((el) => el.scrollTo({ left: 110, behavior: 'instant' }));
     await expect.poll(() => dock.evaluate((el) => el.scrollLeft)).toBe(110);
-    await page.getByRole('button', { name: '关闭工作流面板', exact: true }).click();
+    await page.getByRole('button', { name: /^关闭工作流面板：/ }).click();
     const writes: string[] = [];
     page.on('request', (request) => {
       if (request.url().endsWith('/actions')) writes.push(request.method());

@@ -98,6 +98,23 @@ export function useWorkspace() {
     [enqueue],
   );
 
+  const selectBoard = useCallback((id: string) => {
+    const previous = current.current;
+    if (
+      !previous ||
+      previous.activeBoardId === id ||
+      !previous.boards.some((board) => board.id === id)
+    )
+      return;
+    const next = { ...previous, activeBoardId: id };
+    current.current = next;
+    setWorkspace(next);
+    setHistoryStatus({
+      canUndo: history.current.canUndo(id),
+      canRedo: history.current.canRedo(id),
+    });
+  }, []);
+
   const restore = useCallback(
     (direction: 'undo' | 'redo', id: string) => {
       if (
@@ -145,6 +162,7 @@ export function useWorkspace() {
   return {
     workspace,
     update,
+    selectBoard,
     updateViewport,
     error,
     saveStatus,

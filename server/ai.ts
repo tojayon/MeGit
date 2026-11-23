@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Router } from 'express';
@@ -9,14 +9,20 @@ import type { RepoState } from '../shared/types.js';
 import { AppError } from './errors.js';
 import { commitMessage, type readCommitContext } from './ai-commit.js';
 import { AssistantService, assistantRouter } from './assistant.js';
+import { ProjectDelivery, projectDeliveryRouter } from './assistant-project.js';
+import type { LocalServices } from './local-service.js';
 import type { Repository } from '../shared/types.js';
 
 const configSchema = z.strictObject({
   endpoint: z.string().trim().min(1).max(2048),
   model: z.string().trim().min(1).max(256),
 });
-const storedSchema = configSchema.extend({ secret: z.string().max(65536) });
+const storedSchema = configSchema.extend({
+  secret: z.string().max(65536),
+  projectDelivery: z.boolean().optional(),
+});
 const inputSchema = configSchema.extend({
+  projectDelivery: z.boolean().optional(),
   apiKey: z
     .string()
     .trim()
@@ -151,11 +157,13 @@ export function aiRouter(
     }>;
     repository: (id: string) => Promise<Repository>;
     proxy: () => Promise<string | undefined>;
+    services?: LocalServices;
   },
 ) {
   const router = Router();
   const filename = path.join(directory, 'ai-settings.json');
   let saving = false;
+  let projectRevision = randomUUID();
   async function load() {
     try {
       return storedSchema.parse(JSON.parse(await readFile(filename, 'utf8')));
@@ -169,15 +177,50 @@ export function aiRouter(
       endpoint: config ? normalizeAiEndpoint(config.endpoint) : '',
       model: config?.model ?? '',
       hasApiKey: Boolean(config?.secret),
+      projectDelivery: config?.projectDelivery === true,
     };
   }
-  async function configForRequest() {
-    const config = await load();
+  async function credentials(config: Awaited<ReturnType<typeof load>>) {
     if (!config) throw new AppError('aiNotConfigured');
     const apiKey = config.secret
       ? Buffer.from(await protect(config.secret, true), 'base64').toString('utf8')
       : '';
     return { endpoint: config.endpoint, model: config.model, apiKey };
+  }
+  const configForRequest = async () => credentials(await load());
+  function projectSettings(config: Awaited<ReturnType<typeof load>>) {
+    if (!config) return null;
+    return {
+      endpoint: normalizeAiEndpoint(config.endpoint),
+      model: config.model,
+      enabled: config.projectDelivery === true,
+      key: createHash('sha256')
+        .update(JSON.stringify([projectRevision, config]))
+        .digest('hex'),
+    };
+  }
+  if (assistant?.services) {
+    router.use(
+      '/project',
+      projectDeliveryRouter(
+        new ProjectDelivery({
+          repository: assistant.repository,
+          settings: async () => projectSettings(await load()),
+          services: assistant.services,
+          complete: async (approved, messages, signal) => {
+            const transport = await getTransport();
+            const config = await load();
+            const current = projectSettings(config);
+            if (!current?.enabled) throw new AppError('projectDisabled', 403);
+            if (current.key !== approved.key) throw new AppError('projectChanged', 409);
+            const auth = await credentials(config);
+            if (projectSettings(await load())?.key !== approved.key)
+              throw new AppError('projectChanged', 409);
+            return completeAi(auth, messages, transport, signal);
+          },
+        }),
+      ),
+    );
   }
   if (assistant)
     router.use(
@@ -213,10 +256,16 @@ export function aiRouter(
           : apiKey
             ? await protect(Buffer.from(apiKey).toString('base64'))
             : '';
-      const next = { endpoint, model, secret };
+      const next = {
+        endpoint,
+        model,
+        secret,
+        projectDelivery: input.data.projectDelivery ?? previous?.projectDelivery ?? false,
+      };
       await mkdir(directory, { recursive: true });
       await writeFile(temporary, JSON.stringify(next), { flag: 'wx', mode: 0o600 });
       await rename(temporary, filename);
+      projectRevision = randomUUID();
       res.json(summary(next));
     } catch (error) {
       throw error instanceof AppError ? error : new AppError('aiStorage', 503);

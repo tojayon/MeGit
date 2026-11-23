@@ -88,7 +88,7 @@ test('两套主题的左右面板同色，且与白板底色不同', async ({ pa
     const navigation = page.locator('#workspace-navigation');
     const matchingSurfaces = [
       dock,
-      page.locator('.workflow-panel > .inspector-heading'),
+      page.locator('.workflow-panel > .workflow-header'),
       panel.locator(':scope > .inspector-heading'),
       page.locator('.workspace-statusbar'),
     ];

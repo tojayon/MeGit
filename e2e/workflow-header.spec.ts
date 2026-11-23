@@ -33,8 +33,8 @@ test('工作流标题栏与详情等高，信息和关闭重开不改写白板�
     const store = await seed(request, f.repo);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
-    const heading = page.locator('.workflow-panel > .inspector-heading');
-    await expect(heading.getByRole('heading', { name: '发布工作流', exact: true })).toBeVisible();
+    const heading = page.locator('.workflow-panel > .workflow-header');
+    await expect(heading.getByRole('tab', { name: '发布工作流', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '查看示例仓库', exact: true }).click();
     const repository = page.locator('.dock-card .inspector-heading');
     expect((await heading.boundingBox())!.height).toBe((await repository.boundingBox())!.height);
@@ -47,7 +47,7 @@ test('工作流标题栏与详情等高，信息和关闭重开不改写白板�
     page.on('request', (request) => {
       if (request.url().includes('/api/') && !['GET', 'HEAD'].includes(request.method())) writes++;
     });
-    const info = heading.getByRole('button', { name: '工作流信息', exact: true });
+    const info = heading.getByRole('button', { name: '工作流信息：发布工作流', exact: true });
     await info.click();
     const popup = page.getByRole('dialog', { name: '工作流信息', exact: true });
     await expect(popup).toContainText('审核通过后发布。');
@@ -55,7 +55,7 @@ test('工作流标题栏与详情等高，信息和关闭重开不改写白板�
     await page.keyboard.press('Escape');
     await expect(popup).toHaveCount(0);
     await expect(info).toBeFocused();
-    await heading.getByRole('button', { name: '关闭工作流面板', exact: true }).click();
+    await heading.getByRole('button', { name: '关闭工作流面板：发布工作流', exact: true }).click();
     await expect(heading).toBeHidden();
     await expect(repository).toBeVisible();
     const reopen = page.getByRole('button', { name: '重新打开工作流', exact: true });
@@ -63,7 +63,7 @@ test('工作流标题栏与详情等高，信息和关闭重开不改写白板�
     await page.keyboard.press('Enter');
     await expect(heading).toBeVisible();
     await expect(viewport).toHaveAttribute('style', transform!);
-    await heading.getByRole('button', { name: '关闭工作流面板', exact: true }).click();
+    await heading.getByRole('button', { name: '关闭工作流面板：发布工作流', exact: true }).click();
     await page
       .locator('#workspace-navigation .board-item')
       .filter({ hasText: '发布工作流' })
@@ -74,6 +74,12 @@ test('工作流标题栏与详情等高，信息和关闭重开不改写白板�
     expect(writes).toBe(0);
     expect(await store.read()).toEqual(saved);
     await page.screenshot({ path: '.megit/verification/workflow-header/dark-zh.png' });
+    await page.setViewportSize({ width: 760, height: 700 });
+    const headerBox = (await heading.boundingBox())!;
+    const dockBox = (await repository.boundingBox())!;
+    expect(dockBox.y).toBeGreaterThanOrEqual(headerBox.y + headerBox.height);
+    await info.click();
+    await expect(popup).toContainText('审核通过后发布。');
   } finally {
     await f.cleanup();
   }
@@ -92,8 +98,8 @@ test('关闭工作流后仍可打开导航、切换工作流，刷新保留关�
   });
   expect((await request.put('/api/workspace', { headers, data: workspace })).ok()).toBe(true);
   await page.goto('/');
-  const heading = page.locator('.workflow-panel > .inspector-heading');
-  await heading.getByRole('button', { name: '关闭工作流面板', exact: true }).click();
+  const heading = page.locator('.workflow-panel > .workflow-header');
+  await heading.getByRole('button', { name: '关闭工作流面板：开发流程', exact: true }).click();
   await expect(heading).toBeHidden();
   await page.getByRole('button', { name: '收起流程导航', exact: true }).click();
   await page.getByRole('button', { name: '我的工作流', exact: true }).click();
@@ -102,8 +108,8 @@ test('关闭工作流后仍可打开导航、切换工作流，刷新保留关�
     .getByRole('button', { name: '另一工作流', exact: false })
     .click();
   await expect(heading).toBeVisible();
-  await expect(heading.getByRole('heading', { name: '另一工作流', exact: true })).toBeVisible();
-  await heading.getByRole('button', { name: '关闭工作流面板', exact: true }).click();
+  await expect(heading.getByRole('tab', { name: '另一工作流', exact: true })).toBeVisible();
+  await heading.getByRole('button', { name: '关闭工作流面板：另一工作流', exact: true }).click();
   await page.reload();
   await expect(heading).toBeHidden();
   await expect(page.getByRole('button', { name: '重新打开工作流', exact: true })).toBeVisible();
@@ -139,25 +145,32 @@ test('明亮英文长工作流名与390px触控标题栏可读，信息和关闭
     );
     const page = await context.newPage();
     await page.goto('/');
-    const heading = page.locator('.workflow-panel > .inspector-heading');
-    await expect(heading.getByRole('heading', { name, exact: true })).toBeVisible();
+    const heading = page.locator('.workflow-panel > .workflow-header');
+    await expect(heading.getByRole('tab', { name, exact: true })).toBeVisible();
     expect(await heading.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
       true,
     );
-    const sizes = await heading.getByRole('button').evaluateAll((elements) =>
-      elements.map((element) => ({
-        width: element.getBoundingClientRect().width,
-        height: element.getBoundingClientRect().height,
-      })),
-    );
+    const sizes = await heading
+      .getByRole('button')
+      .or(heading.getByRole('tab'))
+      .evaluateAll((elements) =>
+        elements.map((element) => ({
+          width: element.getBoundingClientRect().width,
+          height: element.getBoundingClientRect().height,
+        })),
+      );
     expect(sizes.every((size) => size.width >= 44 && size.height >= 44)).toBe(true);
-    await heading.getByRole('button', { name: 'Workflow information', exact: true }).click();
+    await heading
+      .getByRole('button', { name: `Workflow information: ${name}`, exact: true })
+      .click();
     await expect(
       page.getByRole('dialog', { name: 'Workflow information', exact: true }),
     ).toContainText(name);
     await page.screenshot({ path: '.megit/verification/workflow-header/light-en-touch-info.png' });
     await page.keyboard.press('Escape');
-    await heading.getByRole('button', { name: 'Close workflow panel', exact: true }).click();
+    await heading
+      .getByRole('button', { name: `Close workflow panel: ${name}`, exact: true })
+      .click();
     await expect(page.getByRole('button', { name: 'Reopen workflow', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

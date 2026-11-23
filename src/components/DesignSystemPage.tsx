@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Check,
@@ -37,7 +37,8 @@ import { BranchDialog, type BranchSelection } from './BranchesPanel';
 import { Dialog } from './Dialogs';
 import { PopupMenu } from './PopupMenu';
 import { NavigationExample } from './NavigationExample';
-import { WorkflowHeader } from './WorkflowHeader';
+import { WorkflowHeader, workflowPanelId, workflowTabId } from './WorkflowHeader';
+import { DesktopWindowControls } from './DesktopWindow';
 import { FlowchartExample } from './FlowchartExample';
 import { CanvasToolStrip } from './CanvasTools';
 import { RepositoryPortsExample } from './RepositoryPortsExample';
@@ -47,7 +48,10 @@ import { CommitComposer } from './CommitComposer';
 import { RepositorySyncButtons } from './RepositorySyncButtons';
 import { RepositoryCardExample } from './RepositoryCardExample';
 import { AssistantExample } from './AssistantExample';
+import { AssistantProjectExample } from './AssistantProject';
 import { AssistantGuidanceExample } from './AssistantGuidanceExample';
+import { LocalServiceExample } from './LocalServiceDialog';
+import { WorkspaceStatusbar } from './WorkspaceStatusbar';
 import { RemoteManagement, RemoteManagementCard } from './RemoteManagement';
 import type {
   BranchComparison,
@@ -67,6 +71,31 @@ const sampleCommitIds: Record<string, string> = {
   'main-v1': '6'.repeat(40),
 };
 const sampleCommitId = (name: string) => sampleCommitIds[name] || name;
+
+function WorkspaceStatusExample() {
+  const { t } = useTranslation();
+  const [openName, setOpenName] = useState<string | null>(null);
+  const repositories = [
+    { id: 'megit-example', name: 'MeGit', path: '' },
+    { id: 'long-example', name: sampleRepository, path: '' },
+  ];
+
+  return (
+    <section className="design-card" aria-label={t('board.windowStatus')}>
+      <WorkspaceStatusbar
+        board={{ id: 'status-example', name: 'MeGit', description: '', nodes: [], edges: [] }}
+        repositories={repositories}
+        saveStatus="saved"
+        refreshing={false}
+        preview={{
+          services: repositories.map(({ id }) => ({ repoId: id, status: 'running' })),
+          open: ({ name }) => setOpenName(name),
+        }}
+      />
+      {openName && <LocalServiceExample name={openName} onClose={() => setOpenName(null)} />}
+    </section>
+  );
+}
 
 function CommitComposerExample() {
   const { t } = useTranslation();
@@ -566,6 +595,63 @@ function CanvasToolsExample() {
   );
 }
 
+const exampleWorkflows = [
+  {
+    id: 'design',
+    name: 'MeGit / workflow-with-a-long-name-for-parallel-development',
+    description: '',
+    nodes: [],
+    edges: [],
+  },
+  { id: 'release', name: 'MeGit / release', description: '', nodes: [], edges: [] },
+];
+
+function WorkflowTabsExample() {
+  const { t } = useTranslation();
+  const id = useId();
+  const [boards, setBoards] = useState(exampleWorkflows);
+  const [activeId, setActiveId] = useState(exampleWorkflows[0].id);
+  return (
+    <section className="design-card design-panel-example design-workflow-example">
+      <WorkflowHeader
+        boards={boards}
+        activeId={activeId}
+        id={id}
+        onSelect={setActiveId}
+        onClose={(closedId) => {
+          const next = boards.filter((board) => board.id !== closedId);
+          setBoards(next);
+          if (closedId === activeId) setActiveId(next[0]?.id ?? '');
+        }}
+      />
+      {boards.map((board) => (
+        <div
+          key={board.id}
+          className="design-panel-body"
+          id={workflowPanelId(id, board.id)}
+          role="tabpanel"
+          aria-labelledby={workflowTabId(id, board.id)}
+          hidden={board.id !== activeId}
+        >
+          {board.name}
+        </div>
+      ))}
+      {!boards.length && (
+        <div className="design-panel-body">
+          <Button
+            onClick={() => {
+              setBoards(exampleWorkflows);
+              setActiveId(exampleWorkflows[0].id);
+            }}
+          >
+            {t('board.reopen')}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function DesignSystemPage() {
   const { t } = useTranslation();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -575,7 +661,6 @@ export function DesignSystemPage() {
   const [invalid, setInvalid] = useState(false);
   const [verified, setVerified] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [workflowOpen, setWorkflowOpen] = useState(true);
   return (
     <main className="design-system-page">
       <div className="design-system-content">
@@ -591,6 +676,7 @@ export function DesignSystemPage() {
               <Settings2 size={18} />
             </IconButton>
           </div>
+          <DesktopWindowControls />
         </header>
         <div className="design-system-intro">
           <h1>{t('designSystem.title')}</h1>
@@ -601,30 +687,15 @@ export function DesignSystemPage() {
           <CommitComposerExample />
           <RemoteManagementExample />
           <RepositoryCardExample />
+          <LocalServiceExample />
+          <WorkspaceStatusExample />
           <DockExample />
           <NavigationExample />
           <FlowchartExample />
           <RepositoryPortsExample />
           <RelationBridgeExample />
           <RelationPanelExample />
-          <section className="design-card design-panel-example design-workflow-example">
-            {workflowOpen ? (
-              <WorkflowHeader
-                board={{
-                  id: 'workflow-example',
-                  name: 'MeGit / workflow-with-a-long-name-for-parallel-development',
-                  description: '',
-                  nodes: [],
-                  edges: [],
-                }}
-                onClose={() => setWorkflowOpen(false)}
-              />
-            ) : (
-              <div className="design-panel-body">
-                <Button onClick={() => setWorkflowOpen(true)}>{t('board.reopen')}</Button>
-              </div>
-            )}
-          </section>
+          <WorkflowTabsExample />
           <section className="design-card">
             <h2>{t('learning.title')}</h2>
             <p className="design-caption">{t('learning.demoRule')}</p>
@@ -784,6 +855,7 @@ export function DesignSystemPage() {
             )}
           </section>
           <AssistantExample />
+          <AssistantProjectExample />
           <AssistantGuidanceExample />
           <section className="design-card design-empty-example">
             <FolderGit2 size={28} aria-hidden="true" />

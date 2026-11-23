@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RepoState } from '../../shared/types';
+import type { LocalServiceCardState } from '../../shared/local-service';
 import { RepositoryCard } from './RepositoryCard';
+import { LocalServiceCardControls } from './LocalServiceCardControls';
 
 export function RepositoryCardExample() {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const [staged, setStaged] = useState(false);
   const [changed, setChanged] = useState(true);
+  const [serviceStatus, setServiceStatus] = useState<LocalServiceCardState['status']>('stopped');
   const state: RepoState = {
     branch: 'feature/repository-card-layout',
     head: 'a'.repeat(40),
@@ -34,7 +37,7 @@ export function RepositoryCardExample() {
     checkedAt: '',
   };
   return (
-    <section className="design-card">
+    <section className="design-card" aria-label={t('repositoryCard.example')}>
       <h2>{t('repositoryCard.example')}</h2>
       <RepositoryCard
         repo={{ id: 'card-example', name: 'MeGit / repository-with-a-long-name', path: '' }}
@@ -42,6 +45,12 @@ export function RepositoryCardExample() {
         message={message}
         onMessage={setMessage}
         busy=""
+        serviceControls={
+          <LocalServiceCardControls
+            service={{ repoId: 'card-example', revision: 'preview', status: serviceStatus }}
+            onAction={async (action) => setServiceStatus(action === 'stop' ? 'stopped' : 'running')}
+          />
+        }
         onGenerate={async () => {
           setMessage(t('repositoryCard.aiExample'));
           return true;

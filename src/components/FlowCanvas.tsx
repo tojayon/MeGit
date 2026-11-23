@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { RepositoryCard } from './RepositoryCard';
+import { LocalServiceCardControls } from './LocalServiceCardControls';
+import { useLocalServiceCards } from '../lib/use-local-service-cards';
+import type { LocalServiceAction, LocalServiceCardState } from '../../shared/local-service';
 import { useRepositoryActions } from '../lib/use-repository-actions';
 import type { NoticeMessage } from '../lib/messages';
 import { RepositoryPorts } from './RepositoryPorts';
@@ -113,6 +116,10 @@ type RepoNode = Node<
     repo: Repository;
     state?: RepoState;
     ref?: string;
+    service?: LocalServiceCardState;
+    servicePending?: LocalServiceAction;
+    serviceProblem?: unknown;
+    onServiceAction: ReturnType<typeof useLocalServiceCards>['execute'];
     onOpen: (id: string) => void;
     boardId: string;
     onState: (id: string, state: RepoState) => void;
@@ -172,6 +179,15 @@ const RepositoryNode = memo(function RepositoryNode({ id, data, selected }: Node
         !!data.ref && !!state && !state.branches.some((branch) => branchRef(branch) === data.ref)
       }
       showWorktree={cardUsesWorktree(data.ref, state)}
+      serviceControls={data.service && !data.ref && state && !state.error && (
+        <LocalServiceCardControls
+          key={`${repo.id}:${repo.path}`}
+          service={data.service}
+          pending={data.servicePending}
+          readProblem={data.serviceProblem}
+          onAction={(action, revision) => data.onServiceAction(repo.id, action, revision)}
+        />
+      )}
       onOpen={() => onOpen(id)}
     >
       <RepositoryPorts name={repo.name} />
@@ -390,6 +406,8 @@ function CanvasContents({
 }) {
   const { t } = useTranslation();
   const { preferences } = usePreferences();
+  const localServices = useLocalServiceCards(board.id, board.nodes.some((node) => !node.ref));
+  const serviceByRepo = new Map(localServices.cards.map((service) => [service.repoId, service]));
   const { zoomIn, zoomOut, fitView, screenToFlowPosition } = useReactFlow();
   const flowStore = useStoreApi<CanvasNode, CanvasEdge>();
   const updateNodeInternals = useUpdateNodeInternals();
@@ -629,6 +647,10 @@ function CanvasContents({
             repo,
             state: snapshot?.repositories[node.repoId],
             ref: node.ref,
+            service: node.ref ? undefined : serviceByRepo.get(node.repoId),
+            servicePending: localServices.pending.get(node.repoId),
+            serviceProblem: localServices.problem,
+            onServiceAction: localServices.execute,
             onOpen: onSelectRepo,
             boardId: board.id,
             onState: onRepositoryState,

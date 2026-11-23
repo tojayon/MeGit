@@ -1,0 +1,39 @@
+# MeGit Windows 桌面版
+
+[English](README.md)
+
+## 安装与启动
+
+运行 Windows x64 安装包 `MeGit_<版本>_x64-setup.exe`，然后从开始菜单打开 **MeGit**。安装以当前用户为范围。需要 WebView2；如果未安装，安装程序会联网获取。重新打开 MeGit 会唤醒已有窗口。默认关闭窗口时退出，并停止 MeGit 后端和它管理的本地服务。
+
+- Git 功能使用系统安装的 **Git for Windows**；如果未找到 Git，请安装并加入 PATH 后重新打开 MeGit。GitHub 登录仍使用 Git Credential Manager 和默认浏览器。
+- MeGit 内置自己的 Node.js。要启动仓库的 npm 脚本，仍需在系统 PATH 中安装该仓库需要的 Node.js，且配有同一安装内的 npm。PowerShell 脚本沿用本机 Windows PowerShell 和执行策略。
+- 桌面版使用 `127.0.0.1:43217`。如果端口已经被占用，MeGit 提示后退出，不接管或停止其他程序。浏览器版默认仍使用 `4317`。
+
+## 窗口与托盘
+
+在 **软件设置 → 界面** 中更改，立即生效并在下次启动时恢复：
+
+- **显示系统标题栏**（默认开启）：关闭后，中间面板的工作流标签栏兼作标题栏。拖动标签右侧空白可移动窗口，最右侧是最小化、最大化／还原和关闭窗口按钮。
+- **关闭窗口时隐藏到系统托盘**（默认关闭）：启用后点击关闭按钮只隐藏窗口，MeGit 和它管理的本地服务继续运行。单击托盘图标或再次启动 MeGit 可恢复窗口；要停止服务并退出，请右击托盘图标并选择 **退出 MeGit**。
+
+## 升级与迁移
+
+请先退出 MeGit 再运行新版安装包。白板及服务设置位于 `%LOCALAPPDATA%/app.megit.desktop/data/`，窗口设置在同一应用本地目录的 `window-settings.json`，都不在安装目录内。卸载时如出现删除应用数据的选项，保留数据请勿勾选。无需迁移或复制登记的 Git 仓库。
+
+从浏览器版迁移白板：退出两版，备份原数据及桌面版已有数据，然后将原数据目录（默认项目内 `.megit/`）的 `workspace.json` 复制到桌面数据目录。**桌面已有白板时不要直接覆盖**：当前没有自动合并。浏览器的语言、主题和标签页状态不会一同迁移。网络代理、AI 凭据和本地服务配置建议在桌面版重新设置并确认。
+
+## 从源码构建
+
+构建机器需有 Windows、Node.js 22.12+、Rust 的 x64 MSVC 工具链及 Visual Studio C++ 构建工具 / Windows SDK。用户电脑不需要这些构建工具。
+
+在仓库根目录运行：
+
+```powershell
+npm ci
+powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
+```
+
+安装包在 `desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。正常构建不会自动签名或发布。对外分发前请配置发布者签名，并在干净的 Windows 环境验收安装、覆盖升级、卸载保留、外链、复制和导出。内置 Node 版本及其官方 ZIP 的固定 SHA-256 在 `build.ps1` 中一起维护。
+
+仅准备资源：给构建脚本加 `-PrepareOnly`。随后运行 `node --test desktop/backend.test.mjs` 验证打包的后端；运行 `cargo test --locked --release --target x86_64-pc-windows-msvc --manifest-path desktop/src-tauri/Cargo.toml` 验证窗口导航规则。网页版构建与测试仍可独立运行。

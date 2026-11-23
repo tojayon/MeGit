@@ -11,6 +11,7 @@
   --settings-width: 760px;
   --settings-min-height: 420px;
   --settings-nav-width: 174px;
+  --workflow-tab-width: 240px;
   --repository-card-width: 276px;
   --repository-card-avatar: 48px;
   --repository-card-input: 28px;
@@ -21,6 +22,10 @@
   --commit-lens-row-height: 68px;
   --commit-compact-input-height: 72px;
   --worktree-dialog-height: 680px;
+  --local-service-console-width: 920px;
+  --local-service-console-height: 520px;
+  --local-service-preview-output-height: 140px;
+  --local-service-bar-height: calc(var(--control-compact) + var(--space-1) * 2 + 1px);
   --assistant-repository-width: 900px;
   --edge-route-target: 28px;
   --edge-route-dot: 9px;
@@ -29,6 +34,7 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --motion-explain: 600ms;
+  --motion-service-glow: 6s;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;

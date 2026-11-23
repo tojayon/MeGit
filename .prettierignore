@@ -3,6 +3,9 @@ dist/
 dist-server/
 .megit/
 .worktrees/
+desktop/.stage/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
 test-results/
 playwright-report/
 package-lock.json

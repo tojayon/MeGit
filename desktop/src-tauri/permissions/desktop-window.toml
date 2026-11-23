@@ -1,0 +1,4 @@
+[[permission]]
+identifier = 'allow-desktop-window'
+description = 'Read and change MeGit window preferences and use the app window controls.'
+commands.allow = ['desktop_window']

@@ -4,6 +4,7 @@ import express from 'express';
 import { createApp } from './app.js';
 
 const production = process.argv.includes('--production');
+const desktop = production && process.argv.includes('--desktop');
 const root = production
   ? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
   : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,13 +28,23 @@ if (production) {
   app.use(vite.middlewares);
   closeVite = () => vite.close();
 }
-const server = app.listen(port, '127.0.0.1', () => {
+const server = app.listen(port, '127.0.0.1');
+server.once('listening', () => {
+  if (desktop) {
+    console.log('READY');
+    return;
+  }
   console.log(
     `\n  MeGit · 开发流程\n  http://127.0.0.1:${port}\n  ${production ? '本地运行' : '开发模式'} · 按 Ctrl+C 停止\n`,
   );
 });
 server.on('error', (error: NodeJS.ErrnoException) => {
   process.exitCode = 1;
+  if (desktop) {
+    console.log(error.code === 'EADDRINUSE' ? 'PORT_BUSY' : 'FAILED');
+    process.stdin.destroy();
+    return;
+  }
   console.error(
     error.code === 'EADDRINUSE'
       ? `端口 ${port} 已占用，请打开现有 MeGit 或设置 MEGIT_PORT。`
@@ -41,8 +52,16 @@ server.on('error', (error: NodeJS.ErrnoException) => {
   );
   void closeVite?.().finally(() => process.exit(1));
 });
-for (const signal of ['SIGINT', 'SIGTERM'] as const)
-  process.once(signal, () => {
-    server.close();
-    void closeVite?.();
-  });
+let closing = false;
+function close() {
+  if (closing) return;
+  closing = true;
+  if (desktop) process.stdin.destroy();
+  server.close();
+  void app.locals.closeLocalServices();
+  void closeVite?.();
+}
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, close);
+if (desktop) {
+  process.stdin.once('end', close).once('error', close).resume();
+}

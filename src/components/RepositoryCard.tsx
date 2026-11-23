@@ -33,6 +33,7 @@ export function RepositoryCard({
   onGenerate,
   onOpen,
   children,
+  serviceControls,
   reference,
   referenceMissing,
   showWorktree = true,
@@ -47,6 +48,7 @@ export function RepositoryCard({
   onGenerate: () => Promise<boolean>;
   onOpen: () => void;
   children?: ReactNode;
+  serviceControls?: ReactNode;
   reference?: string;
   referenceMissing?: boolean;
   showWorktree?: boolean;
@@ -88,24 +90,11 @@ export function RepositoryCard({
       data-testid="repository-node"
     >
       {children}
-      <div className="repository-card-heading">
+      <div className="repository-card-heading with-shortcuts">
         <RepositoryAvatar repo={repo} size="large" />
         <div className="repository-card-identity">
           <div className="repository-card-title-row">
             <h3 title={repo.name}>{repo.name}</h3>
-            <IconButton
-              className="repository-card-open nodrag nopan"
-              label={t('repository.viewNamed', {
-                name: reference ? `${repo.name} · ${reference}` : repo.name,
-              })}
-              size="small"
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpen();
-              }}
-            >
-              <ArrowUpRight size={14} />
-            </IconButton>
           </div>
           {state?.error ? (
             <p className="repository-card-status danger-text">
@@ -156,6 +145,22 @@ export function RepositoryCard({
             </div>
           )}
         </div>
+        <div className="repository-card-open nodrag nopan">
+          <IconButton
+            label={t('repository.viewNamed', {
+              name: reference ? `${repo.name} · ${reference}` : repo.name,
+            })}
+            size="small"
+            placement="right"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpen();
+            }}
+          >
+            <ArrowUpRight size={14} />
+          </IconButton>
+        </div>
+        {serviceControls}
       </div>
       {showWorktree && (
         <>

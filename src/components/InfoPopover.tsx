@@ -41,7 +41,7 @@ export function InfoPopover({
   panelClassName?: string;
   titleIcon?: ReactNode;
   titleDetail?: ReactNode;
-  placement?: 'bottom' | 'right';
+  placement?: 'top' | 'bottom' | 'right';
   onOpen?: () => void;
   onClose?: () => void;
 }) {
@@ -72,18 +72,19 @@ export function InfoPopover({
       const { offsetWidth: width, offsetHeight: height } = element;
       const limit = innerWidth - width - 8;
       const side = placement === 'right' && rect.right + 8 <= limit ? rect.right + 8 : null;
-      const left = side ?? Math.max(8, Math.min(rect.right - width, limit));
+      const left =
+        side ?? Math.max(8, Math.min(placement === 'top' ? rect.left : rect.right - width, limit));
       const top =
         side !== null
           ? Math.max(8, Math.min(rect.top, innerHeight - height - 8))
-          : rect.bottom + height + 8 <= innerHeight - 8
+          : placement !== 'top' && rect.bottom + height + 8 <= innerHeight - 8
             ? rect.bottom + 8
             : Math.max(8, rect.top - height - 8);
       element.style.left = `${left}px`;
       element.style.top = `${top}px`;
     };
     position();
-    const observer = placement === 'right' ? new ResizeObserver(position) : null;
+    const observer = placement === 'bottom' ? null : new ResizeObserver(position);
     observer?.observe(element);
     focusWithoutTooltip(element);
     return () => {
@@ -143,7 +144,12 @@ export function InfoPopover({
         }
       }}
     >
-      <Tooltip content={help ?? label} detailed={help !== undefined} disabled={open}>
+      <Tooltip
+        content={help ?? label}
+        detailed={help !== undefined}
+        disabled={open}
+        placement={placement === 'top' ? 'top' : undefined}
+      >
         <button
           ref={trigger}
           type="button"

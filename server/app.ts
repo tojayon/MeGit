@@ -24,6 +24,7 @@ import { aiRouter } from './ai.js';
 import { readCommitContext } from './ai-commit.js';
 import { checkRemoteRead, githubLoginAvailable, loginRemoteGitHub } from './remote-access.js';
 import { NetworkSettings, testNetworkProxy, withProxyFetch } from './network-proxy.js';
+import { LocalServices } from './local-service.js';
 
 const hashSchema = z.string().regex(/^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$/);
 const relationActionSchema = z.strictObject({
@@ -121,6 +122,8 @@ export function createApp(options: { dataDirectory: string }) {
   const app = express();
   const store = new WorkspaceStore(options.dataDirectory);
   const network = new NetworkSettings(options.dataDirectory);
+  const services = new LocalServices(options.dataDirectory);
+  app.locals.closeLocalServices = () => services.close();
   const token = randomBytes(32).toString('hex');
   app.disable('x-powered-by');
   app.use((req, res, next) => {
@@ -156,10 +159,15 @@ export function createApp(options: { dataDirectory: string }) {
   });
   app.use('/api', express.json({ limit: '1mb' }));
 
-  async function repository(id: string) {
+  async function registeredRepository(id: string) {
     const workspace = await store.read();
     const repo = workspace.repositories.find((r) => r.id === id);
     if (!repo) throw new AppError('repositoryMissing', 404);
+    return repo;
+  }
+
+  async function repository(id: string) {
+    const repo = await registeredRepository(id);
     const normalized = await resolveRepository(repo.path);
     if (normalized.toLowerCase() !== repo.path.toLowerCase())
       throw new AppError('repositoryMoved', 409);
@@ -175,6 +183,7 @@ export function createApp(options: { dataDirectory: string }) {
       async () => withProxyFetch(await network.proxy()),
       {
         repository,
+        services,
         proxy: () => network.proxy(),
         board: async (id) => {
           const workspace = await store.read();
@@ -191,6 +200,28 @@ export function createApp(options: { dataDirectory: string }) {
     ),
   );
   app.get('/api/workspace', async (_req, res) => res.json(await store.read()));
+  app.get('/api/local-services', async (req, res) => {
+    const workspace = await store.read();
+    if (req.query.boardId === undefined) {
+      res.json(services.activeServices(workspace.repositories));
+      return;
+    }
+    const board = workspace.boards.find(({ id }) => id === req.query.boardId);
+    if (!board) throw new AppError('boardMissing', 404);
+    const heads = new Set(board.nodes.filter((node) => !node.ref).map((node) => node.repoId));
+    res.json(
+      await services.cardStates(workspace.repositories.filter((repo) => heads.has(repo.id))),
+    );
+  });
+  app.get('/api/repositories/:id/local-service', async (req, res) => {
+    res.json(await services.state((await registeredRepository(req.params.id)).path));
+  });
+  app.put('/api/repositories/:id/local-service', async (req, res) => {
+    res.json(await services.save((await registeredRepository(req.params.id)).path, req.body));
+  });
+  app.post('/api/repositories/:id/local-service', async (req, res) => {
+    res.json(await services.action((await registeredRepository(req.params.id)).path, req.body));
+  });
   app.get('/api/network/settings', async (_req, res) => res.json(await network.read()));
   app.put('/api/network/settings', async (req, res) => res.json(await network.save(req.body)));
   app.post('/api/network/test', async (req, res) => {

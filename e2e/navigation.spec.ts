@@ -48,13 +48,27 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expect(page.locator('.workspace-header')).toHaveCount(0);
   await expect(page.getByRole('main', { name: '开发流程', exact: true })).toBeVisible();
   await expect(navigation.locator('.board-item[aria-current]')).toContainText('开发流程');
-  await expect(page.locator('.workspace-statusbar .save-state')).toHaveText('已保存');
+  const statusbar = page.locator('.workflow-panel .workspace-statusbar');
+  await expect(statusbar.getByText('已保存', { exact: true })).toHaveCount(0);
+  const statusButton = statusbar.getByRole('button', { name: '状态信息', exact: true });
+  await statusButton.focus();
+  await page.keyboard.press('Enter');
+  const status = page.getByRole('dialog', { name: '状态信息', exact: true });
+  await expect(status).toBeVisible();
+  await expect(status.getByText('已保存', { exact: true })).toBeVisible();
+  await expect(status.getByText('15 秒自动检查')).toBeVisible();
+  const statusBox = (await status.boundingBox())!;
+  const buttonBox = (await statusButton.boundingBox())!;
+  expect(statusBox.y + statusBox.height).toBeLessThanOrEqual(buttonBox.y);
+  await page.keyboard.press('Escape');
+  await expect(status).not.toBeVisible();
+  await expect(statusButton).toBeFocused();
   const rail = canvas.getByRole('group', { name: '白板操作', exact: true });
   await expect(rail).toBeVisible();
   const railBox = (await rail.boundingBox())!;
   const canvasBox = (await canvas.boundingBox())!;
   expect(canvasBox.y).toBe(
-    (await page.locator('.workflow-panel > .inspector-heading').boundingBox())!.height,
+    (await page.locator('.workflow-panel > .workflow-header').boundingBox())!.height,
   );
   expect(railBox.height).toBeGreaterThan(railBox.width * 3);
   expect(railBox.width).toBeLessThanOrEqual(50);
@@ -106,12 +120,12 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expectControlsAligned(page);
   const expand = navigation.getByRole('button', { name: '展开流程导航' });
   await expect(expand).toBeFocused();
-  await page.locator('.workflow-panel [data-panel-close]').click();
-  await expect(page.locator('.workflow-panel')).toBeHidden();
+  await page.getByRole('button', { name: /^关闭工作流面板：/ }).click();
+  await expect(page.locator('.workspace-canvas')).toBeHidden();
   await expand.click();
   await expect.poll(iconPositions).toEqual(expandedIcons);
   await collapse.click();
-  await page.locator('[data-workflow-reopen]').click();
+  await page.getByRole('button', { name: '重新打开工作流', exact: true }).click();
   expect((await page.locator('.main-workspace').boundingBox())?.x).toBe(56);
   await page.screenshot({
     path: '.megit/verification/navigation/dark-collapsed.png',
@@ -163,7 +177,7 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page }) => {
+test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     localStorage.setItem(
@@ -238,6 +252,19 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
   });
   await page.locator('.sidebar-scrim').click({ position: { x: 350, y: 400 } });
   await expect(navigation).toHaveAttribute('inert', '');
+  const statusTrigger = page.getByRole('button', { name: 'Status information', exact: true });
+  await statusTrigger.click();
+  const status = page.getByRole('dialog', { name: 'Status information', exact: true });
+  await expect(status.getByText('Saved', { exact: true })).toBeVisible();
+  const statusBox = (await status.boundingBox())!;
+  expect(statusBox.x).toBeGreaterThanOrEqual(0);
+  expect(statusBox.x + statusBox.width).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: testInfo.outputPath('workspace-status-light-en.png'),
+    animations: 'disabled',
+  });
+  await page.mouse.click(195, 140);
+  await expect(status).not.toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(navigation).toHaveAttribute('data-collapsed', 'true');
