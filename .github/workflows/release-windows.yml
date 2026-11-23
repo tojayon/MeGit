@@ -1,0 +1,138 @@
+name: Windows Release
+
+run-name: Windows Release v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version in package.json (for example 0.1.0, without v)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark the draft as a pre-release'
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and test Windows x64
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ inputs.version }}
+      CARGO_TARGET_DIR: ${{ github.workspace }}/desktop/src-tauri/target
+      VITEST_MAX_WORKERS: '4'
+    steps:
+      - name: Preserve repository line endings on Windows
+        run: git config --global core.autocrlf false
+      - name: Check out the selected commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate the release version
+        run: |
+          if ($env:VERSION -cnotmatch '\A(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\z') {
+            throw 'Enter a version in X.Y.Z format without a v prefix.'
+          }
+          $sourceVersion = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          if ($env:VERSION -cne $sourceVersion) {
+            throw "Requested version $env:VERSION does not match package.json ($sourceVersion)."
+          }
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Set up the Rust MSVC toolchain
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-msvc --profile minimal --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup default stable-x86_64-pc-windows-msvc
+      - name: Install dependencies and check the project
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run check
+      - name: Build the installer and verify the bundled backend
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test desktop/backend.test.mjs desktop/window-bridge.test.mjs
+      - name: Collect installer and SHA-256
+        run: |
+          $filename = "MeGit_${env:VERSION}_x64-setup.exe"
+          $installer = Join-Path $env:CARGO_TARGET_DIR "x86_64-pc-windows-msvc/release/bundle/nsis/$filename"
+          $assets = New-Item -ItemType Directory -Path release-assets
+          Copy-Item -LiteralPath $installer -Destination $assets.FullName
+          $hash = (Get-FileHash -LiteralPath (Join-Path $assets.FullName $filename) -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath (Join-Path $assets.FullName 'SHA256.txt') -Value "$hash  $filename" -Encoding ascii -NoNewline
+      - name: Save the installer for review
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: windows-x64-v${{ inputs.version }}
+          path: release-assets/
+          if-no-files-found: error
+          overwrite: true
+
+  draft:
+    name: Create an unpublished Release draft
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Retrieve the verified build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: windows-x64-v${{ inputs.version }}
+          path: release-assets/
+      - name: Verify checksum and create draft
+        shell: bash
+        working-directory: release-assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          tag="v${VERSION}"
+          installer="MeGit_${VERSION}_x64-setup.exe"
+          sha256sum --check SHA256.txt
+          test -s "$installer"
+
+          releases=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name')
+          if grep -Fxq -- "$tag" <<< "$releases"; then
+            echo "A Release or draft for $tag already exists. Nothing was overwritten." >&2
+            exit 1
+          fi
+
+          repository="repos/$GITHUB_REPOSITORY"
+          tag_ref="refs/tags/$tag"
+          existing_ref=$(gh api "$repository/git/matching-refs/tags/$tag" --jq ".[] | select(.ref == \"$tag_ref\") | .ref")
+          if [[ -z "$existing_ref" ]]; then
+            gh api --method POST "$repository/git/refs" -f "ref=$tag_ref" -f "sha=$GITHUB_SHA" --silent
+          else
+            tag_sha=$(gh api "$repository/commits/$tag_ref" --jq .sha)
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "Tag $tag points to $tag_sha, not $GITHUB_SHA. Nothing was overwritten." >&2
+              exit 1
+            fi
+          fi
+
+          options=(--draft --verify-tag --generate-notes --title "MeGit $tag")
+          if [[ "$PRERELEASE" == 'true' ]]; then
+            options+=(--prerelease)
+          fi
+          notes=$(printf 'Unsigned Windows x64 installer. Verify with `SHA256.txt` before installing.\n\nSource commit: `%s`.' "$GITHUB_SHA")
+          release_url=$(gh release create "$tag" "$installer" SHA256.txt --repo "$GITHUB_REPOSITORY" "${options[@]}" --notes "$notes")
+          printf '### [%s Release draft](%s)\n\nReview the installer and notes, then publish manually.\n' "$tag" "$release_url" >> "$GITHUB_STEP_SUMMARY"

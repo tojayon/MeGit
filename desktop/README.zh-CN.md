@@ -37,3 +37,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
 安装包在 `desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。正常构建不会自动签名或发布。对外分发前请配置发布者签名，并在干净的 Windows 环境验收安装、覆盖升级、卸载保留、外链、复制和导出。内置 Node 版本及其官方 ZIP 的固定 SHA-256 在 `build.ps1` 中一起维护。
 
 仅准备资源：给构建脚本加 `-PrepareOnly`。随后运行 `node --test desktop/backend.test.mjs` 验证打包的后端；运行 `cargo test --locked --release --target x86_64-pc-windows-msvc --manifest-path desktop/src-tauri/Cargo.toml` 验证窗口导航规则。网页版构建与测试仍可独立运行。
+
+## 在 GitHub 手动发版
+
+1. 新版本先在根目录运行 `npm version 0.1.1 --no-git-tag-version`（将示例换成目标版本），提交并推送版本文件和本次改动到 `main`。首次发版也可以用项目中尚未发布的当前版本。无需提前创建标签。
+2. 将发布工作流合入 GitHub 默认分支后，在仓库进入 **Actions → Windows Release → Run workflow**，选择 `main`，在 `version` 填入同一个版本号（不带 `v`），按需保留默认勾选的 `prerelease`。
+3. 工作流测试并打包，保存安装包和 `SHA256.txt`，将 `v<版本>` 标签指向触发时的提交，并创建 **Release 草稿**。在运行摘要或 **Releases** 打开草稿，下载试装、审阅说明，再手动点击 **Publish release**。普通推送不会触发，也不会自动公开发布。当前自动构建不签名。
+
+版本不匹配、同版本已有 Release（包括草稿），或同名标签指向其他提交时，工作流会失败，不会覆盖。如果上传中断并留下不完整的草稿，用该次运行的 **Artifacts** 补齐附件；如需重跑，请先清理不完整的草稿。标签已指向同一提交时可复用。若创建草稿报权限错误，请检查仓库或组织是否允许 Actions 创建标签和 Release。
