@@ -14,6 +14,12 @@
 - 新增用例在旧版检出凸角始终展开。新版默认露出 8px，鼠标悬停展开，斜向移到小卡片按钮时保持展开，移开后自动收起；键盘 Tab 聚焦即展开，触屏可直接点击，减少动态效果时无滑出动画。展开、收起与计时跨天均不改变仓库卡片尺寸。
 - 隔离副本 `npm run check`（278 项测试及构建）和 12 项 Edge 场景通过。双主题截图和日志位于 `.megit/verification/repository-service-tray/`。主工作区并行的本地合并功能仍有类型错误，未更新现有正式预览或重启服务。
 
+## 2026-11-23：Windows 发布测试长分支路径
+
+- 隔离检出 `03bed80`，不加载用户或系统 Git 配置，复现长分支用例在创建 `.lock` 文件时报 `Filename too long`。仅在该用例的 Windows 临时仓库启用 `core.longpaths`，保留原分支名长度和两项 API 断言。
+- 同环境重跑原用例、`npm run check`（279 项测试）和 6 项桌面窗口与工作流标签 Edge 测试，均通过。未修改全局 Git 配置，未触发远端发布。
+- 隔离检出继续用发布脚本生成 `MeGit_0.1.0_x64-setup.exe`，打包后端和窗口桥的 3 项测试通过。安装包及构建日志位于 `.megit/verification/windows-release-longpaths/`，未上传或试装。
+
 ## 2026-11-23：Windows 发布测试临时路径
 
 - GitHub Actions 第 2 次发版（`45169921954`）进入测试后，AI 助手和项目交付用例分别报 `outsideLink` / `repositoryMoved`，安装包步骤未执行。

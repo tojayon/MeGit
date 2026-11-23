@@ -63,6 +63,8 @@ describe('真实分支树的只读 API', () => {
     );
     expect(result.branches.filter((branch: { remote: boolean }) => branch.remote)).toHaveLength(1);
     const long = 'feature/' + 'x'.repeat(229);
+    if (process.platform === 'win32')
+      await git(f.repo, 'config', '--local', 'core.longpaths', 'true');
     await git(f.repo, 'branch', long);
     const ref = 'refs/heads/' + long;
     expect((await f.get('branch-tree?' + new URLSearchParams({ base: ref }))).status).toBe(200);
