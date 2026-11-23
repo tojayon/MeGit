@@ -173,7 +173,7 @@ export function RelationBridgeExample() {
               targetCommits: [{ hash: '132340ad59d164f0596b064e9ac320dd65511413', subject: 'Add service documentation' }],
               diff: { text: '--- a/notes.md\n+++ b/notes.md\n@@ -1 +1,2 @@\n # Notes\n+Shared release notes', truncated: false },
             }} />
-            <RelationMergeAi example review={async () => ({ text: t('relation.merge.ai.example') })} />
+            <RelationMergeAi example review={async () => ({ text: t('relation.merge.ai.example'), message: t('relation.merge.ai.exampleMessage') })} />
           </div>
           <footer className="dialog-footer">
             <Button data-dialog-initial-focus="true" onClick={() => setShortcut(null)}>{t('relation.merge.close')}</Button>

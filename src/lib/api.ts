@@ -7,6 +7,7 @@ import type {
   GitAction,
   IntegrationHistory,
   RelationAction,
+  RelationMergeAdvice,
   RelationMergeRequest,
   RelationMergeResult,
   RelationMergeSelection,
@@ -93,7 +94,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify(action), signal },
     ),
   reviewMergeWithAi: (boardId: string, edgeId: string, selection: RelationMergeSelection, reviewKey: string, signal: AbortSignal) =>
-    request<{ kind: 'mergeReview'; text: string }>('/ai/assist', {
+    request<{ kind: 'mergeReview' } & RelationMergeAdvice>('/ai/assist', {
       method: 'POST', signal, body: JSON.stringify({
         kind: 'mergeReview', boardId, edgeId, selection, reviewKey, approved: true,
         language: i18n.resolvedLanguage === 'en' ? 'en' : 'zh-CN',

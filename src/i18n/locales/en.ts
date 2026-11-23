@@ -788,9 +788,15 @@ const en = {
       needsResolution: 'Merge prepared · Conflicts to resolve',
       ai: {
         title: 'AI review',
-        start: 'Ask AI to review',
-        again: 'Review again',
-        help: 'Get a summary, possible risks, and suggested checks without changing the merge.',
+        start: 'Review and draft with AI',
+        again: 'Generate again',
+        help: 'Get review advice and a merge commit message in one request. Use the draft once the merge is prepared and all conflicts are resolved.',
+        message: 'Suggested merge commit message',
+        use: 'Use this message',
+        replace: 'Replace current message',
+        applied: 'Added to the commit field',
+        noMessage: 'AI did not produce a usable commit message. You can still write one yourself.',
+        exampleMessage: 'Merge release notes update',
         consent: 'The commit summaries, diff, and any conflict paths shown here will be sent to your configured AI service. Make sure this content can be shared.',
         send: 'Confirm and send',
         working: 'AI is reviewing the current diff…',
@@ -1139,6 +1145,7 @@ const en = {
     projectWrite: 'Not all changes could be saved. Check the list of files already written.',
     aiNotConfigured: 'Configure the endpoint and model in Settings → AI service first.',
     aiMergeReviewChanged: 'The merge changed. Refresh the result before requesting another AI review.',
+    aiMergeReviewOutput: 'AI did not return a valid review. Try again.',
     aiKeyRequired:
       'Enter a new API Key or explicitly clear the saved key when changing the endpoint.',
     aiStorage:

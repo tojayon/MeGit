@@ -179,7 +179,8 @@ export function RelationMergeDialog({ boardId, edgeId, selection, sourceRepo, ta
             {confirmAbort && <p role="alert" className="error-message">{t('relation.merge.abortHelp')}</p>}
           </>
         )}
-        {result && !confirmAbort && <RelationMergeAi key={result.reviewKey} disabled={busy}
+        {result && !confirmAbort && <RelationMergeAi key={result.reviewKey} disabled={busy || !!error} draft={message}
+          applyMessage={pending?.ready ? setMessage : undefined}
           review={(signal) => api.reviewMergeWithAi(boardId, edgeId, selection, result.reviewKey, signal)} />}
         {pending && !confirmAbort && <Field label={t('relation.merge.message')}>
           <textarea rows={2} maxLength={10000} value={message} onChange={(event) => setMessage(event.target.value)} disabled={busy} />

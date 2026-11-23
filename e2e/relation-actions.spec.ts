@@ -31,7 +31,7 @@ test('审阅本地分叉并在冲突解决后显式提交合并', async ({ page,
     const aiRequests: Array<{ kind: string; approved: boolean; reviewKey: string }> = [];
     await page.route('**/api/ai/assist', async (route) => {
       aiRequests.push(route.request().postDataJSON());
-      await route.fulfill({ json: { kind: 'mergeReview', text: '建议核对 shared.txt 的内容。' } });
+      await route.fulfill({ json: { kind: 'mergeReview', text: '建议核对 shared.txt 的内容。', message: '合并两版文档' } });
     });
     await page.goto('/');
     const bridge = page.locator('.repository-relation-label');
@@ -48,14 +48,17 @@ test('审阅本地分叉并在冲突解决后显式提交合并', async ({ page,
     await dialog.getByText('查看来源改动', { exact: true }).click();
     await expect(dialog.locator('pre')).toContainText('+source version');
     const ai = dialog.getByRole('region', { name: 'AI 审阅' });
-    await ai.getByRole('button', { name: '请 AI 审阅', exact: true }).click();
+    const generate = ai.getByRole('button', { name: 'AI 审阅并生成提交消息', exact: true });
+    await generate.click();
     await expect(ai.getByText(/会发送到你配置的 AI 服务/)).toBeVisible();
     expect(aiRequests).toHaveLength(0);
     await ai.getByRole('button', { name: '取消', exact: true }).click();
-    await expect(ai.getByRole('button', { name: '请 AI 审阅', exact: true })).toBeFocused();
-    await ai.getByRole('button', { name: '请 AI 审阅', exact: true }).click();
+    await expect(generate).toBeFocused();
+    await generate.click();
     await ai.getByRole('button', { name: '确认发送', exact: true }).click();
     await expect(ai.getByRole('status')).toHaveText('建议核对 shared.txt 的内容。');
+    await expect(ai.getByText('合并两版文档', { exact: true })).toBeVisible();
+    await expect(ai.getByRole('button', { name: '使用此消息' })).toHaveCount(0);
     expect(aiRequests).toEqual([{ kind: 'mergeReview', approved: true, reviewKey: expect.stringMatching(/^[a-f0-9]{64}$/),
       boardId: workspace.boards[0].id, edgeId: 'merge', selection: expect.any(Object), language: 'zh-CN' }]);
     expect(await git(target, 'status', '--porcelain')).toBe('');
@@ -74,10 +77,20 @@ test('审阅本地分叉并在冲突解决后显式提交合并', async ({ page,
     await bridge.hover();
     await shortcut.click();
     await expect(dialog.locator('pre')).toContainText('+resolved');
-    await dialog.getByLabel('合并提交消息').fill('Merge both versions');
+    const message = dialog.getByLabel('合并提交消息');
+    await message.fill('手写草稿');
+    await generate.click();
+    await ai.getByRole('button', { name: '确认发送', exact: true }).click();
+    await expect(ai.getByText('合并两版文档', { exact: true })).toBeVisible();
+    await expect(message).toHaveValue('手写草稿');
+    expect(aiRequests).toHaveLength(2);
+    await ai.getByRole('button', { name: '替换当前消息', exact: true }).click();
+    await expect(message).toHaveValue('合并两版文档');
+    await message.fill('合并两版文档并解决冲突');
     await dialog.getByRole('button', { name: '提交合并', exact: true }).click();
     await expect(dialog).toBeHidden();
     expect(await git(target, 'show', '-s', '--format=%P', 'HEAD')).toBe(`${targetHead} ${sourceHead}`);
+    expect(await git(target, 'show', '-s', '--format=%s', 'HEAD')).toBe('合并两版文档并解决冲突');
     expect(await git(target, 'show', 'HEAD:shared.txt')).toBe('resolved');
     expect(await git(target, 'remote')).toBe('');
   } finally {
@@ -102,10 +115,11 @@ test('明亮英文窄屏的合并规范示例不请求真实 AI', async ({ page 
   await card.getByRole('button', { name: /^Review and merge:/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Review and merge', exact: true });
   await expect(dialog.getByText('MeWiki-Server', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Ask AI to review' }).click();
+  await dialog.getByRole('button', { name: 'Review and draft with AI' }).click();
   await expect(dialog.getByText(/No data will be sent/)).toBeVisible();
   await dialog.getByRole('button', { name: 'Confirm and send' }).click();
   await expect(dialog.getByRole('status')).toContainText('does not contact an AI service');
+  await expect(dialog.getByText('Merge release notes update')).toBeVisible();
   expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(providerRequests).toBe(0);
   await page.keyboard.press('Escape');

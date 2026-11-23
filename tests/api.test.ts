@@ -193,6 +193,7 @@ describe('本机 API 边界与端到端 Git 数据', () => {
     expect(review).toMatchObject({ phase: 'review', sourceTotal: 1, targetTotal: 1, diff: { text: expect.stringContaining('+from source') } });
     const calls: string[] = [];
     let changeDuringReview = false;
+    let modelMessage = 'Merge source changes';
     const provider = createServer(async (req, res) => {
       let raw = '';
       for await (const chunk of req) raw += chunk;
@@ -202,7 +203,7 @@ describe('本机 API 边界与端到端 Git 数据', () => {
         await git(target, 'add', '--', 'incoming.txt');
       }
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ choices: [{ message: { content: 'Review fixture advice' } }] }));
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ text: 'Review fixture advice', message: modelMessage }) } }] }));
     }).listen(0, '127.0.0.1');
     await once(provider, 'listening');
     cleanups.push(() => new Promise((resolve, reject) => provider.close((error) => error ? reject(error) : resolve())));
@@ -218,7 +219,9 @@ describe('本机 API 边界与端到端 Git 数据', () => {
     });
     expect((await aiReview(review.reviewKey, false)).status).toBe(400);
     expect(calls).toHaveLength(0);
-    expect(await (await aiReview(review.reviewKey)).json()).toEqual({ kind: 'mergeReview', text: 'Review fixture advice' });
+    const advice = { kind: 'mergeReview', text: 'Review fixture advice', message: 'Merge source changes' };
+    expect(await (await aiReview(review.reviewKey)).json()).toEqual(advice);
+    expect(calls).toHaveLength(1);
     expect(calls[0]).toContain('from source');
     expect(calls[0]).not.toContain('LOCAL_SECRET_NEVER_SEND');
     expect(calls[0]).not.toContain('merge-target');
@@ -245,8 +248,10 @@ describe('本机 API 边界与端到端 Git 数据', () => {
     const afterAbort = await (await merge('prepare')).json();
     expect((await aiReview(review.reviewKey)).status).toBe(409);
     expect(calls).toHaveLength(1);
-    expect(await (await aiReview(afterAbort.reviewKey)).json()).toEqual({ kind: 'mergeReview', text: 'Review fixture advice' });
+    expect(await (await aiReview(afterAbort.reviewKey)).json()).toEqual(advice);
     expect(calls[1]).toContain('pending');
+    modelMessage = 'Not a valid\nmerge subject';
+    expect(await (await aiReview(afterAbort.reviewKey)).json()).toEqual({ kind: 'mergeReview', text: 'Review fixture advice', message: null });
     changeDuringReview = true;
     expect(await (await aiReview(afterAbort.reviewKey)).json()).toMatchObject({ code: 'aiMergeReviewChanged' });
     await git(target, 'merge', '--abort');

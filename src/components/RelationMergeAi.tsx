@@ -1,11 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { RelationMergeAdvice } from '../../shared/types';
 import { formatError } from '../lib/messages';
 import { Button } from './Button';
 
-export function RelationMergeAi({ review, disabled, example = false }: {
-  review: (signal: AbortSignal) => Promise<{ text: string }>;
+export function RelationMergeAi({ review, applyMessage, draft, disabled, example = false }: {
+  review: (signal: AbortSignal) => Promise<RelationMergeAdvice>;
+  applyMessage?: (message: string) => void;
+  draft?: string;
   disabled?: boolean;
   example?: boolean;
 }) {
@@ -16,7 +19,7 @@ export function RelationMergeAi({ review, disabled, example = false }: {
   const active = useRef<AbortController>(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [text, setText] = useState('');
+  const [advice, setAdvice] = useState<RelationMergeAdvice>();
   const [error, setError] = useState<unknown>(null);
   useEffect(() => () => active.current?.abort(), []);
   useEffect(() => { if (confirm) consentFocus.current?.focus(); }, [confirm]);
@@ -31,11 +34,11 @@ export function RelationMergeAi({ review, disabled, example = false }: {
     setConfirm(false);
     setBusy(true);
     setError(null);
-    setText('');
+    setAdvice(undefined);
     restoreTrigger();
     try {
       const result = await review(controller.signal);
-      if (!controller.signal.aborted) setText(result.text);
+      if (!controller.signal.aborted) setAdvice(result);
     } catch (failure) {
       if (!controller.signal.aborted) setError(failure);
     } finally {
@@ -48,6 +51,7 @@ export function RelationMergeAi({ review, disabled, example = false }: {
     }
   }
 
+  const suggestedMessage = advice?.message;
   return (
     <section className="relation-merge-ai" ref={section} aria-labelledby={heading}>
       <div className="relation-merge-section-heading">
@@ -61,7 +65,7 @@ export function RelationMergeAi({ review, disabled, example = false }: {
           }}>{t('relation.merge.ai.stop')}</Button>
         ) : (
           <Button data-merge-ai-control size="compact" disabled={disabled} onClick={() => setConfirm(true)}>
-            {t(text ? 'relation.merge.ai.again' : 'relation.merge.ai.start')}
+            {t(advice ? 'relation.merge.ai.again' : 'relation.merge.ai.start')}
           </Button>
         ))}
       </div>
@@ -77,8 +81,18 @@ export function RelationMergeAi({ review, disabled, example = false }: {
         <>
           {busy && <p role="status">{t('relation.merge.ai.working')}</p>}
           {error != null && <p className="error-message" role="alert">{formatError(error)}</p>}
-          {text ? <div className="relation-merge-ai-result" role="status">{text}</div> :
+          {advice ? <div className="relation-merge-ai-result" role="status">{advice.text}</div> :
             !busy && error == null && <p className="muted">{t('relation.merge.ai.help')}</p>}
+          {advice && (suggestedMessage ? (
+            <div className="relation-merge-ai-message">
+              <h4>{t('relation.merge.ai.message')}</h4>
+              <p>{suggestedMessage}</p>
+              {applyMessage && <Button size="compact" disabled={disabled || draft === suggestedMessage}
+                onClick={() => applyMessage(suggestedMessage)}>
+                {t(draft === suggestedMessage ? 'relation.merge.ai.applied' : draft?.trim() ? 'relation.merge.ai.replace' : 'relation.merge.ai.use')}
+              </Button>}
+            </div>
+          ) : <p className="muted">{t('relation.merge.ai.noMessage')}</p>)}
         </>
       )}
     </section>

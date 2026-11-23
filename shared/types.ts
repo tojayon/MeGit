@@ -272,6 +272,7 @@ export type RelationMergeResult =
     }
   | { phase: 'committed' | 'aborted'; state: RepoState };
 export type RelationMergeView = Extract<RelationMergeResult, { phase: 'review' | 'pending' }>;
+export type RelationMergeAdvice = { text: string; message: string | null };
 export interface IntegrationState {
   state: 'integrated' | 'pending' | 'unknown';
   sourceHead: string | null;
