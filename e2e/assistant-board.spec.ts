@@ -70,7 +70,7 @@ test('无仓库流程图：审阅预览、刷新、整批应用、撤销与过�
     await panel.getByRole('textbox', { name: '给 AI 助手的消息' }).fill('补充测试及通过的流程');
     await panel.getByRole('button', { name: '发送消息', exact: true }).click();
     const plan = panel.getByRole('region', { name: '流程图修改计划' });
-    await expect(plan.getByRole('button', { name: '确认应用到白板' })).toBeEnabled();
+    await expect(plan.getByRole('button', { name: '确认应用到工作流' })).toBeEnabled();
     await expect(plan.getByRole('img', { name: '修改后的流程预览' })).toBeVisible();
     await plan.getByText('查看具体修改', { exact: true }).first().click();
     await expect(plan.getByText('npm test', { exact: true })).toBeVisible();
@@ -82,11 +82,11 @@ test('无仓库流程图：审阅预览、刷新、整批应用、撤销与过�
     await plan.getByRole('img', { name: '修改后的流程预览' }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: '.megit/verification/assistant/board-dark-review.png' });
     await page.reload();
-    await expect(plan.getByRole('button', { name: '确认应用到白板' })).toBeEnabled();
+    await expect(plan.getByRole('button', { name: '确认应用到工作流' })).toBeEnabled();
     expect((await readBoard()).notes).toHaveLength(2);
-    await plan.getByRole('button', { name: '确认应用到白板' }).click();
+    await plan.getByRole('button', { name: '确认应用到工作流' }).click();
     await expect(
-      plan.getByText('已应用到白板，可使用白板撤销恢复。保存状态见页面底部。'),
+      plan.getByText('已应用到工作流，可使用工作流撤销恢复。保存状态见页面底部。'),
     ).toBeVisible();
     await expect.poll(async () => (await readBoard()).notes.length).toBe(3);
     expect((await readBoard()).connections).toEqual(
@@ -95,29 +95,29 @@ test('无仓库流程图：审阅预览、刷新、整批应用、撤销与过�
         expect.objectContaining({ source: 'test', target: 'end', label: '通过' }),
       ]),
     );
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect.poll(async () => (await readBoard()).notes.length).toBe(2);
     expect((await readBoard()).connections).toHaveLength(1);
     // Applied status remains consumed even after undo and reload.
     await page.reload();
-    await expect(plan.getByRole('button', { name: '确认应用到白板' })).toHaveCount(0);
+    await expect(plan.getByRole('button', { name: '确认应用到工作流' })).toHaveCount(0);
     expect((await readBoard()).notes).toHaveLength(2);
     await panel.getByRole('textbox', { name: '给 AI 助手的消息' }).fill('重新补充测试流程');
     await panel.getByRole('button', { name: '发送消息', exact: true }).click();
-    const pending = panel.getByRole('button', { name: '确认应用到白板' });
+    const pending = panel.getByRole('button', { name: '确认应用到工作流' });
     await expect(pending).toBeEnabled();
     // A local board edit during review invalidates the plan.
     await page.getByRole('button', { name: '锁定布局', exact: true }).click();
     await expect(pending).toBeDisabled();
     await expect(
-      panel.getByText('流程图已变化或尚未保存，请检查当前白板后重新生成计划。'),
+      panel.getByText('流程图已变化或尚未保存，请检查当前工作流后重新生成计划。'),
     ).toBeVisible();
     await page.getByRole('button', { name: '偏好设置', exact: true }).click();
     await page.getByRole('button', { name: '明亮', exact: true }).click();
     await page.getByLabel('界面语言').selectOption('en');
     await page.keyboard.press('Escape');
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.getByRole('button', { name: 'Apply to whiteboard' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Apply to workflow' })).toBeDisabled();
     expect(
       await page
         .getByRole('complementary', { name: 'MeGit AI assistant' })
@@ -149,9 +149,9 @@ test('流程计划规范示例支持明暗、中英与窄屏，键盘确认只�
     true,
   );
   await plan.screenshot({ path: '.megit/verification/assistant/board-example-light-narrow.png' });
-  await plan.getByRole('button', { name: 'Apply to whiteboard' }).focus();
+  await plan.getByRole('button', { name: 'Apply to workflow' }).focus();
   await page.keyboard.press('Enter');
-  await expect(plan.getByRole('status')).toContainText('Applied to the whiteboard');
-  await expect(plan.getByRole('button', { name: 'Apply to whiteboard' })).toHaveCount(0);
+  await expect(plan.getByRole('status')).toContainText('Applied to the workflow');
+  await expect(plan.getByRole('button', { name: 'Apply to workflow' })).toHaveCount(0);
   expect(requests).toEqual([]);
 });

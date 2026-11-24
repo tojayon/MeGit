@@ -84,9 +84,10 @@ test('画布按钮阻止冒泡时提示仍随激活关闭，悬停和聚焦只�
   await expect(page.getByRole('tooltip')).toHaveText('使用帮助');
   await blankCanvas(page);
   await expect(page.getByRole('tooltip')).toHaveCount(0);
-  await page.getByRole('button', { name: '工作流选项', exact: true }).click();
+  const exportTrigger = page.getByRole('button', { name: '导出工作流', exact: true });
+  await exportTrigger.click();
   await detail.click();
-  await expect(page.locator('.small-menu')).toHaveCount(0);
+  await expect(exportTrigger).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('tooltip')).toHaveCount(0);
 });
 
@@ -108,46 +109,16 @@ test('主动聚焦的提示先响应 Escape，弹窗保持打开且下次 Escape
   await expect(page.getByRole('tooltip')).toHaveCount(0);
 });
 
-test('工作流菜单在画布外点、焦点离开、Escape 与再次点击触发器后关闭', async ({ page }) => {
+test('工作流设置可通过键盘打开，关闭后安静返回入口', async ({ page }) => {
   await page.goto('/');
-  const trigger = page.getByRole('button', { name: '工作流选项', exact: true });
-  const menu = page.locator('.small-menu');
-  await trigger.click();
-  await expect(menu).toBeVisible();
-  await blankCanvas(page);
-  await expect(menu).toHaveCount(0);
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  await trigger.click();
-  await page.getByRole('button', { name: '添加仓库', exact: true }).focus();
-  await expect(menu).toHaveCount(0);
-  await trigger.click();
-  await page.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
-  await expect(trigger).toBeFocused();
-  await expect(page.getByRole('tooltip')).toHaveCount(0);
-  await trigger.click();
-  await trigger.click();
-  await expect(menu).toHaveCount(0);
-});
-
-test('工作流菜单键盘进入与 Tab 离开，重命名弹窗关闭后返回有效入口', async ({ page }) => {
-  await page.goto('/');
-  const trigger = page.getByRole('button', { name: '工作流选项', exact: true });
-  const rename = page.getByRole('button', { name: '重命名', exact: true });
+  const trigger = page.getByRole('button', { name: '工作流设置', exact: true });
   await trigger.focus();
   await page.keyboard.press('Enter');
-  await expect(rename).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.locator('.small-menu')).toHaveCount(0);
-  await expect(trigger).not.toBeFocused();
-  await trigger.focus();
-  await page.keyboard.press('ArrowDown');
-  await expect(rename).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.locator('.small-menu')).toHaveCount(0);
+  const dialog = page.getByRole('dialog', { name: '工作流设置', exact: true });
+  await expect(dialog.getByLabel('工作流名称')).toBeVisible();
+  await expect(dialog.getByLabel('工作流说明')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await expect(page.getByRole('tooltip')).toHaveCount(0);
 });
@@ -160,17 +131,17 @@ test('导出和排列菜单互斥，外点、Tab、Escape 与执行动作均收�
       .locator(`.react-flow__node[data-id="${id}"]`)
       .click({ modifiers: ['Control'], position: { x: 65, y: 42 } });
   }
-  const exportTrigger = page.getByRole('button', { name: '导出白板', exact: true });
+  const exportTrigger = page.getByRole('button', { name: '导出工作流', exact: true });
   const arrange = page.getByRole('button', { name: '排列所选节点', exact: true });
   await arrange.click();
   await expect(arrange).toHaveAttribute('aria-expanded', 'true');
   await exportTrigger.click();
   await expect(arrange).toHaveAttribute('aria-expanded', 'false');
   await expect(exportTrigger).toHaveAttribute('aria-expanded', 'true');
-  await page.getByRole('button', { name: '工作流选项', exact: true }).click();
+  await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+  await page.getByRole('button', { name: '关闭工作流设置', exact: true }).click();
   await expect(exportTrigger).toHaveAttribute('aria-expanded', 'false');
   await exportTrigger.click();
-  await expect(page.locator('.small-menu')).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: '导出 SVG', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
@@ -196,7 +167,7 @@ test('导出和排列菜单互斥，外点、Tab、Escape 与执行动作均收�
 test('窗口失焦与滚动清理临时浮层，菜单内滚动保留内容', async ({ page, request }) => {
   await seedNotes(request);
   await page.goto('/');
-  const trigger = page.getByRole('button', { name: '导出白板', exact: true });
+  const trigger = page.getByRole('button', { name: '导出工作流', exact: true });
   await trigger.hover();
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   await expect(page.getByRole('tooltip')).toHaveCount(0);
@@ -217,7 +188,7 @@ test('窗口失焦与滚动清理临时浮层，菜单内滚动保留内容', as
 test('滚动或窗口变化关闭菜单时保留键盘落点，外部操作保留目标焦点', async ({ page, request }) => {
   await seedNotes(request);
   await page.goto('/');
-  const trigger = page.getByRole('button', { name: '导出白板', exact: true });
+  const trigger = page.getByRole('button', { name: '导出工作流', exact: true });
   for (const reason of ['wheel', 'resize', 'blur']) {
     await trigger.focus();
     await page.keyboard.press('ArrowDown');
@@ -251,7 +222,7 @@ test('触摸激活和恢复焦点不会粘住提示，窄屏抽屉与模态分�
     await expect(touch.getByRole('tooltip')).toHaveCount(0);
     await touch.getByRole('button', { name: '取消', exact: true }).tap();
     await expect(touch.getByRole('tooltip')).toHaveCount(0);
-    await touch.getByRole('button', { name: '打开流程导航', exact: true }).tap();
+    await touch.getByRole('button', { name: '打开工作流导航', exact: true }).tap();
     const nav = touch.locator('#workspace-navigation');
     await nav.getByRole('button', { name: '偏好设置', exact: true }).tap();
     await touch.keyboard.press('Escape');
@@ -260,7 +231,7 @@ test('触摸激活和恢复焦点不会粘住提示，窄屏抽屉与模态分�
     await expect(touch.getByRole('tooltip')).toHaveCount(0);
     await touch.keyboard.press('Escape');
     await expect(nav).toHaveAttribute('inert', '');
-    await expect(touch.getByRole('button', { name: '打开流程导航', exact: true })).toBeFocused();
+    await expect(touch.getByRole('button', { name: '打开工作流导航', exact: true })).toBeFocused();
     await expect(touch.getByRole('tooltip')).toHaveCount(0);
   } finally {
     await context.close();

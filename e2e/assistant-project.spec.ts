@@ -158,10 +158,10 @@ test('在现有助手中授权读取、预览文件、写入及配置信任，�
     await page.keyboard.press('Escape');
     await panel.getByRole('textbox', { name: '给 AI 助手的消息' }).fill('新增验收环节');
     await panel.getByRole('button', { name: '发送消息', exact: true }).click();
-    await expect(panel.getByRole('button', { name: '确认应用到白板' })).toBeEnabled();
-    await panel.getByRole('button', { name: '确认应用到白板' }).click();
+    await expect(panel.getByRole('button', { name: '确认应用到工作流' })).toBeEnabled();
+    await panel.getByRole('button', { name: '确认应用到工作流' }).click();
     await expect(
-      panel.getByText('已应用到白板，可使用白板撤销恢复。保存状态见页面底部。'),
+      panel.getByText('已应用到工作流，可使用工作流撤销恢复。保存状态见页面底部。'),
     ).toBeVisible();
     await panel.getByRole('button', { name: '新建对话', exact: true }).click();
     await expect(panel.getByRole('button', { name: '默认范围', exact: true })).toBeVisible();

@@ -34,7 +34,7 @@ test('主题与语言独立切换、刷新恢复，英文错误与窄屏设置�
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await page.getByRole('button', { name: 'Add repository', exact: true }).first().click();
   await page.getByLabel('Repository path', { exact: true }).fill('Z:\\megit-missing-fixture');
-  await page.getByRole('button', { name: 'Add to board', exact: true }).click();
+  await page.getByRole('button', { name: 'Add to workflow', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Directory does not exist');
   await page.getByRole('button', { name: 'Close Add local repository' }).click();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -245,7 +245,7 @@ test('跨页面同步语言和主题时，关系表单错误与读屏名称即�
       await page.getByRole('button', { name: '添加仓库', exact: true }).click();
       await page.getByLabel('仓库路径').fill(repoPath);
       await page.getByLabel('卡片显示名称').fill(name);
-      await page.getByRole('button', { name: '添加到白板' }).click();
+      await page.getByRole('button', { name: '添加到工作流' }).click();
       await expect(page.getByTestId('repository-node').filter({ hasText: name })).toBeVisible();
     }
     await expect(page.getByText('已保存', { exact: true })).toBeVisible();

@@ -4,7 +4,7 @@ export default {
   title: 'Repository avatar',
   configure: 'Set repository avatar',
   configureHelp:
-    'Choose this project’s logo from its repository to use on the board, in repository lists and in details. Only the relative image path is saved; repository files and Git history stay unchanged. You can also restore the default icon.',
+    'Choose this project’s logo from its repository to use in the workflow, in repository lists and in details. Only the relative image path is saved; repository files and Git history stay unchanged. You can also restore the default icon.',
   preview: 'Avatar preview for {{name}}',
   default: 'Default repository icon',
   reset: 'Restore default icon',

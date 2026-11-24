@@ -28,7 +28,7 @@ test('仓库默认打开图形树，更换树干与比较不切换代码，文�
     const tree = page.getByRole('region', { name: '分支生长树', exact: true });
     await expect(tree).toBeVisible();
     await expect(page.locator('.file-group')).toHaveCount(0);
-    await expect(page.getByRole('tablist')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: '详情浏览区域' }).getByRole('tablist')).toHaveCount(0);
     await page.screenshot({
       path: '.megit/verification/branch-tree/product-dark-zh.png',
       animations: 'disabled',

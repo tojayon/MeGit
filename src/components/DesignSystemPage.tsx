@@ -38,6 +38,7 @@ import { Dialog } from './Dialogs';
 import { PopupMenu } from './PopupMenu';
 import { NavigationExample } from './NavigationExample';
 import { WorkflowHeader, workflowPanelId, workflowTabId } from './WorkflowHeader';
+import { WorkflowSettingsDialog } from './WorkflowSettingsDialog';
 import { DesktopWindowControls } from './DesktopWindow';
 import { FlowchartExample } from './FlowchartExample';
 import { CanvasToolStrip } from './CanvasTools';
@@ -473,17 +474,18 @@ function DockPanelExample({ title, onClose }: { title: string; onClose: () => vo
   const [draft, setDraft] = useState('');
   return (
     <aside className="inspector" aria-label={title}>
-      <PanelHeader
-        title={title}
-        icon={<FolderGit2 size={20} />}
-        closeLabel={t('designSystem.closeExample')}
-        onClose={onClose}
-      />
       <div className="context-panel-body">
         <Field label={t('repository.message')}>
           <textarea rows={8} value={draft} onChange={(event) => setDraft(event.target.value)} />
         </Field>
       </div>
+      <PanelHeader
+        bottom
+        title={title}
+        icon={<FolderGit2 size={20} />}
+        closeLabel={t('designSystem.closeExample')}
+        onClose={onClose}
+      />
     </aside>
   );
 }
@@ -611,6 +613,13 @@ function WorkflowTabsExample() {
   const id = useId();
   const [boards, setBoards] = useState(exampleWorkflows);
   const [activeId, setActiveId] = useState(exampleWorkflows[0].id);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const active = boards.find((board) => board.id === activeId);
+  const closeWorkflow = (closedId: string) => {
+    const next = boards.filter((board) => board.id !== closedId);
+    setBoards(next);
+    if (closedId === activeId) setActiveId(next[0]?.id ?? '');
+  };
   return (
     <section className="design-card design-panel-example design-workflow-example">
       <WorkflowHeader
@@ -618,11 +627,7 @@ function WorkflowTabsExample() {
         activeId={activeId}
         id={id}
         onSelect={setActiveId}
-        onClose={(closedId) => {
-          const next = boards.filter((board) => board.id !== closedId);
-          setBoards(next);
-          if (closedId === activeId) setActiveId(next[0]?.id ?? '');
-        }}
+        onClose={closeWorkflow}
       />
       {boards.map((board) => (
         <div
@@ -634,6 +639,9 @@ function WorkflowTabsExample() {
           hidden={board.id !== activeId}
         >
           {board.name}
+          {board.id === activeId && (
+            <Button onClick={() => setSettingsOpen(true)}>{t('board.settings')}</Button>
+          )}
         </div>
       ))}
       {!boards.length && (
@@ -647,6 +655,27 @@ function WorkflowTabsExample() {
             {t('board.reopen')}
           </Button>
         </div>
+      )}
+      {settingsOpen && active && (
+        <WorkflowSettingsDialog
+          key={active.id}
+          board={active}
+          onClose={() => setSettingsOpen(false)}
+          onSave={(details) => {
+            setBoards((previous) =>
+              previous.map((board) => (board.id === active.id ? { ...board, ...details } : board)),
+            );
+            setSettingsOpen(false);
+          }}
+          onRemove={
+            boards.length > 1
+              ? () => {
+                  closeWorkflow(active.id);
+                  setSettingsOpen(false);
+                }
+              : undefined
+          }
+        />
       )}
     </section>
   );

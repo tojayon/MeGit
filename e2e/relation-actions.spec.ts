@@ -170,7 +170,7 @@ test('待推送拖动和保存视角期间保持亮蓝色，确认后才推送',
       }
       await route.continue();
     });
-    const tools = page.getByRole('group', { name: '白板工具', exact: true });
+    const tools = page.getByRole('group', { name: '画布工具', exact: true });
     const pan = tools.getByRole('button', { name: '平移', exact: true });
     const extraTools = tools.locator('.canvas-hover-tools');
     await pan.click();
@@ -271,7 +271,7 @@ test('待拉取默认亮绿色，明亮英文触屏可操作且确认按钮显�
       version: 1, theme: 'light', language: 'en',
     })));
     await page.goto('/');
-    await page.getByRole('button', { name: 'Fit board', exact: true }).tap();
+    await page.getByRole('button', { name: 'Fit to canvas', exact: true }).tap();
     const pull = page.getByRole('button', { name: 'Pull: Project · origin/main → Project · main', exact: true });
     const push = page.getByRole('button', { name: 'Push: Project · main → Project · origin/main', exact: true });
     const pullSlot = page.locator('.repository-relation-shortcut[data-action="pull"]');

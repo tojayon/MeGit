@@ -1,11 +1,10 @@
 import { useContext, useId, useState, type ComponentProps, type ReactNode } from 'react';
-import { Bot, Cable, Monitor, Network } from 'lucide-react';
+import { Bot, Cable, Monitor, Network, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DesktopWindowContext } from '../lib/desktop-window';
 import { AiPanel } from './AiPanel';
 import { DesktopWindowSettingsPanel } from './DesktopWindowSettingsPanel';
 import { Dialog } from './Dialogs';
-import { Field } from './Field';
 import { NetworkSettingsPanel } from './NetworkSettingsPanel';
 
 const categories = [
@@ -32,28 +31,19 @@ export function SettingsDialog({
   let content: ReactNode;
   if (category === 'network') content = <NetworkSettingsPanel example={example} />;
   else if (category === 'interface') content = <DesktopWindowSettingsPanel example={example} />;
-  else if (example)
-    content =
-      category === 'service' ? (
-        <div className="settings-form">
-          <Field label={t('ai.endpoint')}>
-            <input readOnly value="https://example.invalid/v1" />
-          </Field>
-          <Field label={t('ai.model')}>
-            <input readOnly value="example-model" />
-          </Field>
-          <Field label={t('ai.key')}>
-            <input type="password" readOnly value="" />
-          </Field>
-        </div>
-      ) : (
-        <p className="muted">{t('settings.openBoard')}</p>
-      );
-  else content = <AiPanel repositories={[]} {...ai} section={category} />;
+  else content = <AiPanel repositories={[]} {...ai} section={category} example={example} />;
   return (
-    <Dialog title={t('settings.title')} onClose={onClose} className="settings-dialog">
+    <Dialog
+      title={t('settings.title')}
+      titleIcon={<Settings2 className="settings-title-icon" size={18} aria-hidden="true" />}
+      onClose={onClose}
+      className="settings-dialog"
+    >
       <div className="settings-layout">
-        <nav className="settings-navigation" aria-label={t('settings.categories')}>
+        <nav
+          className="settings-navigation settings-category-nav"
+          aria-label={t('settings.categories')}
+        >
           {categories
             .filter(({ id: categoryId }) => categoryId !== 'interface' || desktop || example)
             .map(({ id: categoryId, icon: Icon, label }) => (

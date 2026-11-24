@@ -55,7 +55,7 @@ test('从仓库目录选择头像，跨白板与刷新保留，各处共用且�
     await expect(page.getByText('已保存', { exact: true })).toBeVisible();
     await page.screenshot({ path: '.megit/verification/repository-avatars/dark-zh.png' });
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: '导出白板', exact: true }).click();
+    await page.getByRole('button', { name: '导出工作流', exact: true }).click();
     await page.getByRole('button', { name: '导出 SVG', exact: true }).click();
     const saved = await download;
     const exported = await readFile((await saved.path())!, 'utf8');

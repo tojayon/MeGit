@@ -46,7 +46,7 @@ async function seed(request: APIRequestContext, repo: string, second?: string) {
   expect((await request.put('/api/workspace', { headers, data: workspace })).ok()).toBe(true);
 }
 
-test('Git 详情直接并排显示，不包含全局导航、标签或白板操作底栏', async ({ page, request }) => {
+test('Git 详情直接并排显示，不包含全局导航、标签或工作流操作底栏', async ({ page, request }) => {
   const f = await fixture();
   try {
     await commitFile(f.repo);
@@ -60,10 +60,13 @@ test('Git 详情直接并排显示，不包含全局导航、标签或白板操�
     await page.locator('[data-edge-id="link"]').click();
     const dock = page.getByRole('region', { name: '详情浏览区域', exact: true });
     await expect(dock.locator('.dock-card')).toHaveCount(3);
+    const footers = dock.locator('.dock-card > .inspector > footer.inspector-heading');
+    await expect(footers).toHaveCount(3);
+    await expect(footers.last().getByRole('heading', { name: '依赖关系' })).toBeVisible();
     await expect(dock.locator('.dock-header, .dock-tabs, .inspector-footer')).toHaveCount(0, {
       timeout: 1000,
     });
-    await expect(dock.getByRole('button', { name: '从白板移除', exact: true })).toHaveCount(0);
+    await expect(dock.getByRole('button', { name: '从工作流移除', exact: true })).toHaveCount(0);
     await expect(dock.getByRole('button', { name: '移除关系', exact: true })).toHaveCount(0);
     await expect(dock.getByLabel('连线样式', { exact: true })).toHaveCount(0);
     await expect(dock.getByRole('button', { name: '编辑关系', exact: true })).toHaveCount(0);
@@ -88,8 +91,8 @@ test('两套主题的左右面板同色，且与白板底色不同', async ({ pa
     const navigation = page.locator('#workspace-navigation');
     const matchingSurfaces = [
       dock,
-      page.locator('.workflow-panel > .workflow-header'),
-      panel.locator(':scope > .inspector-heading'),
+      page.locator('.main-workspace > .workflow-header'),
+      panel.locator(':scope > footer.inspector-heading'),
       page.locator('.workspace-statusbar'),
     ];
     const expectMatchingSurfaces = async () => {
@@ -132,13 +135,13 @@ test('白板和说明编辑由画布打开弹窗，不占用 Git 详情区域', 
     await seed(request, f.repo);
     await page.goto('/');
     await page.getByRole('button', { name: '公共库', exact: true }).click();
-    await page.getByRole('button', { name: '白板详情', exact: true }).click();
-    const editor = page.getByRole('dialog', { name: '白板详情', exact: true });
+    await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+    const editor = page.getByRole('dialog', { name: '工作流设置', exact: true });
     await expect(editor).toBeVisible({ timeout: 1000 });
     await expect(page.locator('.dock-card')).toHaveCount(1);
-    await editor.getByLabel('流程说明').fill('白板编辑保留在画布弹窗');
+    await editor.getByLabel('工作流说明').fill('白板编辑保留在画布弹窗');
     await editor.getByRole('button', { name: '保存', exact: true }).click();
-    await editor.getByRole('button', { name: '关闭白板详情', exact: true }).click();
+    await expect(editor).toHaveCount(0);
     await page.getByTestId('note-node').getByRole('button', { name: '说明详情' }).click();
     await expect(page.getByRole('dialog', { name: '说明详情', exact: true })).toBeVisible();
     await expect(page.locator('.dock-card')).toHaveCount(1);
@@ -163,13 +166,13 @@ test('移除按钮位于选中副工具栏，批量移除及关系移除均可�
     await expect(remove).toHaveClass(/danger/);
     await remove.click();
     await expect(page.locator('.react-flow__node[data-id="r"]')).toHaveCount(0);
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect(page.locator('.react-flow__node[data-id="r"]')).toBeVisible();
     await page.locator('[data-edge-id="link"]').click();
     await expect(page.locator('.selection-count')).toHaveText('已选 1 项');
     await remove.click();
     await expect(page.locator('[data-edge-id="link"]')).toHaveCount(0);
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect(page.locator('[data-edge-id="link"]')).toBeVisible();
     await page
       .locator('.react-flow__node[data-id="r"]')
@@ -182,7 +185,7 @@ test('移除按钮位于选中副工具栏，批量移除及关系移除均可�
     await expect(
       page.locator('.react-flow__node[data-id="r"], .react-flow__node[data-id="note"]'),
     ).toHaveCount(0);
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect(
       page.locator('.react-flow__node[data-id="r"], .react-flow__node[data-id="note"]'),
     ).toHaveCount(2);
@@ -192,7 +195,7 @@ test('移除按钮位于选中副工具栏，批量移除及关系移除均可�
     await remove.click();
     await expect(page.locator('.react-flow__node[data-id="group"]')).toHaveCount(0);
     await expect(page.getByTestId('repository-node')).toHaveCount(2);
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect(page.locator('.react-flow__node[data-id="group"]')).toBeVisible();
     expect(await git(f.repo, 'rev-parse', 'HEAD')).toBe(head);
   } finally {
@@ -221,8 +224,8 @@ test('重复打开定位已有 Git 详情，空白选择与白板弹窗保留仓
     );
     await page.locator('.react-flow__pane').click({ position: { x: 250, y: 700 } });
     await expect(page.locator('.dock-card')).toHaveCount(2);
-    await page.getByRole('button', { name: '白板详情', exact: true }).click();
-    await page.getByRole('button', { name: '关闭白板详情', exact: true }).click();
+    await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+    await page.getByRole('button', { name: '关闭工作流设置', exact: true }).click();
     await expect(repo.getByRole('button', { name: '查看分支 main', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -239,7 +242,7 @@ test('重复打开定位已有 Git 详情，空白选择与白板弹窗保留仓
   }
 });
 
-test('长仓库名在列标题完整换行并保留关闭入口', async ({ page, request }) => {
+test('详情底栏长标题保持单行省略，键盘可查看全名', async ({ page, request }) => {
   const f = await fixture();
   try {
     await commitFile(f.repo);
@@ -257,7 +260,15 @@ test('长仓库名在列标题完整换行并保留关闭入口', async ({ page,
       .getByRole('button', { name: title, exact: true })
       .click();
     const heading = page.locator('.dock-card .inspector-heading');
-    await expect(heading.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    const name = heading.getByRole('heading', { name: title, exact: true });
+    await expect(name).toHaveCSS('white-space', 'nowrap');
+    await expect(name).toHaveCSS('text-overflow', 'ellipsis');
+    expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+    expect((await heading.boundingBox())!.height).toBe(29);
+    await name.focus();
+    await expect(page.getByRole('tooltip')).toHaveText(title);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
     await expect(
       heading.getByRole('button', { name: '关闭仓库详情', exact: true }),
     ).toBeInViewport();
@@ -351,7 +362,7 @@ test('拖拽和键盘调宽遵守窗口 2/3 上限，宽度记忆且画布视角
     expect((await dock.boundingBox())!.width).toBeCloseTo(320, 0);
     await page.keyboard.press('ArrowLeft');
     expect((await dock.boundingBox())!.width).toBeCloseTo(336, 0);
-    await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeDisabled();
     expect(await (await request.get('/api/workspace', { headers })).json()).toEqual(before);
     await page.reload();
     await page.getByRole('button', { name: '公共库', exact: true }).click();
@@ -368,7 +379,7 @@ test('拖拽和键盘调宽遵守窗口 2/3 上限，宽度记忆且画布视角
   }
 });
 
-test('关系比较独立滚动，关闭后焦点恢复相邻列，切换白板清空旧 Git 详情', async ({
+test('关系比较独立滚动，切回工作流恢复未关闭的 Git 详情', async ({
   page,
   request,
 }) => {
@@ -405,7 +416,9 @@ test('关系比较独立滚动，关闭后焦点恢复相邻列，切换白板�
       .locator('.board-list')
       .getByRole('button', { name: '详情对照 2', exact: true })
       .click();
-    await expect(page.locator('.inspector-dock')).toHaveCount(0);
+    await expect(page.locator('.dock-card')).toHaveCount(1);
+    await expect(page.getByRole('complementary', { name: '公共库 仓库详情' })).toBeVisible();
+    await expect(relation).toHaveCount(0);
   } finally {
     await f.cleanup();
   }
@@ -425,7 +438,7 @@ test('添加仓库直接打开新详情，同时保留原仓库内页', async ({
     await page.getByRole('button', { name: '添加仓库', exact: true }).click();
     await page.getByLabel('仓库路径').fill(second);
     await page.getByLabel('卡片显示名称').fill('新增仓库');
-    await page.getByRole('button', { name: '添加到白板', exact: true }).click();
+    await page.getByRole('button', { name: '添加到工作流', exact: true }).click();
     await expect(page.locator('.dock-card')).toHaveCount(2);
     await page.getByRole('button', { name: '公共库', exact: true }).click();
     await expect(
@@ -451,15 +464,43 @@ test('区域无标签仍可平滑横向浏览，双主题与英文窄屏保留�
     await page.getByRole('button', { name: '应用库', exact: true }).click();
     await page.locator('[data-edge-id="link"]').click();
     const scroller = page.getByLabel('详情内容', { exact: true });
+    const previous = page.getByRole('button', { name: '向左浏览详情', exact: true });
+    const next = page.getByRole('button', { name: '向右浏览详情', exact: true });
+    const map = scroller.locator('.branch-tree-viewport').first();
+    await expect(scroller).toHaveCSS('scrollbar-width', 'none');
+    await expect(map).toHaveCSS('scrollbar-width', 'none');
     expect(await scroller.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     await page.getByRole('button', { name: '公共库', exact: true }).click();
     await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeLessThan(2);
-    await scroller.hover({ position: { x: 20, y: 12 } });
+    await expect(previous).toBeDisabled();
+    await expect(next).toBeEnabled();
+    const leftButton = (await previous.boundingBox())!;
+    const rightButton = (await next.boundingBox())!;
+    const contentBox = (await scroller.boundingBox())!;
+    const footerBox = (await scroller.locator('.inspector-heading-bottom').first().boundingBox())!;
+    expect(leftButton.x + leftButton.width).toBeLessThanOrEqual(contentBox.x);
+    expect(rightButton.x).toBeGreaterThanOrEqual(contentBox.x + contentBox.width);
+    expect(
+      Math.abs(leftButton.y + leftButton.height / 2 - footerBox.y - footerBox.height / 2),
+    ).toBeLessThan(1);
+    expect(rightButton.y).toBe(leftButton.y);
+    await next.click();
+    await expect(previous).toBeEnabled();
+    await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+    await scroller.evaluate((el) => el.scrollTo({ left: el.scrollWidth, behavior: 'instant' }));
+    await expect(next).toBeDisabled();
+    await scroller.evaluate((el) => el.scrollTo({ left: 100, behavior: 'instant' }));
+    await previous.press('Enter');
+    await expect(previous).toBeDisabled();
+    await scroller.locator('.dock-card').first().locator('.panel-heading-title').hover();
     await page.mouse.wheel(350, 0);
     await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(100);
+    await page.setViewportSize({ width: 1460, height: 1000 });
     await page.getByRole('separator', { name: '调整详情区域宽度', exact: true }).focus();
     await page.keyboard.press('End');
     await expect.poll(() => scroller.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await expect(previous).toHaveCount(0);
+    await expect(next).toHaveCount(0);
     await page.mouse.move(100, 800);
     await page.keyboard.press('Escape');
     await page.screenshot({
@@ -479,6 +520,7 @@ test('区域无标签仍可平滑横向浏览，双主题与英文窄屏保留�
       animations: 'disabled',
     });
     await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole('button', { name: 'Browse details to the right' })).toBeVisible();
     expect(
       (await page.getByRole('region', { name: 'Details browser', exact: true }).boundingBox())!
         .width,

@@ -79,9 +79,9 @@ async function arrange(page: Page, label: string) {
   await page.getByRole('button', { name: label, exact: true }).click();
 }
 
-test('框选与平移常驻切换，其余白板工具按需显示且无底卡', async ({ page }) => {
+test('框选与平移常驻切换，其余画布工具按需显示且无底卡', async ({ page }) => {
   await page.goto('/');
-  const tools = page.getByRole('group', { name: '白板工具', exact: true });
+  const tools = page.getByRole('group', { name: '画布工具', exact: true });
   const modes = tools.locator('.canvas-mode-switch');
   const extra = tools.locator('.canvas-hover-tools');
   const selectMode = tools.getByRole('button', { name: '选择', exact: true });
@@ -102,7 +102,7 @@ test('框选与平移常驻切换，其余白板工具按需显示且无底卡',
   await expect(selectMode).toHaveAttribute('aria-pressed', 'false');
   await expect(panMode).toHaveCSS('background-color', 'rgb(1, 53, 124)');
 
-  const exportButton = tools.getByRole('button', { name: '导出白板', exact: true });
+  const exportButton = tools.getByRole('button', { name: '导出工作流', exact: true });
   await exportButton.click();
   await page.mouse.move(5, 5);
   await expect(exportButton).toHaveAttribute('aria-expanded', 'true');
@@ -137,7 +137,7 @@ test('设计规范在明亮英文和触屏上复用白板开关', async ({ brows
       );
     });
     await page.goto('/design-system');
-    const tools = page.getByRole('group', { name: 'Board tools', exact: true });
+    const tools = page.getByRole('group', { name: 'Canvas tools', exact: true });
     const modes = tools.locator('.canvas-mode-switch');
     const extra = tools.locator('.canvas-hover-tools');
     const panMode = tools.getByRole('button', { name: 'Pan', exact: true });
@@ -171,7 +171,7 @@ test('选择、平移、独立锁定与说明历史；原生输入撤销不回�
     .poll(async () => (await readWorkspace(request)).boards[0].notes![0].position.x)
     .toBe(200);
   await expect(node(page, 'n1')).toHaveAttribute('style', /translate\(200px, 180px\)/);
-  await page.getByRole('button', { name: '重做白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '重做工作流编辑', exact: true }).click();
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].notes![0].position.x)
     .toBe(210);
@@ -180,11 +180,11 @@ test('选择、平移、独立锁定与说明历史；原生输入撤销不回�
   await node(page, 'n1').focus();
   await page.keyboard.press('ArrowRight');
   await expect(node(page, 'n1')).toHaveAttribute('style', /translate\(210px, 180px\)/);
-  await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '锁定缩放', exact: true }).click();
   const zoom = await page.locator('.canvas-zoom-label').innerText();
-  await expect(page.getByRole('button', { name: '放大白板', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: '适应白板', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '放大画布', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '适应画布', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '平移', exact: true }).click();
   const box = (await node(page, 'n1').boundingBox())!;
   await page.mouse.move(box.x + 60, box.y + 50);
@@ -212,7 +212,7 @@ test('选择、平移、独立锁定与说明历史；原生输入撤销不回�
     .getByRole('button', { name: '移除所选元素', exact: true })
     .click();
   await expect(page.getByTestId('note-node')).toHaveCount(3);
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect(page.getByTestId('note-node').filter({ hasText: '部署说明' })).toBeVisible();
   await page.getByRole('button', { name: '锁定布局', exact: true }).click();
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
@@ -233,7 +233,7 @@ test('多选排列、独立白板历史、聚焦与 SVG / PNG 导出，双主题
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].notes!.map((n) => n.position.y))
     .toEqual([180, 180, 180]);
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].notes![1].position.y)
     .toBe(300);
@@ -242,10 +242,11 @@ test('多选排列、独立白板历史、聚焦与 SVG / PNG 导出，双主题
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].notes![1].position.x)
     .toBe(660);
-  await page.getByRole('button', { name: /另一白板/ }).click();
-  await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: /MeGit 设计/ }).click();
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  const navigation = page.getByRole('complementary', { name: '工作流导航', exact: true });
+  await navigation.getByRole('button', { name: /另一白板/ }).click();
+  await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeDisabled();
+  await navigation.getByRole('button', { name: /MeGit 设计/ }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].notes![1].position.x)
     .toBe(560);
@@ -253,12 +254,12 @@ test('多选排列、独立白板历史、聚焦与 SVG / PNG 导出，双主题
   await page.getByRole('button', { name: '聚焦所选内容', exact: true }).click();
   await expect(page.getByTestId('note-node')).toHaveCount(1);
   expect((await readWorkspace(request)).boards[0].notes).toHaveLength(3);
-  await page.getByRole('button', { name: '适应白板', exact: true }).click();
+  await page.getByRole('button', { name: '适应画布', exact: true }).click();
   await expect(page.getByText('已保存', { exact: true })).toBeVisible();
   await page.mouse.move(1400, 850);
   await page.keyboard.press('Escape');
   await page.screenshot({ path: `${evidence}/tools-dark-zh.png`, animations: 'disabled' });
-  await page.getByRole('button', { name: '导出白板', exact: true }).click();
+  await page.getByRole('button', { name: '导出工作流', exact: true }).click();
   const svgDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出 SVG', exact: true }).click();
   const svg = await svgDownload;
@@ -275,7 +276,7 @@ test('多选排列、独立白板历史、聚焦与 SVG / PNG 导出，双主题
       source,
     ),
   ).toBe('');
-  await page.getByRole('button', { name: '导出白板', exact: true }).click();
+  await page.getByRole('button', { name: '导出工作流', exact: true }).click();
   const pngDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出 PNG', exact: true }).click();
   const png = await pngDownload;
@@ -308,9 +309,9 @@ test('多选排列、独立白板历史、聚焦与 SVG / PNG 导出，双主题
     })
     .toBeLessThan(0.01);
   await expect(page.getByRole('button', { name: 'Add note', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Export board', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Export workflow', exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('button', { name: 'Export board', exact: true }).click();
+  await page.getByRole('button', { name: 'Export workflow', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Export PNG', exact: true })).toBeInViewport();
   await page.keyboard.press('Escape');
   await page.screenshot({ path: `${evidence}/tools-mobile-light-en.png`, animations: 'disabled' });
@@ -399,7 +400,7 @@ test('真实框选后直接使用方向键与选择框拖动，布局持久化�
     .toBeGreaterThan(210);
   const moved = (await readWorkspace(request)).boards[0].notes!;
   expect(moved[1].position.x - moved[0].position.x).toBeCloseTo(360, 8);
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].notes![0].position.x)
     .toBe(210);
@@ -420,7 +421,7 @@ test('聚焦中新增说明立即可见，撤销移除且原说明保留', async
   await expect(page.getByTestId('note-node')).toHaveCount(4);
   await expect(page.getByRole('dialog', { name: '说明详情' })).toBeVisible();
   await page.getByRole('button', { name: '关闭说明详情', exact: true }).click();
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect(page.getByTestId('note-node')).toHaveCount(3);
 });
 
@@ -489,7 +490,7 @@ test('聚焦过滤后折叠组端口与连线贴合，锁定缩放不影响重�
     await page.getByRole('button', { name: '添加仓库', exact: true }).click();
     await page.getByLabel('仓库路径').fill(added);
     await page.getByLabel('卡片显示名称').fill('新加入的仓库');
-    await page.getByRole('button', { name: '添加到白板', exact: true }).click();
+    await page.getByRole('button', { name: '添加到工作流', exact: true }).click();
     await expect(
       page.getByTestId('repository-node').filter({ hasText: '新加入的仓库' }),
     ).toBeVisible();
@@ -524,7 +525,7 @@ test('所选仓库直接分组且正确恢复成员；说明草稿在移动和�
     await expect
       .poll(async () => (await readWorkspace(request)).boards[0].groups!.map((g) => g.nodeIds))
       .toEqual([['a'], ['b', 'c']]);
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect
       .poll(async () => (await readWorkspace(request)).boards[0].groups!.map((g) => g.nodeIds))
       .toEqual([['a', 'b']]);
@@ -589,7 +590,7 @@ test('组与成员混合多选共同移动，上下游聚焦；撤销白板不�
     await expect(page.getByTestId('note-node')).toHaveCount(0);
     await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await page.getByRole('button', { name: '关闭仓库详情' }).click();
-    await page.getByRole('button', { name: '导出白板', exact: true }).click();
+    await page.getByRole('button', { name: '导出工作流', exact: true }).click();
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 SVG', exact: true }).click();
     const file = await download;
@@ -615,12 +616,12 @@ test('组与成员混合多选共同移动，上下游聚焦；撤销白板不�
     const head = await git(f.repo, 'rev-parse', 'HEAD');
     await page.getByRole('button', { name: '关闭工作区', exact: true }).click();
     await page.getByRole('button', { name: '关闭仓库详情' }).click();
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect
       .poll(async () => (await readWorkspace(request)).boards[0].nodes[0].position.x)
       .toBe(160);
     expect(await git(f.repo, 'rev-parse', 'HEAD')).toBe(head);
-    await page.getByRole('button', { name: '重做白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '重做工作流编辑', exact: true }).click();
     await expect
       .poll(async () => (await readWorkspace(request)).boards[0].nodes[0].position.x)
       .toBe(moved.nodes[0].position.x);

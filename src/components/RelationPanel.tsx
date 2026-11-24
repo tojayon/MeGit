@@ -22,6 +22,7 @@ export function RelationPanel({
   boardId,
   sampleHistory,
   viewKey,
+  bottomNavigation = false,
   source,
   target,
   result,
@@ -31,6 +32,7 @@ export function RelationPanel({
   boardId?: string;
   sampleHistory?: IntegrationHistory;
   viewKey?: string;
+  bottomNavigation?: boolean;
   source?: Repository;
   target?: Repository;
   result?: IntegrationState;
@@ -162,15 +164,19 @@ export function RelationPanel({
     : currentResult?.messageCode
       ? t(`integration.${currentResult.messageCode}`, { count: currentResult.pending ?? 0 })
       : t('relation.reading');
+  const navigation = (
+    <PanelHeader
+      bottom={bottomNavigation}
+      title={edge.label || t(`relation.${edge.kind}`)}
+      icon={<Link2 size={20} />}
+      closeLabel={t('relation.close')}
+      onClose={onClose}
+      actions={<HelpTip topic={edge.kind} />}
+    />
+  );
   return (
     <aside className="inspector relation-inspector" aria-label={t('relation.details')}>
-      <PanelHeader
-        title={edge.label || t(`relation.${edge.kind}`)}
-        icon={<Link2 size={20} />}
-        closeLabel={t('relation.close')}
-        onClose={onClose}
-        actions={<HelpTip topic={edge.kind} />}
-      />
+      {!bottomNavigation && navigation}
       <div ref={scroll} className="relation-panel-body">
         <div className="relation-repository-pair">
           <RelationRepositoryCard
@@ -274,6 +280,7 @@ export function RelationPanel({
           </div>
         )}
       </div>
+      {bottomNavigation && navigation}
     </aside>
   );
 }

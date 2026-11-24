@@ -21,7 +21,7 @@ test('流程白板连接真实仓库，保存布局，查看历史与暂存提�
       await page.getByRole('button', { name: '添加仓库', exact: true }).first().click();
       await page.getByLabel('仓库路径').fill(repoPath);
       await page.getByLabel('卡片显示名称').fill(name);
-      await page.getByRole('button', { name: '添加到白板' }).click();
+      await page.getByRole('button', { name: '添加到工作流' }).click();
       await expect(page.getByTestId('repository-node').filter({ hasText: name })).toBeVisible();
     };
     await addRepo(f.repo, '公共编辑器');
@@ -126,7 +126,7 @@ test('获取远端后刷新已打开的历史，并支持多个白板和键盘�
     await page.getByRole('button', { name: '添加仓库', exact: true }).first().click();
     await page.getByLabel('仓库路径').fill(f.repo);
     await page.getByLabel('卡片显示名称').fill('接口项目');
-    await page.getByRole('button', { name: '添加到白板' }).click();
+    await page.getByRole('button', { name: '添加到工作流' }).click();
     await page.getByRole('button', { name: '查看接口项目' }).click();
     await openRepositoryTools(page, 'history');
     await expect(page.locator('.commit-row').filter({ hasText: '测试提交' })).toHaveCount(1);
@@ -145,14 +145,12 @@ test('获取远端后刷新已打开的历史，并支持多个白板和键盘�
     if (await page.getByRole('dialog', { name: '提交历史', exact: true }).count())
       await page.getByRole('button', { name: '关闭提交历史', exact: true }).click();
     await page.getByRole('button', { name: '关闭仓库详情' }).click();
-    await page.getByRole('button', { name: '新建流程', exact: true }).click();
-    await page.getByLabel('流程名称').fill('第二条工作流');
+    await page.getByRole('button', { name: '新建工作流', exact: true }).click();
+    await page.getByLabel('工作流名称').fill('第二条工作流');
     await page.getByRole('button', { name: '保存', exact: true }).click();
     await expect(page.getByRole('heading', { name: '把仓库连接成工作流' })).toBeVisible();
-    await page
-      .getByRole('button', { name: /开发流程/ })
-      .first()
-      .click();
+    const navigation = page.getByRole('complementary', { name: '工作流导航', exact: true });
+    await navigation.getByRole('button', { name: /开发流程/ }).click();
     await expect(page.getByTestId('repository-node')).toHaveCount(1);
     const node = page.locator('.react-flow__node').first();
     await expect(node).toBeVisible();
@@ -167,9 +165,9 @@ test('获取远端后刷新已打开的历史，并支持多个白板和键盘�
       await page.getByRole('button', { name: '关闭提交历史', exact: true }).click();
     await page.getByRole('button', { name: '关闭仓库详情' }).click();
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole('button', { name: '打开流程导航' }).click();
-    await expect(page.getByRole('button', { name: /第二条工作流/ })).toBeVisible();
-    await page.getByRole('button', { name: /第二条工作流/ }).click();
+    await page.getByRole('button', { name: '打开工作流导航' }).click();
+    const drawer = page.getByRole('dialog', { name: '工作流导航', exact: true });
+    await drawer.getByRole('button', { name: /第二条工作流/ }).click();
     await expect(page.getByRole('heading', { name: '把仓库连接成工作流' })).toBeVisible();
     await expect(page.getByText('已保存', { exact: true })).toBeVisible();
     expect(failedSnapshots).toEqual([]);

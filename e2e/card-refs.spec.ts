@@ -79,7 +79,7 @@ test('同仓库分支卡片各自代表自己的引用，工作区操作跟随�
     const add = page.getByRole('dialog', { name: '添加本地仓库' });
     await add.getByRole('button', { name: 'MeWiki', exact: true }).click();
     await add.getByLabel('卡片显示名称').fill('MeWiki 文档库');
-    await add.getByRole('button', { name: '添加到白板', exact: true }).click();
+    await add.getByRole('button', { name: '添加到工作流', exact: true }).click();
     await dialog.getByRole('combobox').selectOption('refs/remotes/origin/main');
     await dialog.getByRole('button', { name: '保存', exact: true }).click();
     await expect(page.getByTestId('repository-node')).toHaveCount(4);

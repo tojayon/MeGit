@@ -6,12 +6,14 @@ import { request } from '../lib/api';
 import { formatError } from '../lib/messages';
 import { Button } from './Button';
 import { Field } from './Field';
+import { SettingsActions, SettingsOption } from './SettingsForm';
 
 type AiResult = { kind: 'diagram'; diagram: AiDiagram } | { kind: 'repository'; text: string };
 const exampleSettings: AiSettings = {
   endpoint: 'https://example.invalid/v1',
   model: 'example-model',
-  hasApiKey: false,
+  hasApiKey: true,
+  projectDelivery: true,
 };
 
 export function AiPanel({
@@ -43,8 +45,10 @@ export function AiPanel({
   const [model, setModel] = useState(example ? exampleSettings.model : '');
   const [key, setKey] = useState('');
   const [clearKey, setClearKey] = useState(false);
-  const [projectDelivery, setProjectDelivery] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [projectDelivery, setProjectDelivery] = useState(
+    example && exampleSettings.projectDelivery === true,
+  );
+  const [busy, setBusy] = useState<'save' | 'test' | 'repository' | 'diagram'>();
   const [error, setError] = useState<unknown>();
   const [notice, setNotice] = useState<'saved' | 'connected' | 'applied'>();
   const [repositoryId, setRepositoryId] = useState(selectedRepo ?? '');
@@ -77,7 +81,7 @@ export function AiPanel({
 
   async function run(action: 'save' | 'test' | 'repository' | 'diagram') {
     if (busy || example) return;
-    setBusy(true);
+    setBusy(action);
     onBusy?.(true);
     setError(undefined);
     setNotice(undefined);
@@ -119,79 +123,109 @@ export function AiPanel({
     } catch (failure) {
       setError(failure);
     } finally {
-      setBusy(false);
+      setBusy(undefined);
       onBusy?.(false);
     }
   }
 
-  return (
-    <div className="settings-form">
-      {section === 'service' && (
-        <fieldset
-          className="theme-fieldset settings-form"
-          aria-label={t('ai.service')}
-          disabled={!settings || busy || example}
-        >
-          <Field label={t('ai.endpoint')}>
-            <input
-              type="url"
-              value={endpoint}
-              onChange={(event) => setEndpoint(event.target.value)}
-            />
-          </Field>
-          <Field label={t('ai.model')}>
-            <input value={model} onChange={(event) => setModel(event.target.value)} />
-          </Field>
-          <Field label={t(settings?.hasApiKey ? 'ai.savedKey' : 'ai.key')}>
-            <input
-              type="password"
-              autoComplete="new-password"
-              disabled={clearKey}
-              value={key}
-              onChange={(event) => setKey(event.target.value)}
-            />
-          </Field>
-          {settings?.hasApiKey && (
-            <label className="ai-clear-key">
+  const feedback = busy ? (
+    <p className="muted" role="status">
+      {t('ai.working')}
+    </p>
+  ) : error ? (
+    <p role="alert" className="error-message">
+      {formatError(error)}
+    </p>
+  ) : notice ? (
+    <p className="settings-success" role="status">
+      {t(`ai.${notice}`)}
+    </p>
+  ) : !settings && section === 'service' ? (
+    <p className="muted" role="status">
+      {t('settings.loading')}
+    </p>
+  ) : null;
+
+  if (section === 'service') {
+    const disabled = !settings || !!busy || example;
+    return (
+      <div className="settings-form">
+        <div className="settings-fields">
+          <fieldset
+            className="theme-fieldset settings-group"
+            aria-label={quick ? t('ai.service') : undefined}
+            disabled={disabled}
+          >
+            {!quick && <legend>{t('settings.connection')}</legend>}
+            <Field label={t('ai.endpoint')}>
               <input
-                type="checkbox"
+                type="url"
+                value={endpoint}
+                onChange={(event) => setEndpoint(event.target.value)}
+              />
+            </Field>
+            <Field label={t('ai.model')}>
+              <input value={model} onChange={(event) => setModel(event.target.value)} />
+            </Field>
+            <Field label={t(settings?.hasApiKey ? 'ai.savedKey' : 'ai.key')}>
+              <input
+                type="password"
+                autoComplete="new-password"
+                disabled={clearKey}
+                value={key}
+                onChange={(event) => setKey(event.target.value)}
+              />
+            </Field>
+            {settings?.hasApiKey && (
+              <SettingsOption
+                label={t('ai.clearKey')}
                 checked={clearKey}
                 onChange={(event) => setClearKey(event.target.checked)}
               />
-              {t('ai.clearKey')}
-            </label>
-          )}
+            )}
+          </fieldset>
           {!quick && (
-            <label>
-              <input
-                type="checkbox"
+            <fieldset className="theme-fieldset settings-group" disabled={disabled}>
+              <legend>{t('settings.permissions')}</legend>
+              <SettingsOption
+                label={t('projectDelivery.enable')}
+                help={t('settings.projectDeliveryHelp')}
                 checked={projectDelivery}
                 onChange={(event) => setProjectDelivery(event.target.checked)}
               />
-              {t('projectDelivery.enable')}
-            </label>
+            </fieldset>
           )}
-          <div className="settings-actions">
-            <Button
-              variant="primary"
-              disabled={!dirty || !endpoint.trim() || !model.trim()}
-              onClick={() => void run('save')}
-            >
-              {t('ai.save')}
-            </Button>
-            <Button disabled={!ready} onClick={() => void run('test')}>
-              {t('ai.test')}
-            </Button>
-          </div>
-        </fieldset>
-      )}
-      {section === 'assistant' && !settings?.model && !error && (
+        </div>
+        <SettingsActions feedback={feedback}>
+          <Button
+            disabled={disabled || !ready}
+            busy={busy === 'test' || undefined}
+            onClick={() => void run('test')}
+          >
+            {t('ai.test')}
+          </Button>
+          <Button
+            variant="primary"
+            disabled={disabled || !dirty || !endpoint.trim() || !model.trim()}
+            busy={busy === 'save' || undefined}
+            onClick={() => void run('save')}
+          >
+            {t('ai.save')}
+          </Button>
+        </SettingsActions>
+      </div>
+    );
+  }
+
+  return (
+    <div className="settings-form settings-standalone">
+      {!settings?.model && !error && (
         <p className="muted">{t(settings ? 'settings.configureAi' : 'ai.working')}</p>
       )}
-      {section === 'assistant' && settings?.model && !repositories.length && !applyDiagram && (
+      {settings?.model && !repositories.length && !applyDiagram && (
         <p className="muted">{t('settings.openBoard')}</p>
       )}
-      {section === 'assistant' && repositories.length > 0 && (
+      {repositories.length > 0 && (
         <fieldset className="theme-fieldset" disabled={!ready}>
           <legend>{t('ai.repository')}</legend>
           <Field label={t('ai.repositoryScope')}>
@@ -219,7 +253,7 @@ export function AiPanel({
           </Button>
         </fieldset>
       )}
-      {section === 'assistant' && applyDiagram && (
+      {applyDiagram && (
         <fieldset className="theme-fieldset" disabled={!ready}>
           <legend>{t('ai.diagram')}</legend>
           <Field label={t('ai.prompt')}>
@@ -237,19 +271,13 @@ export function AiPanel({
           </Button>
         </fieldset>
       )}
-      {busy && <p role="status">{t('ai.working')}</p>}
-      {notice && <p role="status">{t(`ai.${notice}`)}</p>}
-      {Boolean(error) && (
-        <p role="alert" className="error-message">
-          {formatError(error)}
-        </p>
-      )}
-      {section === 'assistant' && result?.kind === 'repository' && (
+      {feedback}
+      {result?.kind === 'repository' && (
         <p role="status" className="ai-output">
           {result.text}
         </p>
       )}
-      {section === 'assistant' && result?.kind === 'diagram' && (
+      {result?.kind === 'diagram' && (
         <section aria-label={t('ai.preview')}>
           <h3>{t('ai.preview')}</h3>
           <ol>
@@ -270,7 +298,7 @@ export function AiPanel({
           {!canApply && <p className="muted">{t('ai.boardUnavailable')}</p>}
           <Button
             variant="primary"
-            disabled={!canApply || busy}
+            disabled={!canApply || !!busy}
             onClick={() => {
               if (applyDiagram?.(result.diagram)) {
                 setResult(undefined);

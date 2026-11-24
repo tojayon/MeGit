@@ -3,7 +3,7 @@
 </p>
 
 <p align="center"><strong>A visual Git workbench for multi-repository workflows</strong></p>
-<p align="center">Map dependencies, verify what has landed, and inspect local Git history from one board.</p>
+<p align="center">Map dependencies, verify what has landed, and inspect local Git history from one workflow.</p>
 
 <p align="center">
   <a href="#quick-start"><img src="https://img.shields.io/badge/Node.js-22.12%2B-43853d" alt="Node.js 22.12+"></a>
@@ -19,7 +19,7 @@
 
 ## Features
 
-- **Workflow canvas** — Keep multiple boards open in tabs, group repositories, map dependencies and release steps, and export boards as SVG or PNG. Each tab has workflow information on the left and a close button on the right. Closing the tab does not delete the board.
+- **Workflow canvas** — Each workflow has one canvas. Keep multiple workflows open in tabs, group repositories, map dependencies and release steps, and export as SVG or PNG. Each tab has workflow information on the left and a close button on the right. Closing the tab does not remove the workflow.
 - **Integration checks** — See which source commits are missing from a target. Open the connection to inspect the comparison.
 - **Connection shortcuts** — Pending push (blue, right) and pull (green, left) are visible without hovering when they can run. If a direction has no pending commits, its shortcut appears in gray on hover or keyboard focus and cannot be activated. Pull status reflects the last fetch. For two local repositories, edit the connection and enable fast-forward integration to move source commits into the checked-out target. Every action shows its direction and requires confirmation; the connection remains a comparison entry point.
 - **Review and merge locally** — Enable *Review and merge* on a connection between two local repositories to compare their unique commits before changing anything. Prepare the merge in the checked-out target, review the staged result, and explicitly commit or abort. If files conflict, resolve and stage them in the target, then reopen the connection to continue. No remote or push is needed.
@@ -49,9 +49,13 @@ Open **[127.0.0.1:4317](http://127.0.0.1:4317)**. On Windows, you can also doubl
 
 Add two local repositories and connect them with a **Code integration** edge to compare their Git refs by commit ancestry.
 
-Hold **Shift** while dragging board cards, groups, or a selection to move only horizontally or vertically. The main drag direction sets the axis until you release Shift. Auto snap only adjusts positions along that axis; hold **Alt** to bypass snapping without unlocking it.
+Hold **Shift** while dragging cards, groups, or a selection to move only horizontally or vertically. The main drag direction sets the axis until you release Shift. Auto snap only adjusts positions along that axis; hold **Alt** to bypass snapping without unlocking it.
 
-Open a board under **My workflows**; the current workflow is highlighted as a dark card. To register or manage local repositories, open **Repository management** just above **Preferences** at the bottom of the sidebar.
+Open a workflow under **My workflows**. Use **Workflow settings** in the upper-right canvas toolbar to edit its name and description or to remove it after confirmation. Local repositories are kept, and the last workflow cannot be removed. Global settings remain in the sidebar. To register or manage local repositories, open **Repository management** just above **Preferences**.
+
+Workflow tabs span the canvas and the right-hand details. Repository and relationship controls are at the bottom of their respective panels. Each workflow remembers which details were open, the active detail, and the panel width when you switch workflows or reload the browser tab. Select **Hide workflow panel** just to the left of **+** under **My workflows** to give the details the full workspace width without closing any tabs. Use the same button to show the canvas again.
+
+When the detail columns do not fit, use the arrows at either end of the bottom row to browse them. Long titles stay on one line; hover or focus a title to see its full name. The details browser and branch map hide their scrollbars without disabling scrolling or panning.
 
 ## Product gallery
 
@@ -74,7 +78,7 @@ The reference picker is the first control in the reference row. The lower-left c
 
 ![Interactive Git lesson showing two branch histories joining](docs/screenshots/git-classroom.png)
 
-**Dark mode** — The same release board in the dark theme.
+**Dark mode** — The same release workflow in the dark theme.
 
 ![MeGit release workflow in dark mode](docs/screenshots/workflow-dark.png)
 
@@ -82,17 +86,19 @@ The reference picker is the first control in the reference row. The lower-left c
 
 ## Local by default
 
+Open **Settings** from the sidebar to configure the AI service and network proxy. AI connection details and project permissions appear in separate groups. Test and save actions stay visible while you scroll; the desktop app’s **Interface** switches apply immediately.
+
 The bottom-left control in the AI composer shows the current conversation’s capabilities. **Default scope** reads referenced repository context and reads and edits the referenced workflow. For file changes, enable **AI project delivery** in **Settings → AI service**, reference exactly one repository in the chat, then choose **Default scope → Repository read/write**. There’s no second repository picker. **Learn more** shows the local path, AI provider, and file access rules. Send requests in the same chat and review proposals before saving. Ordinary questions and workflow edits still work. Changing repository references restores the default scope; new chats and page reloads do not inherit the authorization. A generated PowerShell entry can also be saved to local startup settings after explicit trust. Saving does not run the script, stage changes, commit, or push.
 
-MeGit binds to `127.0.0.1` and saves boards locally. Git uses your existing configuration and credentials. An AI provider receives task context only when you use a configured AI feature.
+MeGit binds to `127.0.0.1` and saves workflows locally. Git uses your existing configuration and credentials. An AI provider receives task context only when you use a configured AI feature.
 
 On Windows, open **Local service** in a repository's details to approve an existing npm script or a repository PowerShell script. Start, stop, or restart the managed foreground service and read its output directly in the terminal panel. An optional TCP port enables readiness and conflict checks; MeGit does not stop unrelated listeners or launch services automatically.
 
-Click the repository name on a board card to open its details. Once a local service is configured, a small tab peeks out from behind the upper-right edge of the current HEAD card. Hover over the card or focus the service button with the keyboard to reveal it. On touchscreens without hover, the button is always exposed. While the service runs, the tab extends left to show elapsed time before the Stop button without resizing the card itself. It shows `02:03:04` until one full day has elapsed, then includes days (for example, `01d 02:03:04`). The timer updates every second, continues across page refreshes, and resets when the service restarts. Errors appear on the card; Restart, configuration, and full output stay in the Local service panel.
+Click the repository name on a canvas card to open its details. Once a local service is configured, a circular button sits halfway in a semicircular notch near the upper-right side of the current HEAD card. The button is green for Start and red for Stop, and shares the card's blue outline when selected. Hovering shows a tooltip without changing the button's appearance or size. While the service runs, elapsed time appears above the card, to the left of the Stop button, without resizing the card. It shows `02:03:04` until one full day has elapsed, then includes days (for example, `01d 02:03:04`). The timer updates every second, continues across page refreshes, and resets when the service restarts. Errors appear on the card; Restart, configuration, and full output stay in the Local service panel.
 
 See the [local service script specification](docs/LOCAL_SERVICE_SCRIPTS.md) for entry rules and working npm and PowerShell examples.
 
-Each active service has its own terminal tab on the left side of the board's footer. Select a tab to open that repository's terminal directly. Save and check details are under **Status information** on the right.
+Each active service has its own terminal tab on the left side of the workflow footer. Select a tab to open that repository's terminal directly. Save and check details are under **Status information** on the right.
 
 ## Development
 

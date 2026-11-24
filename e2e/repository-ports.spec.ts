@@ -225,7 +225,7 @@ test('仅有入线的共享点可以发起出线，取消不分离，保存后�
       'incoming',
       '.react-flow__node[data-id="a"] [data-handleid="target-right"]',
     );
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await node.hover();
     await expect.poll(async () => (await visiblePorts(node)).length).toBe(5);
     expect(outgoing.sourcePort).toBe('right');

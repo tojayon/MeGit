@@ -112,7 +112,7 @@ test('流程步骤、判断及失败回路持久化；连线编辑、删除清�
   await page.locator('.react-flow__node[data-id="check"]').click();
   await page.getByRole('button', { name: '移除所选元素', exact: true }).click();
   await expect.poll(async () => (await store.read()).connections.length).toBe(0);
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect.poll(async () => (await store.read()).connections.length).toBe(3);
   await page.reload();
   await expect(page.getByTestId('flow-step')).toHaveCount(3);
@@ -167,7 +167,7 @@ test('可拖连步骤，双主题／语言、导出形状和设计规范实例',
       y: (rect.y + rect.height / 2 - canvas.y - matrix.f) / matrix.d,
     };
   });
-  await page.getByRole('button', { name: 'Export board', exact: true }).click();
+  await page.getByRole('button', { name: 'Export workflow', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export SVG', exact: true }).click();
   const svg = await readFile((await (await download).path())!, 'utf8');
@@ -205,7 +205,7 @@ test('窄屏触控可查看判断详情', async ({ browser, request }) => {
   });
   const page = await context.newPage();
   await page.goto('/');
-  await page.getByRole('button', { name: '适应白板', exact: true }).tap();
+  await page.getByRole('button', { name: '适应画布', exact: true }).tap();
   await page.getByTestId('flow-step').filter({ hasText: '检查通过？' }).tap();
   await page.getByRole('button', { name: '说明详情', exact: true }).tap();
   const dialog = page.getByRole('dialog', { name: '流程步骤详情', exact: true });
@@ -284,14 +284,14 @@ test('流程连线可拖动两端重连，保留条件、撤销重做和刷新�
   expect(
     (await store.read()).connections.find((c: { id: string }) => c.id === 'retry').waypoints,
   ).toBeUndefined();
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect
     .poll(
       async () =>
         (await store.read()).connections.find((c: { id: string }) => c.id === 'retry').source,
     )
     .toBe('check');
-  await page.getByRole('button', { name: '重做白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '重做工作流编辑', exact: true }).click();
   await expect
     .poll(
       async () =>
@@ -355,7 +355,7 @@ test('合法长标题与摘要保留在详情，图上与导出不越出步骤�
     }),
   );
   expect.soft(Math.max(...overflow)).toBeLessThanOrEqual(1);
-  await page.getByRole('button', { name: '导出白板', exact: true }).click();
+  await page.getByRole('button', { name: '导出工作流', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出 SVG', exact: true }).click();
   const svg = await readFile((await (await download).path())!, 'utf8');

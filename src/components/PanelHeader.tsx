@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { IconButton } from './IconButton';
+import { Tooltip } from './Tooltip';
 
 export function PanelHeader({
   title,
@@ -9,6 +10,7 @@ export function PanelHeader({
   onClose,
   actions,
   iconAction,
+  bottom = false,
 }: {
   title: string;
   icon: ReactNode;
@@ -16,9 +18,11 @@ export function PanelHeader({
   onClose: () => void;
   actions?: ReactNode;
   iconAction?: { label: string; help?: ReactNode; onClick: () => void; disabled?: boolean };
+  bottom?: boolean;
 }) {
+  const Container = bottom ? 'footer' : 'header';
   return (
-    <header className="inspector-heading">
+    <Container className={`inspector-heading${bottom ? ' inspector-heading-bottom' : ''}`}>
       {iconAction ? (
         <IconButton className="repo-symbol repository-avatar-button" {...iconAction}>
           {icon}
@@ -29,14 +33,25 @@ export function PanelHeader({
         </div>
       )}
       <div className="panel-heading-title">
-        <h2>{title}</h2>
+        {bottom ? (
+          <Tooltip content={title} placement="top">
+            <h2 tabIndex={0}>{title}</h2>
+          </Tooltip>
+        ) : (
+          <h2>{title}</h2>
+        )}
       </div>
       <div className="panel-heading-actions">
         {actions}
-        <IconButton data-panel-close label={closeLabel} onClick={onClose}>
+        <IconButton
+          data-panel-close
+          label={closeLabel}
+          onClick={onClose}
+          placement={bottom ? 'top' : 'bottom'}
+        >
           <X size={18} />
         </IconButton>
       </div>
-    </header>
+    </Container>
   );
 }

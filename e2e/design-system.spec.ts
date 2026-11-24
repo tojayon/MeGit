@@ -18,7 +18,7 @@ test('仓库路径错误关联字段并聚焦；提交中防重复和意外关�
     await submitted;
     await route.continue();
   });
-  const submit = dialog.getByRole('button', { name: '添加到白板', exact: true });
+  const submit = dialog.getByRole('button', { name: '添加到工作流', exact: true });
   await submit.click();
   await expect(submit).toHaveAttribute('aria-busy', 'true');
   await expect(submit).toBeDisabled();
@@ -51,9 +51,8 @@ test('保存传输失败保留修改并可重试；版本冲突保持停止写�
       });
     } else await route.continue();
   });
-  await page.getByRole('button', { name: '工作流选项', exact: true }).click();
-  await page.getByRole('button', { name: '重命名', exact: true }).click();
-  await page.getByRole('dialog').getByRole('textbox').fill('设计规范验收');
+  await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('工作流名称').fill('设计规范验收');
   await page.getByRole('dialog').getByRole('button', { name: '保存', exact: true }).click();
   const retry = page.getByRole('button', { name: '重试保存', exact: true });
   await expect(retry).toBeVisible();
@@ -68,16 +67,14 @@ test('保存传输失败保留修改并可重试；版本冲突保持停止写�
   ).json();
   expect(current.boards[0].name).toBe('设计规范验收');
   failure = 'workspaceConflict';
-  await page.getByRole('button', { name: '工作流选项', exact: true }).click();
-  await page.getByRole('button', { name: '重命名', exact: true }).click();
-  await page.getByRole('dialog').getByRole('textbox').fill('保留未保存修改');
+  await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('工作流名称').fill('保留未保存修改');
   await page.getByRole('dialog').getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('另一页面更新');
   await expect(retry).toHaveCount(0);
   await expect(page.getByRole('button', { name: '刷新页面', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '工作流选项', exact: true }).click();
-  await page.getByRole('button', { name: '重命名', exact: true }).click();
-  await page.getByRole('dialog').getByRole('textbox').fill('冲突后的编辑');
+  await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('工作流名称').fill('冲突后的编辑');
   await page.getByRole('dialog').getByRole('button', { name: '保存', exact: true }).click();
   expect(writes).toBe(3);
   await expect(page.getByRole('main', { name: '保留未保存修改', exact: true })).toBeVisible();
@@ -166,10 +163,10 @@ test('展开检查器与导航保留手动视角，分组与关系错误聚焦�
     await page.clock.runFor(400);
     await expect(viewport).toHaveAttribute('style', initial!);
     await page.getByRole('button', { name: '关闭仓库详情', exact: true }).click();
-    await page.getByRole('button', { name: '收起流程导航', exact: true }).click();
+    await page.getByRole('button', { name: '收起工作流导航', exact: true }).click();
     await page.clock.runFor(400);
     await expect(viewport).toHaveAttribute('style', initial!);
-    await page.getByRole('button', { name: '展开流程导航', exact: true }).click();
+    await page.getByRole('button', { name: '展开工作流导航', exact: true }).click();
     await page.clock.runFor(400);
     await expect(viewport).toHaveAttribute('style', initial!);
     await page.getByRole('button', { name: '仓库分组', exact: true }).click();
@@ -212,6 +209,13 @@ test('粗指针环境的标准与紧凑按钮均有 44px 命中目标', async ({
     );
     expect(heights.length).toBeGreaterThan(5);
     for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
+    const dock = page.getByRole('region', { name: '详情浏览区域', exact: true });
+    const next = dock.getByRole('button', { name: '向右浏览详情', exact: true });
+    await expect(next).toBeVisible();
+    const button = (await next.boundingBox())!;
+    const footer = (await dock.locator('.inspector-heading-bottom').first().boundingBox())!;
+    expect(button.width).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(button.y + button.height / 2 - footer.y - footer.height / 2)).toBeLessThan(1);
     await expect(page.getByRole('button', { name: '紧凑按钮', exact: true })).toBeVisible();
   } finally {
     await context.close();

@@ -93,8 +93,8 @@ test('configures the local AI service and adds a diagram only after confirmation
     await expect(
       page.locator('.react-flow__node').filter({ hasText: 'AI Draft Start' }),
     ).toHaveCount(0);
-    await page.getByRole('button', { name: 'Confirm and add to board' }).click();
-    await expect(page.getByText('The flowchart draft was added to the board.')).toBeVisible();
+    await page.getByRole('button', { name: 'Confirm and add to workflow' }).click();
+    await expect(page.getByText('The flowchart draft was added to the workflow.')).toBeVisible();
     await page.getByRole('button', { name: 'Close Settings' }).click();
     await expect(
       page.locator('.react-flow__node').filter({ hasText: 'AI Draft Start' }),
@@ -107,7 +107,7 @@ test('configures the local AI service and adds a diagram only after confirmation
 test('opens categorized software settings from the narrow navigation drawer', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 760 });
   await page.goto('/');
-  await page.getByRole('button', { name: '打开流程导航', exact: true }).click();
+  await page.getByRole('button', { name: '打开工作流导航', exact: true }).click();
   const navigation = page.locator('#workspace-navigation');
   const opener = navigation.getByRole('button', { name: '软件设置', exact: true });
   await opener.click();

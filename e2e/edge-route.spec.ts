@@ -121,7 +121,7 @@ test('流程线及 Git 关系均可拖动中间路线，一次撤销、取消、
       expect(changed.target).toBe(id === 'flow' ? 'end' : 'b');
       await drag(page, segments.first(), { x: 0, y: 60 });
       await expect.poll(route).not.toEqual(changed);
-      await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+      await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
       await expect.poll(route).toEqual(changed);
       await edge.focus();
       await page.keyboard.press('Enter');
@@ -137,10 +137,10 @@ test('流程线及 Git 关系均可拖动中间路线，一次撤销、取消、
       await mkdir('.megit/verification/edge-route', { recursive: true });
       if (id === 'flow')
         await page.screenshot({ path: '.megit/verification/edge-route/dark-zh.png' });
-      await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+      await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
       await expect.poll(async () => (await route()).waypoints).toBeUndefined();
       expect((await store.read()).boards[0].nodes).toEqual(before.nodes);
-      await page.getByRole('button', { name: '重做白板编辑', exact: true }).click();
+      await page.getByRole('button', { name: '重做工作流编辑', exact: true }).click();
       await expect.poll(route).toEqual(changed);
       await page.reload();
       expect(await route()).toEqual(changed);
@@ -157,7 +157,7 @@ test('流程线及 Git 关系均可拖动中间路线，一次撤销、取消、
         expect((await route()).waypoints).toEqual(changed.waypoints);
       }
     }
-    await page.getByRole('button', { name: '导出白板', exact: true }).click();
+    await page.getByRole('button', { name: '导出工作流', exact: true }).click();
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出 SVG', exact: true }).click();
     const svg = await readFile((await (await download).path())!, 'utf8');
@@ -255,7 +255,7 @@ test('两类路线共用横竖吸附，Alt 即时跳过，取消清理，开关�
       await expect.poll(route).toEqual(aligned);
       await page
         .getByRole('button', {
-          name: id === 'flow' ? '撤销白板编辑' : 'Undo board edit',
+          name: id === 'flow' ? '撤销工作流编辑' : 'Undo workflow edit',
           exact: true,
         })
         .click();
@@ -364,7 +364,7 @@ test('折点增删、键盘微调、恢复自动路线与锁定保护，双主�
     await mkdir('.megit/verification/edge-route', { recursive: true });
     await page.screenshot({ path: '.megit/verification/edge-route/light-en.png' });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole('button', { name: 'Fit board', exact: true }).click();
+    await page.getByRole('button', { name: 'Fit to canvas', exact: true }).click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

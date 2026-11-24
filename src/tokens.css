@@ -12,7 +12,9 @@
   --repository-index-card-width: 300px;
   --settings-width: 760px;
   --settings-min-height: 420px;
+  --settings-height: 586px;
   --settings-nav-width: 174px;
+  --settings-checkbox-size: 16px;
   --workflow-tab-width: 240px;
   --repository-card-width: 276px;
   --repository-card-avatar: 48px;
@@ -29,6 +31,12 @@
   --local-service-console-height: 520px;
   --local-service-preview-output-height: 140px;
   --local-service-bar-height: calc(var(--control-compact) + var(--space-1) * 2 + 1px);
+  --local-service-card-button-size: var(--control-small);
+  --local-service-card-notch-inset: var(--space-6);
+  --local-service-card-notch-gap: 2px;
+  --local-service-card-notch-radius: calc(
+    var(--local-service-card-button-size) / 2 + var(--local-service-card-notch-gap)
+  );
   --assistant-repository-width: 900px;
   --edge-route-target: 28px;
   --edge-route-dot: 9px;
@@ -134,6 +142,7 @@
 @media (pointer: coarse) {
   :root {
     --assistant-send-size: var(--control-touch);
+    --local-service-card-button-size: var(--control-touch);
     --canvas-control-size: var(--control-touch);
     --panel-heading-control-size: var(--control-touch);
   }

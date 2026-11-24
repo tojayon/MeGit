@@ -258,7 +258,7 @@ export default {
       meaning:
         'Remove a local branch name only when its commits are already included in the current commit.',
       effect:
-        'Keeps remote branches and repository files. The current branch and branches used by another worktree are protected. Board Undo cannot restore Git actions.',
+        'Keeps remote branches and repository files. The current branch and branches used by another worktree are protected. Workflow Undo cannot restore Git actions.',
     },
     tracking: {
       title: 'Track remote branch',
@@ -284,7 +284,7 @@ export default {
     dependency: {
       title: 'Development dependency',
       meaning:
-        'Record your own development order or dependency direction between repositories to organize the board.',
+        'Record your own development order or dependency direction between repositories to organize the workflow.',
       effect:
         'The relation does not install dependencies, run tasks, or confirm code integration. Editing it does not change repository files.',
     },

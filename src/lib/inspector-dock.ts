@@ -7,6 +7,7 @@ export interface InspectorState {
   items: InspectorItem[];
   active: string;
   request: number;
+  width?: number;
 }
 export const emptyDock: InspectorState = { boardId: '', items: [], active: '', request: 0 };
 export function isInspectorState(value: unknown): value is InspectorState {
@@ -15,6 +16,8 @@ export function isInspectorState(value: unknown): value is InspectorState {
   return (
     typeof state.boardId === 'string' &&
     typeof state.active === 'string' &&
+    (state.width === undefined ||
+      (Number.isFinite(state.width) && state.width > 0 && state.width <= 16384)) &&
     Number.isSafeInteger(state.request) &&
     state.request >= 0 &&
     Array.isArray(state.items) &&
@@ -39,6 +42,7 @@ export function openInspector(
   const items = state.boardId === boardId ? state.items : [];
   const key = inspectorKey(item);
   return {
+    ...(state.boardId === boardId ? state : undefined),
     boardId,
     items: items.some((i) => inspectorKey(i) === key) ? items : [...items, item],
     active: key,

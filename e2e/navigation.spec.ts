@@ -40,8 +40,8 @@ test('侧栏的右侧按钮、计数和图标共享同一对齐线', async ({ pa
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
     const navigation = page.locator('#workspace-navigation');
-    const create = navigation.getByRole('button', { name: '新建流程', exact: true });
-    const collapse = navigation.getByRole('button', { name: '收起流程导航', exact: true });
+    const create = navigation.getByRole('button', { name: '新建工作流', exact: true });
+    const collapse = navigation.getByRole('button', { name: '收起工作流导航', exact: true });
     const sectionIcon = navigation.locator('.flow-outline .sidebar-section-heading svg');
     const repoArrow = navigation.locator('.outline-repo:not(.outline-group-title) svg').last();
     const workflowCounts = await navigation.locator('.board-item small').all();
@@ -114,31 +114,31 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await page.keyboard.press('Escape');
   await expect(status).not.toBeVisible();
   await expect(statusButton).toBeFocused();
-  const rail = canvas.getByRole('group', { name: '白板操作', exact: true });
+  const rail = canvas.getByRole('group', { name: '工作流操作', exact: true });
   await expect(rail).toBeVisible();
   const railBox = (await rail.boundingBox())!;
   const canvasBox = (await canvas.boundingBox())!;
   expect(canvasBox.y).toBe(
-    (await page.locator('.workflow-panel > .workflow-header').boundingBox())!.height,
+    (await page.locator('.main-workspace > .workflow-header').boundingBox())!.height,
   );
   expect(railBox.height).toBeGreaterThan(railBox.width * 3);
   expect(railBox.width).toBeLessThanOrEqual(50);
   expect(canvasBox.x + canvasBox.width - railBox.x - railBox.width).toBeCloseTo(12, 0);
-  await rail.getByRole('button', { name: '白板详情', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '白板详情', exact: true })).toBeVisible();
+  await rail.getByRole('button', { name: '工作流设置', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '工作流设置', exact: true })).toBeVisible();
   const inspectorCanvas = (await canvas.boundingBox())!;
   const inspectorRail = (await rail.boundingBox())!;
   expect(inspectorCanvas.width).toBe(canvasBox.width);
   expect(
     inspectorCanvas.x + inspectorCanvas.width - inspectorRail.x - inspectorRail.width,
   ).toBeCloseTo(12, 0);
-  await page.getByRole('button', { name: '关闭白板详情', exact: true }).click();
+  await page.getByRole('button', { name: '关闭工作流设置', exact: true }).click();
   await page.screenshot({
     path: '.megit/verification/navigation/dark-expanded.png',
     animations: 'disabled',
   });
 
-  const collapse = navigation.getByRole('button', { name: '收起流程导航', exact: true });
+  const collapse = navigation.getByRole('button', { name: '收起工作流导航', exact: true });
   await expect(collapse).toHaveAttribute('aria-expanded', 'true');
   const preferences = navigation.getByRole('button', { name: '偏好设置', exact: true });
   const management = navigation.getByRole('button', { name: '仓库管理', exact: true });
@@ -184,7 +184,7 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   expect(collapsedSymbol.width).toBeCloseTo(34, 1);
   expect(collapsedSymbol.height).toBeCloseTo(collapsedSymbol.width, 1);
   await expectControlsAligned(page);
-  const expand = navigation.getByRole('button', { name: '展开流程导航' });
+  const expand = navigation.getByRole('button', { name: '展开工作流导航' });
   await expect(expand).toBeFocused();
   await expect(line).toBeHidden();
   const ribbonBox = (await divider.boundingBox())!;
@@ -246,7 +246,7 @@ test('桌面导航在面板与 Ribbon 间切换，Logo 透明且刷新恢复折�
   await expect(navigation.getByText('Local service', { exact: true })).toHaveCount(0);
   await expectControlsAligned(page);
   await expect(page.getByRole('main', { name: '开发流程', exact: true })).toBeVisible();
-  await expect(canvas.getByRole('group', { name: 'Board actions', exact: true })).toBeVisible();
+  await expect(canvas.getByRole('group', { name: 'Workflow actions', exact: true })).toBeVisible();
   await page.mouse.move(600, 300);
   await page.screenshot({
     path: '.megit/verification/navigation/light-expanded-en.png',
@@ -271,14 +271,14 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
   });
   await page.goto('/');
   await expect(page.locator('.workspace-header')).toHaveCount(0);
-  await page.getByRole('button', { name: '白板详情', exact: true }).click();
-  const inspector = page.getByRole('dialog', { name: '白板详情', exact: true });
+  await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+  const inspector = page.getByRole('dialog', { name: '工作流设置', exact: true });
   await expect(inspector).toBeVisible();
-  await inspector.getByRole('button', { name: '关闭白板详情', exact: true }).click();
+  await inspector.getByRole('button', { name: '关闭工作流设置', exact: true }).click();
   await expect(inspector).toHaveCount(0);
   const navigation = page.locator('#workspace-navigation');
   const opener = page.getByRole('button', {
-    name: '打开流程导航',
+    name: '打开工作流导航',
     exact: true,
     includeHidden: true,
   });
@@ -287,7 +287,7 @@ test('窄屏抽屉管理键盘焦点并保留桌面折叠偏好', async ({ page 
   await expect(opener).toHaveAttribute('aria-expanded', 'true');
   await expect(navigation).toHaveAttribute('role', 'dialog');
   await expect(navigation).toHaveAttribute('data-collapsed', 'false');
-  const close = navigation.getByRole('button', { name: '关闭流程导航', exact: true });
+  const close = navigation.getByRole('button', { name: '关闭工作流导航', exact: true });
   await expect(close).toBeFocused();
   await expect.poll(async () => (await navigation.boundingBox())?.x).toBe(0);
   await navigation.getByRole('link', { name: 'MeGit 首页' }).focus();
@@ -369,11 +369,11 @@ test('画布两侧控件在桌面、折叠和触控窄屏保持同一尺寸与�
       await expectControlsAligned(page);
       const size = hasTouch ? 44 : 32;
       await expect(page.locator('.navigation-toggle:visible')).toHaveCSS('width', `${size}px`);
-      await page.getByRole('button', { name: '收起流程导航', exact: true }).click();
+      await page.getByRole('button', { name: '收起工作流导航', exact: true }).click();
       await expectControlsAligned(page);
       await page.setViewportSize({ width: 390, height: 844 });
       await expectControlsAligned(page);
-      await page.getByRole('button', { name: '打开流程导航', exact: true }).click();
+      await page.getByRole('button', { name: '打开工作流导航', exact: true }).click();
       await expect
         .poll(async () => (await page.locator('#workspace-navigation').boundingBox())?.x)
         .toBe(0);
@@ -383,7 +383,7 @@ test('画布两侧控件在桌面、折叠和触控窄屏保持同一尺寸与�
       await expect(
         page.locator('.navigation-bottom').getByRole('button', { name: '使用帮助', exact: true }),
       ).toBeVisible();
-      await page.getByRole('button', { name: '关闭流程导航', exact: true }).click();
+      await page.getByRole('button', { name: '关闭工作流导航', exact: true }).click();
       await page.setViewportSize({ width: 320, height: 700 });
       await expectControlsAligned(page);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

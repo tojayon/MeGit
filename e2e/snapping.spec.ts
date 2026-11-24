@@ -140,9 +140,9 @@ test('拖动临近水平边缘时精确吸附，参考线随结束清除，撤�
   await page.mouse.up();
   await expect(moving).toHaveAttribute('style', /translate\(605px, 140px\)/);
   await expect(page.locator('.snap-guides')).toHaveCount(0);
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect(moving).toHaveAttribute('style', /translate\(580px, 340px\)/);
-  await page.getByRole('button', { name: '重做白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '重做工作流编辑', exact: true }).click();
   await expect(moving).toHaveAttribute('style', /translate\(605px, 140px\)/);
 });
 
@@ -154,7 +154,7 @@ test('吸附开关只保存浏览器偏好，关闭后自由移动，刷新仍�
   const before = await readWorkspace(request);
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeDisabled();
   expect(await readWorkspace(request)).toEqual(before);
   expect(
     await page.evaluate(
@@ -234,7 +234,7 @@ test('按住 Shift 拖动锁定主轴，吸附不改变另一轴，松开按键�
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].notes![1].position)
     .toEqual({ x: 580, y: 195 });
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect.poll(() => position(moving)).toEqual({ x: 580, y: 340 });
 });
 
@@ -245,7 +245,7 @@ test('指针停在白板边缘自动平移时仍可切换 Shift 锁轴', async (
   await page.goto('/');
   const moving = node(page, 'b');
   const start = await beginDrag(page, moving);
-  const canvas = (await page.getByRole('application', { name: '开发流程白板' }).boundingBox())!;
+  const canvas = (await page.getByRole('application', { name: '工作流画布' }).boundingBox())!;
   await page.mouse.move(canvas.x + canvas.width - 18, start.y + 40, { steps: 8 });
   await expect.poll(async () => (await position(moving)).y).toBe(380);
   const beforeLock = await position(moving);
@@ -273,7 +273,7 @@ test('Escape 取消正在吸附的拖动并回到原位，不创建历史，下�
   await page.mouse.up();
   await expect(page.locator('.snap-guides')).toHaveCount(0);
   await expect.poll(() => position(moving)).toEqual({ x: 580, y: 340 });
-  await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeDisabled();
   const next = await beginDrag(page, moving);
   await page.mouse.move(next.x + 25, next.y - 196, { steps: 8 });
   await page.mouse.up();
@@ -342,10 +342,10 @@ test('多选按整体外框吸附，保持相对位置，整次移动只需一�
   await page.mouse.up();
   await expect.poll(() => position(node(page, 'b'))).toEqual({ x: 475, y: 160 });
   await expect.poll(() => position(node(page, 'c'))).toEqual({ x: 795, y: 200 });
-  await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+  await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
   await expect.poll(() => position(node(page, 'b'))).toEqual({ x: 460, y: 360 });
   await expect.poll(() => position(node(page, 'c'))).toEqual({ x: 780, y: 400 });
-  await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeDisabled();
 });
 
 test('缩放后的多选框可用 Shift 整体纵移并保持相对位置', async ({ page, request }) => {
@@ -459,7 +459,7 @@ for (const collapsed of [true, false]) {
           { x: 520, y: 236 },
           { x: 840, y: 276 },
         ]);
-      await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+      await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
       await expect.poll(() => position(moving)).toEqual({ x: 476, y: 344 });
 
       await page.keyboard.down('Shift');
@@ -471,7 +471,7 @@ for (const collapsed of [true, false]) {
       await expect
         .poll(async () => (await readWorkspace(request)).boards[0].nodes.map((n) => n.position))
         .toEqual([{ x: 500, y: 236 }, { x: 820, y: 276 }]);
-      await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+      await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
       await expect.poll(() => position(moving)).toEqual({ x: 476, y: 344 });
 
       await page.getByRole('button', { name: '锁定布局', exact: true }).click();
@@ -548,7 +548,7 @@ test('多选框的触摸拖动被双指取消后保留选择，再次拖动可�
         (await readWorkspace(request)).boards[0].notes!.slice(1).map((n) => n.position.y),
       )
       .toEqual([160, 200]);
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     await expect.poll(() => position(node(page, 'b'))).toEqual({ x: 460, y: 360 });
     await expect.poll(() => position(node(page, 'c'))).toEqual({ x: 780, y: 400 });
   } finally {
@@ -595,7 +595,7 @@ test('触控拖动被第二根手指打断时回滚并清除参考线，之后�
     await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect(page.locator('.snap-guides')).toHaveCount(0);
     await expect.poll(() => position(moving)).toEqual({ x: 580, y: 340 });
-    await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeDisabled();
     expect((await readWorkspace(request)).boards[0].notes![1].position).toEqual({ x: 580, y: 340 });
     await expect(moving).toHaveClass(/\bdraggable\b/);
     await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touch] });

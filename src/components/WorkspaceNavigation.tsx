@@ -4,6 +4,8 @@ import { RepositoryAvatar } from './RepositoryAvatar';
 import {
   ArrowUpRight,
   CircleHelp,
+  Eye,
+  EyeOff,
   FolderCog,
   FolderGit2,
   Group,
@@ -51,6 +53,9 @@ export function WorkspaceNavigation({
   onSelectGroup,
   onRepositories,
   onCreate,
+  workflowHidden,
+  workflowAreaId,
+  onToggleWorkflow,
   onPreferences,
   onSettings,
   onHelp,
@@ -69,6 +74,9 @@ export function WorkspaceNavigation({
   onSelectGroup: (id: string) => void;
   onRepositories: () => void;
   onCreate: () => void;
+  workflowHidden: boolean;
+  workflowAreaId: string;
+  onToggleWorkflow: () => void;
   onPreferences: () => void;
   onSettings: () => void;
   onHelp: () => void;
@@ -81,6 +89,30 @@ export function WorkspaceNavigation({
   const closeRef = useRef<HTMLButtonElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   useScrollMemory(scroll, viewKey, !collapsed && (!narrow || mobileOpen));
+
+  const workflowActions = (
+    <div className="navigation-section-actions">
+      <IconButton
+        size="small"
+        label={t(workflowHidden ? 'nav.showWorkflowPanel' : 'nav.hideWorkflowPanel')}
+        aria-expanded={!workflowHidden}
+        aria-controls={workflowAreaId}
+        onClick={onToggleWorkflow}
+      >
+        {workflowHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+      </IconButton>
+      <Tooltip content={t('nav.create')} className={collapsed ? undefined : 'navigation-trailing'}>
+        <button
+          type="button"
+          className="icon-button small"
+          aria-label={t('nav.create')}
+          onClick={onCreate}
+        >
+          <Plus size={16} />
+        </button>
+      </Tooltip>
+    </div>
+  );
 
   useEffect(() => {
     if (!narrow && mobileOpen) onMobileClose();
@@ -265,11 +297,7 @@ export function WorkspaceNavigation({
             <NavigationFlyout
               label={t('nav.workflows')}
               icon={<Network size={20} />}
-              actions={
-                <IconButton label={t('nav.create')} onClick={onCreate}>
-                  <Plus size={16} />
-                </IconButton>
-              }
+              actions={workflowActions}
             >
               {workflowList()}
             </NavigationFlyout>
@@ -290,11 +318,7 @@ export function WorkspaceNavigation({
         >
           <div className="sidebar-section-heading">
             <span>{t('nav.workflows')}</span>
-            <Tooltip content={t('nav.create')} className="navigation-trailing">
-              <button className="icon-button small" aria-label={t('nav.create')} onClick={onCreate}>
-                <Plus size={16} />
-              </button>
-            </Tooltip>
+            {!collapsed && workflowActions}
           </div>
           {workflowList()}
           {repositories.length > 0 && (

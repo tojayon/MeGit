@@ -44,10 +44,10 @@ test('折叠栏保留列表入口，选择工作流或仓库后保持折叠并�
     await git(f.root, 'clone', f.repo, second);
     const store = await seed(request, f.repo, second);
     await page.goto('/');
-    await page.getByRole('button', { name: '收起流程导航', exact: true }).click();
+    await page.getByRole('button', { name: '收起工作流导航', exact: true }).click();
     const navigation = page.locator('#workspace-navigation');
     const workflows = navigation.getByRole('button', { name: '我的工作流', exact: true });
-    const repositories = navigation.getByRole('button', { name: '白板中的仓库', exact: true });
+    const repositories = navigation.getByRole('button', { name: '工作流中的仓库', exact: true });
     await expect(workflows).toBeVisible();
     await expect(repositories).toBeVisible();
     await workflows.click();
@@ -66,8 +66,8 @@ test('折叠栏保留列表入口，选择工作流或仓库后保持折叠并�
     await expect(navigation).toHaveAttribute('data-collapsed', 'true');
     await expect(page.getByRole('main', { name: /review-1\// })).toBeVisible();
     await repositories.click();
-    await expect(page.getByRole('dialog', { name: '白板中的仓库', exact: true })).toContainText(
-      '当前白板还没有仓库。',
+    await expect(page.getByRole('dialog', { name: '工作流中的仓库', exact: true })).toContainText(
+      '当前工作流还没有仓库。',
     );
     await workflows.click();
     await page
@@ -77,7 +77,7 @@ test('折叠栏保留列表入口，选择工作流或仓库后保持折叠并�
     await expect(page.locator('.save-state')).toHaveText('已保存');
     const before = await store.read();
     await repositories.click();
-    const outline = page.getByRole('dialog', { name: '白板中的仓库', exact: true });
+    const outline = page.getByRole('dialog', { name: '工作流中的仓库', exact: true });
     await expect(outline.getByRole('button', { name: '客户端', exact: false })).toBeVisible();
     await expect(outline.locator('.repository-avatar')).toHaveCount(2);
     await page.screenshot({
@@ -100,10 +100,10 @@ test('折叠栏保留列表入口，选择工作流或仓库后保持折叠并�
 
 test('浮层互斥，键盘可进入列表，Escape、外点、焦点离开和展开导航正确收起', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: '收起流程导航', exact: true }).click();
+  await page.getByRole('button', { name: '收起工作流导航', exact: true }).click();
   const navigation = page.locator('#workspace-navigation');
   const workflows = navigation.getByRole('button', { name: '我的工作流', exact: true });
-  const repositories = navigation.getByRole('button', { name: '白板中的仓库', exact: true });
+  const repositories = navigation.getByRole('button', { name: '工作流中的仓库', exact: true });
   await workflows.focus();
   await page.keyboard.press('ArrowRight');
   const list = page.getByRole('dialog', { name: '我的工作流', exact: true });
@@ -127,12 +127,12 @@ test('浮层互斥，键盘可进入列表，Escape、外点、焦点离开和�
   await expect(list).toHaveCount(0);
   await expect(preferences).toBeFocused();
   await workflows.click();
-  await list.getByRole('button', { name: '新建流程', exact: true }).click();
+  await list.getByRole('button', { name: '新建工作流', exact: true }).click();
   await expect(list).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: '新建工作流', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await workflows.click();
-  await page.getByRole('button', { name: '展开流程导航', exact: true }).click();
+  await page.getByRole('button', { name: '展开工作流导航', exact: true }).click();
   await expect(list).toHaveCount(0);
   await expect(navigation).toHaveAttribute('data-collapsed', 'false');
 });
@@ -180,9 +180,9 @@ test.describe('明亮英文触控与矮窗口', () => {
         path: '.megit/verification/navigation-flyouts/workflows-light-en-touch.png',
         animations: 'disabled',
       });
-      await navigation.getByRole('button', { name: 'Repositories on board', exact: true }).click();
+      await navigation.getByRole('button', { name: 'Repositories in workflow', exact: true }).click();
       await expect(list).toHaveCount(0);
-      await expect(page.getByRole('dialog', { name: 'Repositories on board' })).toContainText(
+      await expect(page.getByRole('dialog', { name: 'Repositories in workflow' })).toContainText(
         'MeGit Core',
       );
       await page.setViewportSize({ width: 390, height: 844 });
@@ -207,15 +207,15 @@ test('真实示例使用相同列表浮层且不请求工作区', async ({ page 
     if (request.url().includes('/api/')) apiRequests.push(request.url());
   });
   await page.goto('/design-system');
-  const example = page.getByRole('region', { name: '流程导航', exact: true });
+  const example = page.getByRole('region', { name: '工作流导航', exact: true });
   await example.getByRole('button', { name: '我的工作流', exact: true }).click();
   const list = page.getByRole('dialog', { name: '我的工作流', exact: true });
   await list.getByRole('button', { name: 'MeGit / release', exact: true }).click();
   await example.getByRole('button', { name: '我的工作流', exact: true }).click();
   await expect(list.locator('[aria-current]')).toContainText('MeGit / release');
   await page.keyboard.press('Escape');
-  await example.getByRole('button', { name: '白板中的仓库', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '白板中的仓库', exact: true })).toContainText(
+  await example.getByRole('button', { name: '工作流中的仓库', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '工作流中的仓库', exact: true })).toContainText(
     'MeGit Desktop',
   );
   expect(apiRequests).toEqual([]);

@@ -178,7 +178,7 @@ test('连线路由与四边端口持久化，上下游强调，双语主题与�
     await expect(page.locator('.react-flow__edge[data-id="ac"]')).toHaveClass(/context-related/);
     await expect(page.locator('.react-flow__node[data-id="d"]')).not.toHaveClass(/context-related/);
     await page.getByRole('button', { name: '关闭仓库详情' }).click();
-    await page.getByRole('button', { name: '适应白板', exact: true }).click();
+    await page.getByRole('button', { name: '适应画布', exact: true }).click();
     await dragConnection(
       page,
       page.locator(
@@ -239,23 +239,24 @@ test('连线路由与四边端口持久化，上下游强调，双语主题与�
     await page.getByRole('button', { name: '明亮', exact: true }).click();
     await page.getByLabel('界面语言').selectOption('en');
     await page.getByRole('button', { name: 'Close Preferences' }).click();
-    await page.getByRole('button', { name: 'Board details', exact: true }).click();
-    const boardEditor = page.getByRole('dialog', { name: 'Board details', exact: true });
+    await page.getByRole('button', { name: 'Workflow settings', exact: true }).click();
+    const boardEditor = page.getByRole('dialog', { name: 'Workflow settings', exact: true });
     await boardEditor.getByLabel('Workflow description').fill('跨仓库的开发流程');
     await boardEditor.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Workflow settings', exact: true }).click();
     await page.screenshot({
       path: '.megit/verification/whiteboard/board-light-en.png',
       animations: 'disabled',
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(
-      boardEditor.getByRole('button', { name: 'Close board details', exact: true }),
+      boardEditor.getByRole('button', { name: 'Close Workflow settings', exact: true }),
     ).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await boardEditor.getByRole('button', { name: 'Close board details', exact: true }).click();
+    await boardEditor.getByRole('button', { name: 'Close Workflow settings', exact: true }).click();
     await page.getByRole('button', { name: 'Group repositories', exact: true }).click();
     await page.getByLabel('Group name').fill('Clients');
     await page.getByRole('checkbox', { name: '公共库', exact: true }).check();
@@ -272,7 +273,7 @@ test('连线路由与四边端口持久化，上下游强调，双语主题与�
     });
     await page.getByRole('button', { name: 'Close group details' }).click();
     await page.setViewportSize({ width: 1600, height: 1000 });
-    await page.getByRole('button', { name: 'Fit board', exact: true }).click();
+    await page.getByRole('button', { name: 'Fit to canvas', exact: true }).click();
     await expect
       .poll(async () =>
         Number((await page.locator('.canvas-zoom-label').innerText()).replace('%', '')),
@@ -290,18 +291,18 @@ test('连线路由与四边端口持久化，上下游强调，双语主题与�
 
 test('白板弹窗保存名称和说明，关闭重开后保留且不创建 Git 详情', async ({ page, request }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: '白板详情', exact: true }).click();
-  const panel = page.getByRole('dialog', { name: '白板详情', exact: true });
-  await panel.getByLabel('流程说明').fill('新流程说明');
-  await panel.getByLabel('流程名称').fill('重命名后的流程');
+  await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+  const panel = page.getByRole('dialog', { name: '工作流设置', exact: true });
+  await panel.getByLabel('工作流说明').fill('新流程说明');
+  await panel.getByLabel('工作流名称').fill('重命名后的流程');
   await panel.getByRole('button', { name: '保存', exact: true }).click();
   await expect
     .poll(async () => (await readWorkspace(request)).boards[0].name)
     .toBe('重命名后的流程');
   expect((await readWorkspace(request)).boards[0].description).toBe('新流程说明');
-  await panel.getByRole('button', { name: '关闭白板详情', exact: true }).click();
-  await page.getByRole('button', { name: '白板详情', exact: true }).click();
-  await expect(panel.getByLabel('流程说明')).toHaveValue('新流程说明');
+  await expect(panel).toHaveCount(0);
+  await page.getByRole('button', { name: '工作流设置', exact: true }).click();
+  await expect(panel.getByLabel('工作流说明')).toHaveValue('新流程说明');
   await expect(page.locator('.dock-card')).toHaveCount(0);
 });
 
@@ -332,7 +333,7 @@ test('仓库管理跨白板跳转时展开目标仓库的折叠组', async ({ pa
     await page
       .getByRole('dialog', { name: '仓库管理' })
       .getByRole('article').filter({ hasText: '隐藏的仓库' })
-      .getByRole('button', { name: '在白板中打开' })
+      .getByRole('button', { name: '在工作流中打开' })
       .click();
     await expect(page.getByTestId('repository-node')).toHaveCount(1);
     await expect(page.getByRole('complementary', { name: '隐藏的仓库 仓库详情' })).toBeVisible();

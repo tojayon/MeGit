@@ -73,7 +73,7 @@
   min-width: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   background: var(--canvas);
 }
 .dock-card :is(.branch-tree-stage, .branch-tree-viewport) {

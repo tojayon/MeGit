@@ -127,7 +127,7 @@ test('窄桌面窗口的长标签独立滚动，原生控件始终在同一行�
     workspace.boards.map(({ id }: { id: string }) => id),
   );
   await page.goto('/');
-  const header = page.locator('.workflow-panel > .workflow-header');
+  const header = page.locator('.main-workspace > .workflow-header');
   const tabs = header.getByRole('tablist', { name: 'Workflow tabs' });
   const controls = header.getByRole('group', { name: 'Window controls' });
   await expect(controls).toBeVisible();

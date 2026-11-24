@@ -52,7 +52,7 @@ test('桌面设置即时应用、报告失败并在重新载入后恢复', async
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
-  const header = page.locator('.workflow-panel > .workflow-header');
+  const header = page.locator('.main-workspace > .workflow-header');
   const windowControls = header.getByRole('group', { name: '窗口控件' });
   await expect(windowControls).toBeVisible();
   await expect(page.locator('#root > .desktop-title-bar')).toHaveCount(0);

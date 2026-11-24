@@ -2,42 +2,34 @@ import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DesktopWindowContext } from '../lib/desktop-window';
 import { Button } from './Button';
-import { Tooltip } from './Tooltip';
+import { SettingsOption } from './SettingsForm';
 
 export function DesktopWindowSettingsPanel({ example }: { example: boolean }) {
   const { t } = useTranslation();
   const desktop = useContext(DesktopWindowContext);
   const settings = example ? { systemTitleBar: true, closeToTray: false } : desktop?.settings;
   return (
-    <div className="settings-form">
+    <div className="settings-form settings-standalone">
       {settings && (
         <fieldset
-          className="theme-fieldset desktop-window-options"
+          className="theme-fieldset settings-group"
           disabled={example || desktop?.busy}
           aria-label={t('settings.interface')}
         >
-          <Tooltip content={t('settings.systemTitleBarHelp')}>
-            <label>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={settings.systemTitleBar}
-                onChange={(event) => void desktop?.save('setSystemTitleBar', event.target.checked)}
-              />
-              {t('settings.systemTitleBar')}
-            </label>
-          </Tooltip>
-          <Tooltip content={t('settings.closeToTrayHelp')}>
-            <label>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={settings.closeToTray}
-                onChange={(event) => void desktop?.save('setCloseToTray', event.target.checked)}
-              />
-              {t('settings.closeToTray')}
-            </label>
-          </Tooltip>
+          <SettingsOption
+            role="switch"
+            label={t('settings.systemTitleBar')}
+            help={t('settings.systemTitleBarHelp')}
+            checked={settings.systemTitleBar}
+            onChange={(event) => void desktop?.save('setSystemTitleBar', event.target.checked)}
+          />
+          <SettingsOption
+            role="switch"
+            label={t('settings.closeToTray')}
+            help={t('settings.closeToTrayHelp')}
+            checked={settings.closeToTray}
+            onChange={(event) => void desktop?.save('setCloseToTray', event.target.checked)}
+          />
         </fieldset>
       )}
       {!example && desktop?.busy && !settings && (

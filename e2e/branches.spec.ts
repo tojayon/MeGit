@@ -175,8 +175,8 @@ test('创建中文分支、切换、查找和安全删除后同步白板；撤�
     await page.getByRole('button', { name: '关闭仓库详情' }).click();
     await page.getByRole('button', { name: '添加说明', exact: true }).click();
     await page.getByRole('button', { name: '关闭说明详情', exact: true }).click();
-    await expect(page.getByRole('button', { name: '撤销白板编辑', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: '撤销白板编辑', exact: true }).click();
+    await expect(page.getByRole('button', { name: '撤销工作流编辑', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: '撤销工作流编辑', exact: true }).click();
     expect(await git(f.repo, 'branch', '--show-current')).toBe('main');
     expect(await git(f.repo, 'branch', '--list', '功能/登录')).toBe('');
   } finally {

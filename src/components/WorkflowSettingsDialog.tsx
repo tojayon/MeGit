@@ -1,25 +1,32 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Group } from 'lucide-react';
+import { Group, Trash2 } from 'lucide-react';
 import type { Board } from '../../shared/types';
 import { Dialog } from './Dialogs';
 import { Field } from './Field';
 import { Button } from './Button';
+import { RemoveBoardDialog } from './RemoveBoardDialog';
 
-export function BoardPanel({
+export function WorkflowSettingsDialog({
   board,
   viewKey,
   onSave,
   onGroup,
+  onRemove,
+  removeDisabled,
   onClose,
 }: {
   board: Board;
   viewKey?: string;
   onSave: (details: Pick<Board, 'name' | 'description'>) => void;
-  onGroup: (id: string) => void;
+  onGroup?: (id: string) => void;
+  onRemove?: () => void;
+  removeDisabled?: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const formId = useId();
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [nameDraft, setName] = useState({ base: board.name, value: board.name });
   const [descriptionDraft, setDescription] = useState({
     base: board.description,
@@ -32,13 +39,8 @@ export function BoardPanel({
   const description =
     descriptionDraft.base === board.description ? descriptionDraft.value : board.description;
   return (
-    <Dialog
-      viewKey={viewKey}
-      title={t('inspector.board')}
-      closeLabel={t('inspector.closeBoard')}
-      onClose={onClose}
-    >
-      <div className="dialog-body board-editor">
+    <Dialog viewKey={viewKey} title={t('board.settings')} onClose={onClose}>
+      <div className="dialog-body">
         <div className="board-summary">
           <span>{t('board.repositories', { count: board.nodes.length })}</span>
           <span>{t('board.relations', { count: board.edges.length })}</span>
@@ -48,6 +50,7 @@ export function BoardPanel({
           )}
         </div>
         <form
+          id={formId}
           className="inspector-fields"
           onSubmit={(e) => {
             e.preventDefault();
@@ -70,16 +73,8 @@ export function BoardPanel({
               onChange={(e) => setDescription({ base: board.description, value: e.target.value })}
             />
           </Field>
-          <Button
-            type="submit"
-            disabled={
-              !name.trim() || (name.trim() === board.name && description === board.description)
-            }
-          >
-            {t('common.save')}
-          </Button>
         </form>
-        {!!board.groups?.length && (
+        {onGroup && !!board.groups?.length && (
           <div className="context-member-list">
             {board.groups.map((group) => (
               <button key={group.id} onClick={() => onGroup(group.id)}>
@@ -91,6 +86,36 @@ export function BoardPanel({
           </div>
         )}
       </div>
+      <footer className="dialog-footer workflow-settings-actions">
+        {onRemove && (
+          <Button
+            variant="danger"
+            icon={<Trash2 size={16} />}
+            disabled={removeDisabled}
+            onClick={() => setConfirmRemove(true)}
+          >
+            {t('board.removeConfirm')}
+          </Button>
+        )}
+        <Button
+          form={formId}
+          type="submit"
+          variant="primary"
+          disabled={
+            !name.trim() || (name.trim() === board.name && description === board.description)
+          }
+        >
+          {t('common.save')}
+        </Button>
+      </footer>
+      {confirmRemove && onRemove && (
+        <RemoveBoardDialog
+          name={board.name}
+          disabled={removeDisabled}
+          onClose={() => setConfirmRemove(false)}
+          onConfirm={onRemove}
+        />
+      )}
     </Dialog>
   );
 }

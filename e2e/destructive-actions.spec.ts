@@ -98,31 +98,34 @@ for (const english of [false, true]) {
       }
       await page.goto('/');
       const options = page.getByRole('button', {
-        name: english ? 'Workflow options' : '工作流选项',
+        name: english ? 'Workflow settings' : '工作流设置',
         exact: true,
       });
-      const remove = page.getByRole('button', {
-        name: english ? 'Remove workflow' : '移除此流程',
+      const settings = page.getByRole('dialog', {
+        name: english ? 'Workflow settings' : '工作流设置',
+        exact: true,
+      });
+      const remove = settings.getByRole('button', {
+        name: english ? 'Remove workflow' : '移除工作流',
         exact: true,
       });
       const dialog = page.getByRole('dialog', {
         name: english ? 'Remove workflow?' : '移除工作流？',
         exact: true,
       });
+      await options.focus();
+      await page.keyboard.press('Enter');
+      const description = settings.getByLabel(english ? 'Workflow description' : '工作流说明');
+      await description.fill('未保存的说明');
       for (const close of ['cancel', 'escape', 'backdrop', 'enter']) {
-        await options.focus();
-        await page.keyboard.press('ArrowDown');
-        await page.keyboard.press('End');
-        await expect(remove).toBeFocused();
         await expectDanger(remove);
-        await page.keyboard.press('Enter');
+        await remove.press('Enter');
         await expect(dialog).toBeVisible();
         await expect(dialog).toContainText('待移除流程');
         await expect(dialog).toContainText(english ? 'cannot be undone' : '无法撤销');
         await expect(
           dialog.getByRole('button', { name: english ? 'Cancel' : '取消', exact: true }),
         ).toBeFocused();
-        await expect(page.locator('.small-menu')).toHaveCount(0);
         expect((await readWorkspace(request)).boards).toEqual(original.boards);
         if (close === 'cancel')
           await dialog
@@ -132,10 +135,10 @@ for (const english of [false, true]) {
         else if (close === 'backdrop') await page.mouse.click(5, 5);
         else await page.keyboard.press('Enter');
         await expect(dialog).toHaveCount(0);
-        await expect(options).toBeFocused();
+        await expect(remove).toBeFocused();
+        await expect(description).toHaveValue('未保存的说明');
         expect((await readWorkspace(request)).boards).toEqual(original.boards);
       }
-      await options.click();
       await remove.click();
       const confirm = dialog.getByRole('button', {
         name: english ? 'Remove workflow' : '移除工作流',
@@ -177,11 +180,11 @@ test('可撤销的移除入口使用危险图标，撤销恢复节点、关联�
     const original = await seed(request, f.repo, target);
     await page.setViewportSize({ width: 1500, height: 960 });
     await page.goto('/');
-    const undo = page.getByRole('button', { name: '撤销白板编辑', exact: true });
+    const undo = page.getByRole('button', { name: '撤销工作流编辑', exact: true });
     const actions = [
       {
         open: () => page.getByRole('button', { name: '查看源仓库', exact: true }).click(),
-        label: '从白板移除',
+        label: '从工作流移除',
         absent: '.react-flow__node[data-id="a"]',
       },
       {

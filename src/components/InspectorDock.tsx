@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   dockBounds,
   inspectorKey,
@@ -9,6 +10,7 @@ import {
 import { defaults } from '../preferences/storage';
 import { focusWithoutTooltip } from '../lib/overlays';
 import { Tooltip } from './Tooltip';
+import { IconButton } from './IconButton';
 import { useScrollMemory, viewStorage } from '../lib/use-view-state';
 import { isScrollPosition } from '../lib/view-storage';
 
@@ -31,10 +33,12 @@ export function InspectorDock({
 }) {
   const { t } = useTranslation();
   const id = useId();
+  const dock = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const drag = useRef<{ pointer: number; x: number; width: number } | null>(null);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
   const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const [navigation, setNavigation] = useState({ overflow: false, previous: false, next: false });
   const bounds = dockBounds(windowWidth);
   const clamp = (value: number) => Math.min(bounds.max, Math.max(bounds.min, value));
   const effective = clamp(dragWidth ?? width);
@@ -44,6 +48,39 @@ export function InspectorDock({
   );
   useScrollMemory(content, scrollKey);
   const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const updateNavigation = useCallback(() => {
+    const container = dock.current;
+    const element = content.current;
+    if (!container || !element) return;
+    const overflow = element.scrollWidth - container.clientWidth > 1;
+    const previous = element.scrollLeft > 1;
+    const next = element.scrollWidth - element.clientWidth - element.scrollLeft > 1;
+    setNavigation((current) =>
+      overflow === current.overflow && previous === current.previous && next === current.next
+        ? current
+        : { overflow, previous, next },
+    );
+  }, []);
+  useEffect(() => {
+    const container = dock.current;
+    const element = content.current;
+    if (!container || !element) return;
+    const observer = new ResizeObserver(updateNavigation);
+    observer.observe(container);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [updateNavigation, state.items.length]);
+
+  function browse(direction: 'previous' | 'next') {
+    const element = content.current;
+    if (!element || !navigation[direction]) return;
+    const step = Math.min(element.clientWidth, element.firstElementChild?.clientWidth ?? 0);
+    element.scrollBy({
+      left: direction === 'previous' ? -step : step,
+      behavior: reduced() ? 'instant' : 'smooth',
+    });
+  }
+
   const reveal = useCallback((key: string, smooth = true) => {
     const element = content.current;
     const card = Array.from(element?.children || []).find(
@@ -98,6 +135,8 @@ export function InspectorDock({
   return (
     <section
       className={`inspector-dock ${dragWidth === null ? '' : 'resizing'}`}
+      ref={dock}
+      data-overflow={navigation.overflow}
       style={{ width: effective }}
       role="region"
       aria-label={t('dock.region')}
@@ -168,6 +207,7 @@ export function InspectorDock({
         ref={content}
         aria-label={t('dock.content')}
         tabIndex={0}
+        onScroll={updateNavigation}
       >
         {state.items.map((item) => {
           const key = inspectorKey(item);
@@ -186,6 +226,30 @@ export function InspectorDock({
           );
         })}
       </div>
+      {navigation.overflow && (
+        <div className="dock-navigation" role="group" aria-label={t('dock.tabs')}>
+          <IconButton
+            size="small"
+            placement="top"
+            label={t('dock.previous')}
+            aria-controls={`${id}-content`}
+            aria-disabled={!navigation.previous}
+            onClick={() => browse('previous')}
+          >
+            <ChevronLeft size={16} />
+          </IconButton>
+          <IconButton
+            size="small"
+            placement="top"
+            label={t('dock.next')}
+            aria-controls={`${id}-content`}
+            aria-disabled={!navigation.next}
+            onClick={() => browse('next')}
+          >
+            <ChevronRight size={16} />
+          </IconButton>
+        </div>
+      )}
     </section>
   );
 }

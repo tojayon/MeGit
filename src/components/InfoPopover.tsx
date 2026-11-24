@@ -98,7 +98,9 @@ export function InfoPopover({
   }, [open, placement]);
 
   useEffect(() => {
-    if (!open) return;
+    const button = trigger.current;
+    if (!open || !button) return;
+    const origin = button.getBoundingClientRect();
     const dismiss = () => close(true);
     const outside = (event: Event) => {
       if (event.target instanceof Node && !container.current?.contains(event.target)) close();
@@ -107,8 +109,9 @@ export function InfoPopover({
       const target = event.target;
       if (event.type === 'wheel') {
         if (!(target instanceof Node) || !panel.current?.contains(target)) dismiss();
-      } else if (target instanceof Node && target.contains(trigger.current)) {
-        dismiss();
+      } else if (target instanceof Node && target.contains(button)) {
+        const rect = button.getBoundingClientRect();
+        if (rect.left !== origin.left || rect.top !== origin.top) dismiss();
       }
     };
     const hide = () => {

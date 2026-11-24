@@ -9,13 +9,10 @@ import {
   Link2,
   LoaderCircle,
   Menu,
-  MoreHorizontal,
-  Pencil,
   Plus,
   RefreshCw,
   Palette,
-  SlidersHorizontal,
-  Trash2,
+  Settings2,
   X,
 } from 'lucide-react';
 import type { Connection } from '@xyflow/react';
@@ -45,7 +42,7 @@ import { AssistantPanel } from './components/AssistantPanel';
 import { AssistantLauncher } from './components/AssistantLauncher';
 import { applyBoardOperations, boardSignature } from '../shared/assistant-board';
 import { formatError, formatNotice, type NoticeMessage } from './lib/messages';
-import { updatePreferences, usePreferences } from './preferences/store';
+import { usePreferences } from './preferences/store';
 import { BrandLogo } from './components/BrandLogo';
 import { Tooltip } from './components/Tooltip';
 import { GitCommandPreview } from './components/GitCommandPreview';
@@ -53,7 +50,8 @@ import { statusArguments } from '../shared/git-commands';
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
 import { GroupDialog } from './components/GroupDialog';
 import { GroupPanel } from './components/GroupPanel';
-import { BoardPanel } from './components/BoardPanel';
+import { WorkflowSettingsDialog } from './components/WorkflowSettingsDialog';
+import { IconButton } from './components/IconButton';
 import { removeNode, saveGroup, reconnectedFlowConnection } from './lib/whiteboard';
 import { NotePanel } from './components/NotePanel';
 import { Button } from './components/Button';
@@ -66,8 +64,6 @@ import {
   type InspectorItem,
   isInspectorState,
 } from './lib/inspector-dock';
-import { PopupMenu } from './components/PopupMenu';
-import { RemoveBoardDialog } from './components/RemoveBoardDialog';
 import { focusWithoutTooltip } from './lib/overlays';
 import { GitLearningDialog } from './components/GitLearningDialog';
 import { RepositoryIndex } from './components/RepositoryIndex';
@@ -77,13 +73,21 @@ import { WorkspaceStatusbar } from './components/WorkspaceStatusbar';
 import { useViewState, useViewIssue, viewStorage } from './lib/use-view-state';
 import { isBoolean, isNullableText, isStrings, viewKey } from './lib/view-storage';
 
+const dockKey = (boardId: string) => viewKey(boardId, 'dock', 'layout');
+
+function updateDock(boardId: string, change: (state: typeof emptyDock) => typeof emptyDock) {
+  const key = dockKey(boardId);
+  const value = viewStorage.read(key);
+  const state = isInspectorState(value) && value.boardId === boardId ? value : emptyDock;
+  const next = change(state);
+  if (next !== state) viewStorage.write(key, next);
+}
+
 type Modal =
   | 'add'
   | 'card-ref'
   | 'relation'
   | 'new-board'
-  | 'rename-board'
-  | 'remove-board'
   | 'help'
   | 'repositories'
   | 'preferences'
@@ -133,7 +137,6 @@ export default function App() {
   const [selectedEdge, setSelectedEdge] = useViewState('app.relation', null, isNullableText);
   const [selectedGroup, setSelectedGroup] = useViewState('app.group', null, isNullableText);
   const [selectedIds, setSelectedIds] = useViewState('app.selection', [], isStrings);
-  const [dock, setDock] = useViewState('app.dock', emptyDock, isInspectorState);
   const [modal, setModal] = useState<Modal>(() => {
     const saved = viewStorage.read('app.dialog');
     return restorableModal(saved) ? saved : null;
@@ -145,17 +148,18 @@ export default function App() {
   const [assistantOpen, setAssistantOpen] = useViewState('app.assistant', false, isBoolean);
   const viewIssue = useViewIssue();
   const [avatarRepositoryId, setAvatarRepositoryId] = useState<string | null>(null);
-  const [removalTarget, setRemovalTarget] = useState<{ id: string; name: string } | null>(null);
   const [relationDraft, setRelationDraft] = useState<Partial<FlowEdge> | undefined>();
   const [connectionDraft, setConnectionDraft] = useState<Partial<FlowConnection> | undefined>();
   const [groupDraft, setGroupDraft] = useState<FlowGroup | undefined>();
   const [groupMembers, setGroupMembers] = useState<string[]>([]);
   const [notice, setNotice] = useState<{ text: NoticeMessage; error: boolean } | null>(null);
   const [sidebar, setSidebar] = useViewState('app.sidebar', false, isBoolean);
+  const [workflowHidden, setWorkflowHidden] = useViewState('app.workflow-hidden', false, isBoolean);
   const [savedTabs, setSavedTabs] = useViewState('app.workflow-tabs', null, isWorkflowTabList);
   const [legacyClosedBoard] = useState(() => viewStorage.read('app.closed-board'));
   const workflowTabsId = useId();
   const workflowReopenId = `${workflowTabsId}-reopen`;
+  const workflowAreaId = `${workflowTabsId}-area`;
   const closeSidebar = useCallback(() => setSidebar(false), [setSidebar]);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const boardIdRef = useRef('');
@@ -163,6 +167,13 @@ export default function App() {
   const savedRef = useRef(false);
   const refreshQueue = useRef<(() => Promise<void>) | null>(null);
   const board = workspace?.boards.find((b) => b.id === workspace.activeBoardId);
+  const [dock, setDock] = useViewState(board && dockKey(board.id), emptyDock, isInspectorState);
+  useLayoutEffect(() => {
+    const legacy = viewStorage.read('app.dock');
+    if (!isInspectorState(legacy) || !legacy.boardId) return;
+    if (!viewStorage.read(dockKey(legacy.boardId))) viewStorage.write(dockKey(legacy.boardId), legacy);
+    viewStorage.write('app.dock', undefined);
+  }, []);
   const boardClosed =
     savedTabs?.length === 0 || (savedTabs === null && !!board && legacyClosedBoard === board.id);
   const reopenTab = useCallback(
@@ -183,9 +194,9 @@ export default function App() {
   const openDetails = useCallback(
     (kind: InspectorItem['kind'], id: string, scope?: string) => {
       const boardId = scope || board?.id;
-      if (boardId) setDock((previous) => openInspector(previous, boardId, { kind, id }));
+      if (boardId) updateDock(boardId, (previous) => openInspector(previous, boardId, { kind, id }));
     },
-    [board?.id, setDock],
+    [board?.id],
   );
   useEffect(() => {
     if (!board) return;
@@ -193,8 +204,8 @@ export default function App() {
       ...board.nodes.map((node) => `repository:${node.id}`),
       ...board.edges.map((edge) => `relation:${edge.id}`),
     ];
-    queueMicrotask(() => setDock((previous) => reconcileInspectors(previous, board.id, valid)));
-  }, [board, setDock]);
+    queueMicrotask(() => updateDock(board.id, (previous) => reconcileInspectors(previous, board.id, valid)));
+  }, [board]);
   useEffect(() => {
     if (!board) return;
     queueMicrotask(() => {
@@ -371,6 +382,7 @@ export default function App() {
       if (
         modal ||
         boardClosed ||
+        workflowHidden ||
         !(event.ctrlKey || event.metaKey) ||
         event.altKey ||
         (event.target instanceof HTMLElement &&
@@ -384,7 +396,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleHistory);
     return () => window.removeEventListener('keydown', handleHistory);
-  }, [modal, historyAction, boardClosed]);
+  }, [modal, historyAction, boardClosed, workflowHidden]);
 
   function openRelation(draft?: Partial<FlowEdge>) {
     setRelationDraft(draft);
@@ -537,7 +549,6 @@ export default function App() {
   function switchWorkflow(id: string) {
     if (id === board!.id) return;
     clearSelection();
-    setDock(emptyDock);
     setSnapshot(null);
     selectBoard(id);
   }
@@ -548,8 +559,27 @@ export default function App() {
       switchWorkflow(next.id);
       focusWorkflowTab(next.id);
     } else {
-      requestAnimationFrame(() => focusWithoutTooltip(document.getElementById(workflowReopenId)));
+      requestAnimationFrame(() =>
+        focusWithoutTooltip(
+          document.getElementById(workflowReopenId) ??
+            document.querySelector<HTMLElement>('[data-details-trigger]'),
+        ),
+      );
     }
+  }
+  function removeWorkflow() {
+    if (!board || !workspace || workspace.boards.length <= 1 || saveStatus === 'failed') return;
+    const next = adjacentTab(board.id)?.id;
+    update((draft) => {
+      draft.boards = draft.boards.filter((item) => item.id !== board.id);
+      if (draft.activeBoardId === board.id) draft.activeBoardId = next ?? draft.boards[0].id;
+    });
+    const remaining = tabs.filter((item) => item.id !== board.id).map((item) => item.id);
+    setSavedTabs(remaining.length ? remaining : null);
+    clearSelection();
+    viewStorage.write(dockKey(board.id), undefined);
+    setSnapshot(null);
+    setModal(null);
   }
   const statusbar = (
     <WorkspaceStatusbar
@@ -595,6 +625,9 @@ export default function App() {
         onSelectRepo={(id) => openRepo(id, undefined, true)}
         onRepositories={() => setModal('repositories')}
         onCreate={() => setModal('new-board')}
+        workflowHidden={workflowHidden}
+        workflowAreaId={workflowAreaId}
+        onToggleWorkflow={() => setWorkflowHidden((hidden) => !hidden)}
         onPreferences={() => setModal('preferences')}
         onSettings={() => setModal('settings')}
         onHelp={() => setModal('help')}
@@ -643,6 +676,14 @@ export default function App() {
         tabIndex={-1}
         data-details-trigger
       >
+        <WorkflowHeader
+          boards={tabs}
+          activeId={boardClosed ? undefined : board.id}
+          id={workflowTabsId}
+          onSelect={switchWorkflow}
+          onClose={closeWorkflow}
+          desktop
+        />
         {issue && (
           <div className="global-error preference-warning" role="alert">
             <CircleAlert size={16} />
@@ -676,16 +717,8 @@ export default function App() {
             )}
           </div>
         )}
-        <div className="workspace-body">
-          <section className="workflow-panel">
-            <WorkflowHeader
-              boards={tabs}
-              activeId={boardClosed ? undefined : board.id}
-              id={workflowTabsId}
-              onSelect={switchWorkflow}
-              onClose={closeWorkflow}
-              desktop
-            />
+        <div className="workspace-body" data-workflow-hidden={workflowHidden}>
+          <section className="workflow-panel" id={workflowAreaId} hidden={workflowHidden}>
             {tabs.filter((item) => item.id !== board.id).map((item) => (
               <div
                 key={item.id}
@@ -754,49 +787,14 @@ export default function App() {
                     <Group size={17} />
                   </button>
                 </Tooltip>
-                <Tooltip content={t('inspector.board')}>
-                  <button
-                    className="icon-button"
-                    aria-label={t('inspector.board')}
-                    aria-expanded={modal === 'board-details'}
-                    aria-haspopup="dialog"
-                    onClick={() => {
-                      selectBackground();
-                      setModal('board-details');
-                    }}
-                  >
-                    <SlidersHorizontal size={17} />
-                  </button>
-                </Tooltip>
-                <PopupMenu
-                  key={board.id}
-                  label={t('board.options')}
-                  icon={<MoreHorizontal size={18} />}
-                  className="board-menu-container"
-                  triggerClassName="icon-button"
-                  menuClassName="small-menu"
+                <IconButton
+                  label={t('board.settings')}
+                  aria-expanded={modal === 'board-details'}
+                  aria-haspopup="dialog"
+                  onClick={() => setModal('board-details')}
                 >
-                  <button
-                    onClick={() => {
-                      setModal('rename-board');
-                    }}
-                  >
-                    <Pencil size={14} />
-                    {t('common.rename')}
-                  </button>
-                  {workspace.boards.length > 1 && (
-                    <button
-                      className="danger"
-                      onClick={() => {
-                        setRemovalTarget({ id: board.id, name: board.name });
-                        setModal('remove-board');
-                      }}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                      {t('board.remove')}
-                    </button>
-                  )}
-                </PopupMenu>
+                  <Settings2 size={17} />
+                </IconButton>
                 <span className="mobile-only">
                   <Tooltip content={t('preferences.title')}>
                     <button
@@ -979,10 +977,11 @@ export default function App() {
           </section>
           {!!visibleDock.items.length && (
             <InspectorDock
+              key={board.id}
               viewKey={viewKey(board.id, 'dock')}
               state={visibleDock}
-              width={preferences.inspectorWidth}
-              onWidth={(inspectorWidth) => updatePreferences({ inspectorWidth })}
+              width={visibleDock.width ?? preferences.inspectorWidth}
+              onWidth={(width) => setDock((previous) => ({ ...previous, width }))}
               onActive={(active) =>
                 setDock((previous) =>
                   previous.active === active ? previous : { ...previous, active },
@@ -1007,6 +1006,7 @@ export default function App() {
                   <>
                     {activeRepo && activeCard && (
                       <RepositoryPanel
+                        bottomNavigation
                         viewKey={viewKey(
                           board.id,
                           activeCard.id,
@@ -1043,6 +1043,7 @@ export default function App() {
                     )}
                     {activeEdge && (
                       <RelationPanel
+                        bottomNavigation
                         boardId={board.id}
                         viewKey={viewKey(board.id, activeEdge.id, 'relation')}
                         edge={{ ...activeEdge, ...relationRefs(activeEdge, board.nodes) }}
@@ -1108,20 +1109,20 @@ export default function App() {
         />
       )}
       {modal === 'board-details' && (
-        <BoardPanel
+        <WorkflowSettingsDialog
           key={board.id}
           viewKey={viewKey(board.id, 'details')}
           board={board}
           onClose={() => setModal(null)}
           onGroup={openGroup}
-          onSave={(details) =>
+          onRemove={workspace.boards.length > 1 ? removeWorkflow : undefined}
+          removeDisabled={saveStatus === 'failed'}
+          onSave={(details) => {
             update((draft) => {
-              Object.assign(
-                draft.boards.find((item) => item.id === board.id)!,
-                details,
-              );
-            })
-          }
+              Object.assign(draft.boards.find((item) => item.id === board.id)!, details);
+            });
+            setModal(null);
+          }}
         />
       )}
       {modal === 'group-details' && contextGroup && (
@@ -1283,54 +1284,8 @@ export default function App() {
               draft.activeBoardId = id;
             });
             clearSelection();
-            setDock(emptyDock);
             reopenTab(id);
           }}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal === 'remove-board' && removalTarget && (
-        <RemoveBoardDialog
-          name={removalTarget.name}
-          onClose={() => {
-            setModal(null);
-            setRemovalTarget(null);
-          }}
-          onConfirm={() => {
-            if (saveStatus === 'failed') return;
-            const next = adjacentTab(removalTarget.id)?.id;
-            update((draft) => {
-              if (draft.boards.length <= 1) return;
-              draft.boards = draft.boards.filter((b) => b.id !== removalTarget.id);
-              if (draft.activeBoardId === removalTarget.id)
-                draft.activeBoardId = next ?? draft.boards[0].id;
-            });
-            if (tabs.some((item) => item.id === removalTarget.id)) {
-              const remaining = tabs
-                .filter((item) => item.id !== removalTarget.id)
-                .map((item) => item.id);
-              setSavedTabs(remaining.length ? remaining : null);
-            }
-            if (board.id === removalTarget.id) {
-              clearSelection();
-              setDock(emptyDock);
-              setSnapshot(null);
-            }
-            setModal(null);
-            setRemovalTarget(null);
-          }}
-        />
-      )}
-      {modal === 'rename-board' && (
-        <TextDialog
-          title={t('board.rename')}
-          label={t('board.name')}
-          initial={board.name}
-          onSubmit={(name) =>
-            update((draft) => {
-              draft.boards.find((b) => b.id === board.id)!.name = name;
-            })
-          }
           onClose={() => setModal(null)}
         />
       )}

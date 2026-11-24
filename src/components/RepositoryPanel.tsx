@@ -685,6 +685,7 @@ export function RepositoryPanel({
   cardRef,
   actionViewKey,
   viewKey,
+  bottomNavigation = false,
   state,
   onClose,
   onRefresh,
@@ -697,6 +698,7 @@ export function RepositoryPanel({
   cardRef?: string;
   actionViewKey?: string;
   viewKey?: string;
+  bottomNavigation?: boolean;
   state?: RepoState;
   onClose: () => void;
   onRefresh: () => Promise<void>;
@@ -744,35 +746,43 @@ export function RepositoryPanel({
     }
   }
 
+  const navigation = (
+    <PanelHeader
+      bottom={bottomNavigation}
+      title={cardRef ? `${repo.name} · ${cardRefLabel(cardRef)}` : repo.name}
+      icon={<RepositoryAvatar repo={repo} size="large" />}
+      iconAction={
+        onAvatar
+          ? {
+              label: t('repositoryAvatar.configure'),
+              help: t('repositoryAvatar.configureHelp'),
+              onClick: onAvatar,
+              disabled: avatarDisabled,
+            }
+          : undefined
+      }
+      closeLabel={t('repository.close')}
+      onClose={onClose}
+      actions={
+        <>
+          <IconButton
+            label={t('localService.title')}
+            onClick={() => setShowLocalService(true)}
+            placement={bottomNavigation ? 'top' : 'bottom'}
+          >
+            <Terminal size={16} />
+          </IconButton>
+          <RepositoryInfo repo={repo} state={state} />
+        </>
+      }
+    />
+  );
   return (
     <aside
       className="inspector repository-inspector"
       aria-label={t('repository.details', { name: repo.name })}
     >
-      <PanelHeader
-        title={cardRef ? `${repo.name} · ${cardRefLabel(cardRef)}` : repo.name}
-        icon={<RepositoryAvatar repo={repo} size="large" />}
-        iconAction={
-          onAvatar
-            ? {
-                label: t('repositoryAvatar.configure'),
-                help: t('repositoryAvatar.configureHelp'),
-                onClick: onAvatar,
-                disabled: avatarDisabled,
-              }
-            : undefined
-        }
-        closeLabel={t('repository.close')}
-        onClose={onClose}
-        actions={
-          <>
-            <IconButton label={t('localService.title')} onClick={() => setShowLocalService(true)}>
-              <Terminal size={16} />
-            </IconButton>
-            <RepositoryInfo repo={repo} state={state} />
-          </>
-        }
-      />
+      {!bottomNavigation && navigation}
       {state?.error ? (
         <div className="panel-error" role="alert">
           <CircleAlert size={19} />
@@ -804,6 +814,7 @@ export function RepositoryPanel({
           onCommit={(commit) => setDiff({ title: commit.subject, query: { commit: commit.hash } })}
         />
       )}
+      {bottomNavigation && navigation}
       {view && (view !== 'worktree' || showWorktree) && (
         <Dialog
           key={view}
