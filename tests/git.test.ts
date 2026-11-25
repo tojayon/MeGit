@@ -192,6 +192,26 @@ describe('本机 Git 投影', () => {
     ).toEqual(['community/main', 'origin/main']);
   });
 
+  it('只获取所选的已配置远端，不获取同名远端组，也不接受仓库路径', async () => {
+    const { root, repo } = await setup();
+    const remote = path.join(root, 'remote.git');
+    await git(root, 'init', '--bare', remote);
+    const head = await commitFile(repo);
+    await git(repo, 'push', remote, 'main');
+    await git(repo, 'remote', 'add', 'origin', remote);
+    await git(repo, 'remote', 'add', 'mirror', remote);
+    await git(repo, 'config', 'remotes.origin', 'mirror');
+
+    await performAction(repo, { type: 'fetchRemote', remote: 'origin' });
+    expect(await git(repo, 'for-each-ref', '--format=%(refname)', 'refs/remotes')).toBe(
+      'refs/remotes/origin/main',
+    );
+    expect(await git(repo, 'rev-parse', 'HEAD')).toBe(head);
+    await expect(performAction(repo, { type: 'fetchRemote', remote })).rejects.toMatchObject({
+      code: 'remoteNotConfigured',
+    });
+  });
+
   it('定向获取规则引用已删除分支时解释原因，修正规则后清理且保留本地分支', async () => {
     const { root, repo } = await setup();
     const head = await commitFile(repo);
@@ -255,11 +275,13 @@ describe('本机 Git 投影', () => {
       sourceHead: newHead,
       pending: null,
     });
-    await git(target, 'fetch', 'origin');
+    const targetHead = await git(target, 'rev-parse', 'HEAD');
+    await performAction(target, { type: 'fetchRemote', remote: 'origin' });
     expect(await inspectIntegration(repo, target, 'HEAD', 'HEAD')).toMatchObject({
       state: 'pending',
       pending: 1,
     });
+    expect(await git(target, 'rev-parse', 'HEAD')).toBe(targetHead);
     await expect(inspectIntegration(repo, target, '--output=bad', 'HEAD')).rejects.toThrow();
   });
 

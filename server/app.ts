@@ -53,7 +53,8 @@ const actionSchema = z.discriminatedUnion('type', [
     paths: z.array(z.string().min(1).max(4000)).min(1).max(2000),
   }),
   z.object({ type: z.literal('commit'), message: z.string().trim().min(1).max(10000) }),
-  z.object({ type: z.literal('fetch') }),
+  z.strictObject({ type: z.literal('fetch') }),
+  z.strictObject({ type: z.literal('fetchRemote'), remote: z.string().min(1).max(240) }),
   z.strictObject({
     type: z.enum(['pull', 'push']),
     expected: z.strictObject({
@@ -554,7 +555,7 @@ export function createApp(options: { dataDirectory: string }) {
     const worktreeRef = z.string().refine(isCardRef).optional().safeParse(req.query.worktreeRef);
     if (!worktreeRef.success) throw new AppError('invalidRef');
     const action = parsed.data as GitAction;
-    const proxy = ['fetch', 'pull', 'push', 'publishBranch'].includes(action.type)
+    const proxy = ['fetch', 'fetchRemote', 'pull', 'push', 'publishBranch'].includes(action.type)
       ? await network.proxy()
       : undefined;
     res.json({

@@ -120,6 +120,7 @@ test('工作流独立记住右侧详情和宽度，隐藏白板不关闭标签�
     await expect(size).toHaveAttribute('aria-valuenow', '381');
 
     const hide = nav.getByRole('button', { name: '隐藏工作流面板', exact: true });
+    await expect(hide.locator('.lucide-eye')).toHaveCount(1);
     const create = nav.getByRole('button', { name: '新建工作流', exact: true });
     const hideBox = (await hide.boundingBox())!;
     const createBox = (await create.boundingBox())!;
@@ -128,6 +129,9 @@ test('工作流独立记住右侧详情和宽度，隐藏白板不关闭标签�
     const before = await store.read();
     await hide.press('Enter');
     await expect(page.locator('.workflow-panel')).toBeHidden();
+    await expect(
+      nav.getByRole('button', { name: '显示工作流面板', exact: true }).locator('.lucide-eye-off'),
+    ).toHaveCount(1);
     await expect(tabs.getByRole('tab')).toHaveCount(2);
     await expect(size).toBeHidden();
     expect((await dock.boundingBox())!.width).toBe((await tabs.locator('..').boundingBox())!.width);

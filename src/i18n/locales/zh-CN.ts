@@ -732,6 +732,9 @@ export default {
     addRemoteHelp: '仅登记远端地址，不检查连接、不获取。请勿在地址中填入密码或令牌。',
     count_other: '{{count}} 个远端',
     checkRead: '检查读取访问',
+    settings: '远端设置：{{name}}',
+    fetchOne: '获取 {{name}}',
+    fetchOneHelp: '只更新 {{name}} 的本地远端记录，不合并、不推送。',
     readStatus: {
       unchecked: '未检查',
       checking: '检查中…',
@@ -770,6 +773,7 @@ export default {
     deleteBranch: '{{name}}：本地分支已安全删除',
     commit: '{{name}}：提交已保存到本地仓库',
     fetch: '{{name}}：远端记录已更新，过期记录已清理',
+    fetchRemote: '{{name}}：已获取 {{target}} 并清理其过期记录',
     push: '{{name}}：推送完成',
     pull: '{{name}}：已完成快进拉取',
     stage: '{{name}}：文件已暂存',
@@ -942,7 +946,8 @@ export default {
   },
   integration: {
     noCommits: '来源或目标还没有可用的提交。',
-    missingObjects: '目标仓库尚未获取来源提交，暂时无法比较。请先配置来源远端并获取。',
+    missingObjects:
+      '目标仓库尚未获取来源提交。请在目标仓库的「远端管理」中获取来源远端；如果还没配置，可把来源仓库的本机路径添加为远端。获取不会合并改动。',
     included: '目标已包含来源提交；此状态不代表已测试或已部署。',
     noCommonHistory: '两个仓库没有可验证的共同提交历史。',
     pending_one: '来源有 {{count}} 个提交尚未被目标包含。重写历史或 cherry-pick 需要人工核对。',

@@ -43,10 +43,11 @@ it('routes Git and AI HTTPS through the configured proxy, but not local destinat
     await git(sample.repo, 'config', 'remote.origin.proxy', '');
     expect(await checkRemoteRead(sample.repo, 'origin', url)).toEqual({ status: 'proxyConnection' });
     await expect(performAction(sample.repo, { type: 'fetch' }, undefined, url)).rejects.toMatchObject({ code: 'proxyConnection' });
+    await expect(performAction(sample.repo, { type: 'fetchRemote', remote: 'origin' }, undefined, url)).rejects.toMatchObject({ code: 'proxyConnection' });
     await expect(withProxyFetch(url)('https://ai.example.invalid/')).rejects.toMatchObject({ code: 'proxyConnection' });
     const response = await withProxyFetch(url)(`http://127.0.0.1:${localAddress.port}/`);
     expect(await response.text()).toBe('local');
-    expect(targets).toEqual(['git.example.invalid:443', 'git.example.invalid:443', 'ai.example.invalid:443']);
+    expect(targets).toEqual(['git.example.invalid:443', 'git.example.invalid:443', 'git.example.invalid:443', 'ai.example.invalid:443']);
 
     await git(sample.repo, 'remote', 'set-url', 'origin', 'git@git.example.invalid:project/repo.git');
     expect(await checkRemoteRead(sample.repo, 'origin', url)).toEqual({ status: 'proxyUnsupported' });

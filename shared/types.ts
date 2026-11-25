@@ -227,6 +227,7 @@ export type GitAction =
   | { type: 'stage' | 'unstage'; paths: string[] }
   | { type: 'commit'; message: string }
   | { type: 'fetch' }
+  | { type: 'fetchRemote'; remote: string }
   | SyncAction;
 export interface RelationAction {
   type: 'pull' | 'push' | 'integrate';

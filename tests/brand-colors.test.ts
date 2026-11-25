@@ -100,6 +100,17 @@ describe('MeGit 品牌色规范', () => {
           `${theme}: button text on ${background}`,
         ).toBeGreaterThanOrEqual(4.5);
       }
+      for (const background of [
+        'inspector-tab-active-bg',
+        'inspector-tab-action-hover',
+        'inspector-arrow-bg',
+        'inspector-arrow-hover',
+      ]) {
+        expect(
+          contrast(tokens['inspector-footer-on-fill'], tokens[background]),
+          `${theme}: details footer foreground on ${background}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
       for (const foreground of ['card-toolbar-text', 'card-toolbar-accent']) {
         for (const background of ['card-toolbar-bg', 'card-toolbar-disabled']) {
           expect(contrast(tokens[foreground], tokens[background])).toBeGreaterThanOrEqual(4.5);

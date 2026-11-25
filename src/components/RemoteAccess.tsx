@@ -5,12 +5,13 @@ import { api } from '../lib/api';
 import { formatError } from '../lib/messages';
 import { Button } from './Button';
 import { Dialog } from './Dialogs';
-import { RemoteManagementCard } from './RemoteManagement';
+import { RemoteManagementCard, type RemoteCardFetch } from './RemoteManagement';
 
-export function RemoteAccessRow({ repoId, name, disabled, onLogin }: {
+export function RemoteAccessRow({ repoId, name, disabled, fetch, onLogin }: {
   repoId: string;
   name: string;
   disabled: boolean;
+  fetch?: RemoteCardFetch;
   onLogin: () => void;
 }) {
   const { t } = useTranslation();
@@ -48,6 +49,7 @@ export function RemoteAccessRow({ repoId, name, disabled, onLogin }: {
       status={checking ? 'checking' : failure ? 'failed' : status === 'readable' ? 'readable' : 'unchecked'}
       error={failure}
       disabled={disabled}
+      fetch={fetch}
       onCheck={() => void check()}
       onLogin={githubLogin ? onLogin : undefined}
     />

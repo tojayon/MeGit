@@ -269,8 +269,10 @@ test('关系比较提供通俗解释，无法判断的原因始终可见', async
     await relation.getByRole('button', { name: '代码整合说明', exact: true }).click();
     await expect(page.getByRole('tooltip')).toContainText('不会自动合并');
     await page.keyboard.press('Escape');
-    const reason = relation.getByText(/目标仓库尚未获取来源提交|没有可验证的共同提交历史/);
+    const reason = relation.getByText(/目标仓库尚未获取来源提交/);
     await expect(reason).toBeVisible();
+    await expect(reason).toContainText('把来源仓库的本机路径添加为远端');
+    await expect(reason).toContainText('获取不会合并改动');
     const basis = relation.locator('summary');
     if (await basis.count()) await basis.click();
     await expect(reason).toBeVisible();

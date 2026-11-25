@@ -2517,6 +2517,21 @@ code {
   align-items: center;
   gap: var(--space-2);
 }
+.remote-management-settings {
+  margin-inline-start: auto;
+}
+.remote-management-card-settings {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+.remote-management-card-settings[hidden] {
+  display: none;
+}
+.remote-management-fetch-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  overflow-wrap: anywhere;
+}
 .remote-management-footer {
   justify-content: space-between;
   border-top: 1px solid var(--border);
@@ -3157,8 +3172,30 @@ code {
 .dock-card + .dock-card {
   border-inline-start: 1px solid var(--border-strong);
 }
-.dock-card.active:not(:only-child) .inspector-heading-bottom {
-  border-block-start-color: var(--accent);
+.dock-card.active > .inspector > .inspector-heading-bottom {
+  background: var(--inspector-tab-active-bg);
+  color: var(--inspector-footer-on-fill);
+}
+.dock-card.active .inspector-heading-bottom > .repo-symbol {
+  background: transparent;
+  color: inherit;
+}
+.dock-card.active .inspector-heading-bottom :is(
+  .repository-avatar-button,
+  .panel-heading-actions > .tooltip-anchor > .icon-button,
+  .panel-heading-actions > .info-popover-anchor > .tooltip-anchor > .icon-button
+) {
+  color: inherit;
+  &:is(:hover:not(:disabled), [aria-expanded='true']) {
+    background: var(--inspector-tab-action-hover);
+  }
+  &:focus-visible {
+    outline-color: var(--inspector-footer-on-fill);
+    outline-offset: -2px;
+  }
+}
+.dock-card.active .inspector-heading-bottom h2:focus-visible {
+  outline-color: var(--inspector-footer-on-fill);
 }
 .dock-navigation {
   position: absolute;
@@ -3178,11 +3215,24 @@ code {
 .dock-navigation .icon-button {
   width: var(--panel-heading-control-size);
   height: var(--panel-heading-control-size);
+  background: var(--inspector-arrow-bg);
+  color: var(--inspector-footer-on-fill);
+  &:hover:not([aria-disabled='true']) {
+    background: var(--inspector-arrow-hover);
+    color: var(--inspector-footer-on-fill);
+  }
+  &:focus-visible {
+    outline-color: var(--inspector-footer-on-fill);
+    outline-offset: -2px;
+  }
 }
 .dock-navigation .icon-button[aria-disabled='true'] {
-  color: var(--muted);
-  background: transparent;
+  background: var(--inspector-arrow-bg);
+  color: var(--inspector-footer-on-fill);
   cursor: default;
+}
+.dock-navigation .icon-button[aria-disabled='true'] > svg {
+  opacity: 0.7;
 }
 .dock-card > .inspector {
   width: 100%;
@@ -4016,6 +4066,7 @@ code {
   height: var(--local-service-preview-output-height);
 }
 .local-service-open {
+  margin-inline-end: auto;
   color: var(--text);
   text-decoration: none;
 }

@@ -191,6 +191,7 @@ test('点击旧引导重新核对状态，获取需确认，分支地图和远�
     await panel.getByRole('button', { name: '管理远端', exact: true }).click();
     const remotes = page.getByRole('dialog', { name: '远端管理', exact: true });
     await expect(remotes.getByText('origin', { exact: true })).toBeVisible();
+    await remotes.getByRole('button', { name: '远端设置：origin' }).click();
     await remotes.getByRole('button', { name: '检查读取访问', exact: true }).click();
     await expect(remotes.getByText('可读取', { exact: true })).toBeVisible();
   } finally {

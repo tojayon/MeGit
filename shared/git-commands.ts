@@ -102,6 +102,8 @@ export function actionArguments(
       return action.message.trim() ? ['commit', '-m', action.message.trim()] : null;
     case 'fetch':
       return ['fetch', '--all', '--prune', '--no-recurse-submodules'];
+    case 'fetchRemote':
+      return ['fetch', '--prune', '--no-recurse-submodules', '--', action.remote];
     case 'addRemote':
       return ['remote', 'add', '--', action.name, action.destination];
     case 'publishBranch':

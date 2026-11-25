@@ -104,6 +104,28 @@ function LocalServiceButton({
   );
 }
 
+function LocalServiceOpen({ port }: { port?: number }) {
+  const { t } = useTranslation();
+  const icon = <ArrowUpRight size={16} aria-hidden="true" />;
+  return port === undefined ? (
+    <Button size="compact" className="local-service-open" icon={icon} disabled>
+      {t('localService.open')}
+    </Button>
+  ) : (
+    <a
+      className="button compact local-service-open"
+      href={`http://127.0.0.1:${port}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span className="button-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="button-label">{t('localService.open')}</span>
+    </a>
+  );
+}
+
 export function LocalServiceExample({
   name = 'MeGit',
   onClose,
@@ -118,6 +140,7 @@ export function LocalServiceExample({
     <footer className="dialog-footer">
       {running ? (
         <>
+          <LocalServiceOpen />
           <LocalServiceButton
             action="stop"
             onClick={() => setState({ ...sample, status: 'stopped' })}
@@ -346,6 +369,12 @@ export function LocalServiceDialog({ repo, onClose }: { repo: Repository; onClos
         {!draft && state?.available && state.config && <LocalServiceOutput log={state.log} />}
       </div>
       <footer className="dialog-footer">
+        {!draft &&
+          !busy &&
+          readProblem == null &&
+          state?.available &&
+          state.status === 'running' &&
+          state.config?.port != null && <LocalServiceOpen port={state.config.port} />}
         {readProblem != null && !draft && (
           <Button
             size="compact"
@@ -394,17 +423,6 @@ export function LocalServiceDialog({ repo, onClose }: { repo: Repository; onClos
                   disabled={!!busy || state.status === 'stopping'}
                   onClick={() => action('stop')}
                 />
-              )}
-              {state.config && state.status === 'running' && state.config.port != null && (
-                <a
-                  className="button compact local-service-open"
-                  href={`http://127.0.0.1:${state.config.port}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ArrowUpRight size={16} aria-hidden="true" />
-                  <span className="button-label">{t('localService.open')}</span>
-                </a>
               )}
               {state.config && state.status === 'running' && (
                 <LocalServiceButton

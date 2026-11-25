@@ -121,6 +121,12 @@ export function BranchTreePanel({
   const [remoteAction, setRemoteAction] = useState<RemoteAction['type'] | null>(null);
   const [githubLogin, setGitHubLogin] = useState<{ repoId: string; name: string } | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
+  const [remoteFetch, setRemoteFetch] = useState<{
+    remote?: string;
+    pending?: boolean;
+    error?: unknown;
+  } | null>(null);
+  const remoteFetchLock = useRef(false);
   const [searching, setSearching] = useState(false);
   const [filter, setFilter] = useState('');
   const [choosingTrunk, setChoosingTrunk] = useState(false);
@@ -274,6 +280,20 @@ export function BranchTreePanel({
       setActionError(err);
     }
   }
+  async function fetchFromManagement(remote?: string) {
+    if (remoteFetchLock.current || busy || loading || state?.error) return;
+    remoteFetchLock.current = true;
+    setRemoteFetch({ remote, pending: true });
+    try {
+      const action: GitAction = remote === undefined ? { type: 'fetch' } : { type: 'fetchRemote', remote };
+      if (await onAction(action)) setReload((value) => value + 1);
+      setRemoteFetch(null);
+    } catch (error) {
+      setRemoteFetch({ remote, error });
+    } finally {
+      remoteFetchLock.current = false;
+    }
+  }
   const tools = (
     <>
       <HelpTip
@@ -299,10 +319,15 @@ export function BranchTreePanel({
               preview={{ commands: [actionArguments({ type: 'fetch' }, state)] }}
             />
           }
-          fetching={busy === 'fetch'}
-          fetchDisabled={!!busy || loading}
+          fetching={!!remoteFetch?.pending && remoteFetch.remote === undefined}
+          fetchError={
+            remoteFetch?.remote === undefined && remoteFetch?.error
+              ? formatError(remoteFetch.error)
+              : undefined
+          }
+          fetchDisabled={!!busy || loading || !!state.error}
           addDisabled={!!busy || !!state.error}
-          onFetch={() => void act({ type: 'fetch' })}
+          onFetch={() => void fetchFromManagement()}
           onAdd={() => setRemoteAction('addRemote')}
         >
           {state.remotes.map((name) => (
@@ -310,7 +335,21 @@ export function BranchTreePanel({
               key={`${repo.id}:${name}`}
               repoId={repo.id}
               name={name}
-              disabled={!!busy || !!state.error}
+              disabled={!!busy || loading || !!state.error}
+              fetch={{
+                onFetch: () => void fetchFromManagement(name),
+                help: (
+                  <GitHelp
+                    topic="fetch"
+                    preview={{ commands: [actionArguments({ type: 'fetchRemote', remote: name }, state)] }}
+                  />
+                ),
+                pending: remoteFetch?.remote === name && remoteFetch.pending,
+                error:
+                  remoteFetch?.remote === name && remoteFetch.error
+                    ? formatError(remoteFetch.error)
+                    : undefined,
+              }}
               onLogin={() => setGitHubLogin({ repoId: repo.id, name })}
             />
           ))}

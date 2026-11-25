@@ -427,7 +427,7 @@ export async function inspectIntegration(
       ...base,
       state: 'unknown',
       messageCode: 'missingObjects',
-      message: '目标仓库尚未获取来源提交，暂时无法比较。请先配置来源远端并获取。',
+      message: '目标仓库尚未获取来源提交。请在目标仓库获取来源远端；如未配置，可添加来源仓库的本机路径。',
     };
   if (source === target && sourceRef !== targetRef) {
     if (sourceHead === targetHead) base.divergence = { targetAhead: 0, targetBehind: 0 };
@@ -601,7 +601,9 @@ export async function performAction(
         if (!state.staged) throw new AppError('stageRequired');
         if (state.files.some((f) => f.conflicted)) throw new AppError('resolveConflicts');
         args = actionArguments(action, state)!;
-      } else if (action.type === 'fetch') {
+      } else if (action.type === 'fetch' || action.type === 'fetchRemote') {
+        if (action.type === 'fetchRemote' && !state.remotes.includes(action.remote))
+          throw new AppError('remoteNotConfigured', 409);
         if (!state.remotes.length) throw new AppError('noRemote');
         args = actionArguments(action, state)!;
       } else if (
@@ -636,7 +638,7 @@ export async function performAction(
       const targets =
         action.type === 'fetch'
           ? state.remotes
-          : action.type === 'publishBranch'
+          : action.type === 'fetchRemote' || action.type === 'publishBranch'
             ? [action.remote]
             : (action.type === 'pull' || action.type === 'push') && state.pushTarget
               ? [state.pushTarget.remote]
@@ -647,7 +649,7 @@ export async function performAction(
       const result = await run(
         repo,
         args,
-        pushing || ['fetch', 'pull'].includes(action.type),
+        pushing || ['fetch', 'fetchRemote', 'pull'].includes(action.type),
         pushing,
         undefined,
         false,

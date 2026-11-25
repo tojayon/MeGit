@@ -127,6 +127,11 @@
     "dark": {
       "surface": "#1D2024",
       "surface-raised": "#24282E",
+      "inspector-tab-active-bg": "#004461",
+      "inspector-tab-action-hover": "#005D86",
+      "inspector-arrow-bg": "#414953",
+      "inspector-arrow-hover": "#495569",
+      "inspector-footer-on-fill": "#E9EDF3",
       "card-toolbar-bg": "#E9EDF3",
       "card-toolbar-text": "#24282E",
       "card-toolbar-accent": "#01357C",
@@ -209,6 +214,11 @@
     "light": {
       "surface": "#FFFFFF",
       "surface-raised": "#F2F4F7",
+      "inspector-tab-active-bg": "#01357C",
+      "inspector-tab-action-hover": "#012557",
+      "inspector-arrow-bg": "#495569",
+      "inspector-arrow-hover": "#363B43",
+      "inspector-footer-on-fill": "#FFFFFF",
       "card-toolbar-bg": "#24282E",
       "card-toolbar-text": "#E9EDF3",
       "card-toolbar-accent": "#80D4F9",

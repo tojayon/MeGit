@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Circle, CircleAlert, CircleCheck, Cloud, CloudDownload, KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react';
+import { Circle, CircleAlert, CircleCheck, Cloud, CloudDownload, KeyRound, LoaderCircle, Settings, ShieldCheck } from 'lucide-react';
 import { Button } from './Button';
+import { IconButton } from './IconButton';
 import { InfoPopover } from './InfoPopover';
 import { Tooltip } from './Tooltip';
 import { RemoteActionButton } from './RemoteActionButton';
@@ -11,6 +12,7 @@ export function RemoteManagement({
   children,
   fetchHelp,
   fetching,
+  fetchError,
   fetchDisabled,
   addDisabled,
   onFetch,
@@ -20,6 +22,7 @@ export function RemoteManagement({
   children?: ReactNode;
   fetchHelp?: ReactNode;
   fetching?: boolean;
+  fetchError?: string;
   fetchDisabled?: boolean;
   addDisabled?: boolean;
   onFetch: () => void;
@@ -58,6 +61,7 @@ export function RemoteManagement({
           <p>{t('repository.noRemotes')}</p>
         </div>
       )}
+      {fetchError && <p className="remote-management-fetch-error error-message" role="alert">{fetchError}</p>}
       <footer className="remote-management-footer">
         {fetchHelp ? <Tooltip content={fetchHelp} detailed>{fetchButton}</Tooltip> : fetchButton}
         <RemoteActionButton type="addRemote" disabled={addDisabled} onClick={onAdd} />
@@ -68,6 +72,13 @@ export function RemoteManagement({
 
 type RemoteCardStatus = 'unchecked' | 'checking' | 'readable' | 'failed';
 
+export type RemoteCardFetch = {
+  onFetch: () => void;
+  help?: ReactNode;
+  pending?: boolean;
+  error?: string;
+};
+
 const statusIcons = { unchecked: Circle, checking: LoaderCircle, readable: CircleCheck, failed: CircleAlert };
 
 export function RemoteManagementCard({
@@ -75,6 +86,7 @@ export function RemoteManagementCard({
   status,
   error,
   disabled,
+  fetch,
   onCheck,
   onLogin,
 }: {
@@ -82,12 +94,27 @@ export function RemoteManagementCard({
   status: RemoteCardStatus;
   error?: string;
   disabled?: boolean;
+  fetch?: RemoteCardFetch;
   onCheck: () => void;
   onLogin?: () => void;
 }) {
   const { t } = useTranslation();
+  const settingsId = useId();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const Icon = statusIcons[status];
   const checking = status === 'checking';
+  const fetchButton = fetch && (
+    <Button
+      size="compact"
+      icon={<CloudDownload size={15} />}
+      aria-label={t('remoteActions.fetchOne', { name })}
+      disabled={disabled || checking}
+      busy={fetch.pending}
+      onClick={fetch.onFetch}
+    >
+      {t('repository.fetch')}
+    </Button>
+  );
   return (
     <li className="remote-management-card">
       <div className="remote-management-card-top">
@@ -99,8 +126,26 @@ export function RemoteManagementCard({
         </span>
       </div>
       {error && <p className="remote-management-feedback error-message" role="alert">{error}</p>}
+      {fetch?.error && <p className="remote-management-feedback error-message" role="alert">{fetch.error}</p>}
       {status === 'readable' && <p className="remote-management-feedback">{t('remoteActions.pushNotChecked')}</p>}
       <div className="remote-management-card-actions">
+        {fetchButton && (
+          <Tooltip content={fetch?.help ?? t('remoteActions.fetchOneHelp', { name })} detailed={!!fetch?.help}>
+            {fetchButton}
+          </Tooltip>
+        )}
+        <IconButton
+          size="small"
+          className="remote-management-settings"
+          label={t('remoteActions.settings', { name })}
+          aria-controls={settingsId}
+          aria-expanded={settingsOpen}
+          onClick={() => setSettingsOpen(!settingsOpen)}
+        >
+          <Settings size={16} aria-hidden="true" />
+        </IconButton>
+      </div>
+      <div className="remote-management-card-actions remote-management-card-settings" id={settingsId} hidden={!settingsOpen}>
         <Button size="compact" icon={<ShieldCheck size={15} />} disabled={disabled} busy={checking} onClick={onCheck}>
           {t('remoteActions.checkRead')}
         </Button>

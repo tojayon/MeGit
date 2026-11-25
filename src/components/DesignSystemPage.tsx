@@ -170,23 +170,26 @@ function RemoteManagementExample() {
   return (
     <section className="design-card design-remote-management-example">
       <h2>{t('repository.manageRemotes')}</h2>
-      <RemoteManagement count={4} onFetch={() => setChecked(false)} addDisabled onAdd={() => {}}>
+      <RemoteManagement count={4} onFetch={() => setAhead(0)} addDisabled onAdd={() => {}}>
         <RemoteManagementCard
           name="origin"
           status={checked ? 'readable' : 'unchecked'}
+          fetch={{ onFetch: () => setAhead(0) }}
           onCheck={() => setChecked(true)}
         />
         <RemoteManagementCard
           name="community"
           status="readable"
+          fetch={{ onFetch: () => {} }}
           onCheck={() => {}}
           onLogin={() => {}}
         />
-        <RemoteManagementCard name="mirror" status="checking" onCheck={() => {}} />
+        <RemoteManagementCard name="mirror" status="checking" fetch={{ onFetch: () => {} }} onCheck={() => {}} />
         <RemoteManagementCard
           name="archive"
           status="failed"
           error={t('errors.remoteReadAuth')}
+          fetch={{ onFetch: () => {} }}
           onCheck={() => {}}
         />
       </RemoteManagement>

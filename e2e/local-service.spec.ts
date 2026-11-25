@@ -183,6 +183,7 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     await expect(page.getByRole('tooltip', { name: '本地服务' })).not.toBeVisible();
     await shortcut.click();
     const dialog = page.getByRole('dialog', { name: '本地服务', exact: true });
+    const openService = dialog.getByRole('link', { name: '打开服务', exact: true });
     await dialog.getByRole('button', { name: '配置', exact: true }).click();
     await dialog.getByRole('spinbutton', { name: 'TCP 端口（可选）' }).fill(String(port));
     const save = dialog.getByRole('button', { name: '保存配置' });
@@ -190,6 +191,7 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     await dialog.getByRole('checkbox', { name: /我已审核并信任/ }).check();
     await save.click();
     await expect(dialog.getByRole('status')).toHaveText('已停止');
+    await expect(openService).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
     const start = cardControls.getByRole('button', { name: '开始运行', exact: true });
@@ -268,7 +270,11 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     await shortcut.click();
     await expect(dialog.getByRole('status')).toHaveText('运行中');
     const address = `http://127.0.0.1:${port}`;
-    await expect(dialog.getByRole('link', { name: '打开服务' })).toHaveAttribute('href', address);
+    const footer = dialog.locator('footer');
+    await expect(footer.getByRole('link', { name: '打开服务', exact: true })).toHaveAttribute(
+      'href',
+      address,
+    );
     const pid = async () => (await request.get(address)).text();
     const first = await pid();
     const header = dialog.locator('header');
@@ -286,13 +292,26 @@ test('从仓库详情配置、启动、重启和停止项目服务，并保留�
     await expect(stop.locator('svg.lucide-square')).toBeVisible();
     await expect(restart.locator('svg.lucide-rotate-cw')).toBeVisible();
     const headerBox = (await header.boundingBox())!;
-    const footerBox = (await dialog.locator('footer').boundingBox())!;
+    const footerBox = (await footer.boundingBox())!;
     const dialogBox = (await dialog.boundingBox())!;
     expect(dialogBox.width).toBeGreaterThan(800);
     expect(headerBox.height).toBe(41);
     expect(footerBox.height).toBe(headerBox.height);
+    expect((await openService.boundingBox())!.x - footerBox.x).toBeCloseTo(12, 0);
+    expect((await stop.boundingBox())!.x).toBeGreaterThan((await openService.boundingBox())!.x);
     expect((await output.boundingBox())!.height).toBeGreaterThan(dialogBox.height / 2);
     await dialog.screenshot({ path: test.info().outputPath('terminal-dark-zh.png') });
+    const [servicePage] = await Promise.all([
+      page.waitForEvent('popup'),
+      openService.press('Enter'),
+    ]);
+    try {
+      await expect(servicePage).toHaveURL(`${address}/`);
+      await expect(servicePage.locator('body')).toHaveText(first);
+      await expect(dialog).toBeVisible();
+    } finally {
+      await servicePage.close();
+    }
     await restart.click();
     await expect.poll(() => pid().catch(() => first)).not.toBe(first);
     await expect(dialog.getByRole('status')).toHaveText('运行中');
@@ -391,6 +410,7 @@ test('本地服务规范示例适配明亮英文窄屏', async ({ page }) => {
   const example = page.getByRole('region', { name: 'Local service', exact: true });
   const header = example.locator('header');
   const footer = example.locator('footer');
+  const exampleOpen = footer.getByRole('button', { name: 'Open service', exact: true });
   const output = example.locator('pre[aria-label="Recent output"]');
   await expect(example.getByRole('status')).toHaveText('Running');
   await expect(output).toContainText('npm run dev');
@@ -398,11 +418,14 @@ test('本地服务规范示例适配明亮英文窄屏', async ({ page }) => {
   await expect(output).toHaveCSS('color', 'rgb(215, 220, 229)');
   await expect(header).toHaveCSS('background-color', 'rgb(36, 40, 46)');
   await expect(footer).toHaveCSS('background-color', 'rgb(36, 40, 46)');
+  await expect(exampleOpen).toBeDisabled();
+  expect((await exampleOpen.boundingBox())!.x - (await footer.boundingBox())!.x).toBeCloseTo(12, 0);
   const headerBox = (await header.boundingBox())!;
   expect(headerBox.height).toBe(45);
   expect((await footer.boundingBox())!.height).toBe(headerBox.height);
   await example.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect(example.getByRole('status')).toHaveText('Stopped');
+  await expect(exampleOpen).toHaveCount(0);
   await example.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(example.getByRole('status')).toHaveText('Running');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');

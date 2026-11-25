@@ -707,6 +707,9 @@ const en = {
     count_one: '{{count}} remote',
     count_other: '{{count}} remotes',
     checkRead: 'Check read access',
+    settings: 'Remote settings: {{name}}',
+    fetchOne: 'Fetch {{name}}',
+    fetchOneHelp: 'Update the local records for {{name}} only. Does not merge or push.',
     readStatus: {
       unchecked: 'Not checked',
       checking: 'Checking…',
@@ -749,6 +752,7 @@ const en = {
     deleteBranch: '{{name}}: local branch safely deleted',
     commit: '{{name}}: Commit saved to the local repository',
     fetch: '{{name}}: Remote records updated and stale records cleaned up',
+    fetchRemote: '{{name}}: Fetched {{target}} and cleaned up its stale records',
     push: '{{name}}: Push completed',
     pull: '{{name}}: Fast-forward pull completed',
     stage: '{{name}}: Files staged',
@@ -930,7 +934,7 @@ const en = {
   integration: {
     noCommits: 'The source or target has no available commit yet.',
     missingObjects:
-      'The target has not fetched the source commit. Configure the source remote and fetch before comparing.',
+      'The target has not fetched the source commit. In the target repository’s Manage remotes panel, fetch the source remote. If it is not configured, add the source repository’s local path as a remote first. Fetching does not merge changes.',
     included:
       'The target contains the source commit. This does not indicate testing or deployment status.',
     noCommonHistory: 'The repositories have no verifiable common commit history.',

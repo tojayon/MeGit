@@ -214,6 +214,7 @@ export function InspectorDock({
           return (
             <div
               className={`dock-card ${state.active === key ? 'active' : ''}`}
+              aria-current={state.active === key || undefined}
               data-key={key}
               data-kind={item.kind}
               id={`${id}-panel-${key}`}

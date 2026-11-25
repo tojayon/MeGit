@@ -54,13 +54,22 @@ for (const english of [false, true]) {
       const localRow = management.getByRole('listitem').filter({ hasText: 'origin' });
       const githubRow = management.getByRole('listitem').filter({ hasText: 'github' });
       const loginLabel = english ? 'Sign in to GitHub' : '登录 GitHub';
+      const settings = (name: string) => english ? `Remote settings: ${name}` : `远端设置：${name}`;
+      const checkRead = english ? 'Check read access' : '检查读取访问';
       await expect(management.locator('header')).toContainText(english ? '2 remotes' : '2 个远端');
       await expect(localRow.getByRole('heading', { name: 'origin' })).toBeVisible();
       await expect(localRow.getByRole('status')).toHaveText(english ? 'Not checked' : '未检查');
+      const localSettings = localRow.getByRole('button', { name: settings('origin'), exact: true });
+      await expect(localRow.getByRole('button', { name: checkRead })).toHaveCount(0);
+      await expect(localRow.getByRole('button', { name: english ? 'Fetch origin' : '获取 origin', exact: true })).toBeEnabled();
+      await localSettings.press('Enter');
+      await expect(localSettings).toHaveAttribute('aria-expanded', 'true');
       await expect(localRow.getByRole('button', { name: `${loginLabel}…`, exact: true })).toHaveCount(0);
-      await localRow.getByRole('button', { name: english ? 'Check read access' : '检查读取访问' }).click();
+      await localRow.getByRole('button', { name: checkRead }).click();
       await expect(localRow.getByRole('status')).toHaveText(english ? 'Readable' : '可读取');
       await expect(localRow).toContainText(english ? 'Push access not checked' : '未检查推送权限');
+      await expect(githubRow.getByRole('button', { name: `${loginLabel}…`, exact: true })).toHaveCount(0);
+      await githubRow.getByRole('button', { name: settings('github'), exact: true }).click();
       await expect(githubRow.getByRole('button', { name: `${loginLabel}…`, exact: true })).toBeVisible();
       await management.screenshot({
         path: `.megit/verification/remote-management/${english ? 'light-en' : 'dark-zh'}.png`,
@@ -82,7 +91,13 @@ for (const english of [false, true]) {
       expect(authorizationRequests).toEqual([{ name: 'github', action: 'githubLogin' }]);
       await login.getByRole('button', { name: english ? 'Done' : '完成' }).click();
       await git(sample.repo, 'remote', 'remove', 'github');
+      await git(sample.repo, 'remote', 'add', 'mirror', remote);
       await page.reload();
+      await manageButton.click();
+      await localRow.getByRole('button', { name: english ? 'Fetch origin' : '获取 origin', exact: true }).click();
+      await expect.poll(() => git(sample.repo, 'for-each-ref', '--format=%(refname)', 'refs/remotes')).toBe('refs/remotes/origin/occupied');
+      await expect(management).toBeVisible();
+      await page.keyboard.press('Escape');
       if (!(await sync.isVisible())) {
         const open = page.getByRole('button', { name: english ? 'View Remote actions' : '查看Remote actions', exact: true });
         if (await open.isVisible() && !(await manageButton.isVisible())) await open.click();
@@ -91,6 +106,7 @@ for (const english of [false, true]) {
 
       await sync.getByRole('button', { name: `${publish}…`, exact: true }).click();
       const publishDialog = page.getByRole('dialog', { name: publish, exact: true });
+      await publishDialog.getByRole('combobox', { name: english ? 'Remote name' : '远端名称' }).selectOption('origin');
       const branchName = publishDialog.getByLabel(remoteBranch, { exact: true });
       await expect(branchName).toHaveValue('main');
       await branchName.fill('occupied');

@@ -7,6 +7,11 @@
   --surface: #1d2024;
   --surface-raised: #24282e;
   --inspector-dock-surface: var(--rail);
+  --inspector-tab-active-bg: #004461;
+  --inspector-tab-action-hover: #005d86;
+  --inspector-arrow-bg: #414953;
+  --inspector-arrow-hover: #495569;
+  --inspector-footer-on-fill: #e9edf3;
   --card-toolbar-bg: #e9edf3;
   --card-toolbar-text: #24282e;
   --card-toolbar-accent: #01357c;
@@ -98,6 +103,11 @@
   --surface: #ffffff;
   --surface-raised: #f2f4f7;
   --inspector-dock-surface: var(--rail);
+  --inspector-tab-active-bg: #01357c;
+  --inspector-tab-action-hover: #012557;
+  --inspector-arrow-bg: #495569;
+  --inspector-arrow-hover: #363b43;
+  --inspector-footer-on-fill: #ffffff;
   --card-toolbar-bg: #24282e;
   --card-toolbar-text: #e9edf3;
   --card-toolbar-accent: #80d4f9;

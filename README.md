@@ -55,7 +55,7 @@ Open a workflow under **My workflows**. Use **Workflow settings** in the upper-r
 
 Workflow tabs span the canvas and the right-hand details. Repository and relationship controls are at the bottom of their respective panels. Each workflow remembers which details were open, the active detail, and the panel width when you switch workflows or reload the browser tab. Select **Hide workflow panel** just to the left of **+** under **My workflows** to give the details the full workspace width without closing any tabs. Use the same button to show the canvas again.
 
-When the detail columns do not fit, use the arrows at either end of the bottom row to browse them. Long titles stay on one line; hover or focus a title to see its full name. The details browser and branch map hide their scrollbars without disabling scrolling or panning.
+The active detail has a dark filled tab. When the detail columns do not fit, use the dark arrow buttons at either end of the bottom row to browse them. Long titles stay on one line; hover or focus a title to see its full name. The details browser and branch map hide their scrollbars without disabling scrolling or panning.
 
 ## Product gallery
 
@@ -92,7 +92,9 @@ The bottom-left control in the AI composer shows the current conversation’s ca
 
 MeGit binds to `127.0.0.1` and saves workflows locally. Git uses your existing configuration and credentials. An AI provider receives task context only when you use a configured AI feature.
 
-On Windows, open **Local service** in a repository's details to approve an existing npm script or a repository PowerShell script. Start, stop, or restart the managed foreground service and read its output directly in the terminal panel. An optional TCP port enables readiness and conflict checks; MeGit does not stop unrelated listeners or launch services automatically.
+In the branch map, open **Manage remotes** to fetch one remote from its card or fetch all remotes from the footer. Each card’s settings button contains **Check read access** and **Sign in to GitHub**, where available. If an integration connection says the target has not fetched the source commit, fetch the source remote from the target repository. For two local repositories, you can add the source repository’s local path as a remote. Fetch does not merge changes.
+
+On Windows, open **Local service** in a repository's details to approve an existing npm script or a repository PowerShell script. Start, stop, or restart the managed foreground service and read its output directly in the terminal panel. An optional TCP port enables readiness and conflict checks. When a service with a configured port is running, **Open service** on the left of the footer opens `http://127.0.0.1:<port>` in a new tab. MeGit does not stop unrelated listeners or launch services automatically.
 
 Click the repository name on a canvas card to open its details. Once a local service is configured, a circular button sits halfway in a semicircular notch near the upper-right side of the current HEAD card. The button is green for Start and red for Stop, and shares the card's blue outline when selected. Hovering shows a tooltip without changing the button's appearance or size. While the service runs, elapsed time appears above the card, to the left of the Stop button, without resizing the card. It shows `02:03:04` until one full day has elapsed, then includes days (for example, `01d 02:03:04`). The timer updates every second, continues across page refreshes, and resets when the service restarts. Errors appear on the card; Restart, configuration, and full output stay in the Local service panel.
 

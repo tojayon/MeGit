@@ -73,7 +73,8 @@ export function useRepositoryActions({
       await onRefresh();
       const target = operation.type === 'publishBranch' ? `${operation.remote}/${operation.name}`
         : operation.type === 'setTracking' ? operation.targetRef.slice('refs/remotes/'.length)
-          : operation.type === 'addRemote' ? operation.name : '';
+          : operation.type === 'addRemote' ? operation.name
+            : operation.type === 'fetchRemote' ? operation.remote : '';
       onNotice({ key: `actions.${operation.type}`, values: { name: repo.name, target } });
       return true;
     } finally {

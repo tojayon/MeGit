@@ -92,9 +92,9 @@ test('两套主题的左右面板同色，且与白板底色不同', async ({ pa
     const matchingSurfaces = [
       dock,
       page.locator('.main-workspace > .workflow-header'),
-      panel.locator(':scope > footer.inspector-heading'),
       page.locator('.workspace-statusbar'),
     ];
+    const activeFooter = panel.locator(':scope > footer.inspector-heading');
     const expectMatchingSurfaces = async () => {
       const background = await navigation.evaluate(
         (element) => getComputedStyle(element).backgroundColor,
@@ -108,6 +108,7 @@ test('两套主题的左右面板同色，且与白板底色不同', async ({ pa
     await expect(canvas).toBeVisible();
     await expect(map).toBeVisible();
     await expectMatchingSurfaces();
+    await expect(activeFooter).toHaveCSS('background-color', 'rgb(0, 68, 97)');
     await expect(stage).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(map).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(canvas).toHaveCSS('background-color', 'rgb(0, 13, 31)');
@@ -119,6 +120,7 @@ test('两套主题的左右面板同色，且与白板底色不同', async ({ pa
     await page.getByRole('button', { name: '明亮', exact: true }).click();
     await page.getByRole('button', { name: '关闭偏好设置', exact: true }).click();
     await expectMatchingSurfaces();
+    await expect(activeFooter).toHaveCSS('background-color', 'rgb(1, 53, 124)');
     await expect(canvas).toHaveCSS('background-color', 'rgb(217, 225, 235)');
     await expect(map).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(dock).toHaveCSS('border-left-width', '0px');
@@ -474,6 +476,12 @@ test('区域无标签仍可平滑横向浏览，双主题与英文窄屏保留�
     await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeLessThan(2);
     await expect(previous).toBeDisabled();
     await expect(next).toBeEnabled();
+    const footers = scroller.locator('.inspector-heading-bottom');
+    await expect(footers.first()).toHaveCSS('background-color', 'rgb(0, 68, 97)');
+    await expect(footers.first()).toHaveCSS('border-block-start-color', 'rgb(48, 53, 60)');
+    await expect(footers.nth(1)).toHaveCSS('background-color', 'rgb(32, 35, 40)');
+    await expect(previous).toHaveCSS('background-color', 'rgb(65, 73, 83)');
+    await expect(next).toHaveCSS('background-color', 'rgb(65, 73, 83)');
     const leftButton = (await previous.boundingBox())!;
     const rightButton = (await next.boundingBox())!;
     const contentBox = (await scroller.boundingBox())!;
@@ -515,12 +523,30 @@ test('区域无标签仍可平滑横向浏览，双主题与英文窄屏保留�
     await page.getByRole('button', { name: '明亮', exact: true }).click();
     await page.getByLabel('界面语言').selectOption('en');
     await page.getByRole('button', { name: 'Close Preferences', exact: true }).click();
+    const lightScroller = page.getByLabel('Details content', { exact: true });
+    const lightCards = lightScroller.locator('.dock-card');
+    const lightFooters = lightScroller.locator('.inspector-heading-bottom');
+    await expect(lightScroller.locator('.dock-card.active .inspector-heading-bottom')).toHaveCSS(
+      'background-color',
+      'rgb(1, 53, 124)',
+    );
+    await lightFooters.nth(1).getByRole('heading').focus();
+    await expect(lightCards.nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(lightFooters.nth(1)).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+    await expect(lightFooters.nth(1).locator('[data-panel-close]')).toHaveCSS(
+      'color',
+      'rgb(255, 255, 255)',
+    );
+    await expect(lightFooters.first()).toHaveCSS('background-color', 'rgb(242, 244, 247)');
     await page.screenshot({
       path: '.megit/verification/git-inspector/light-en.png',
       animations: 'disabled',
     });
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.getByRole('button', { name: 'Browse details to the right' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Browse details to the right' })).toHaveCSS(
+      'background-color',
+      'rgb(73, 85, 105)',
+    );
     expect(
       (await page.getByRole('region', { name: 'Details browser', exact: true }).boundingBox())!
         .width,
