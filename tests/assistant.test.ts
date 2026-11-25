@@ -4,6 +4,147 @@ import path from 'node:path';
 import { fixture, commitFile, git } from './fixtures';
 import { AssistantService } from '../server/assistant';
 
+it('经授权预览全部拟提交改动，生成可审阅说明，确认前不写仓库', async () => {
+  const fixtureRepo = await fixture();
+  try {
+    const head = await commitFile(fixtureRepo.repo);
+    const remote = path.join(fixtureRepo.root, 'remote.git');
+    await git(fixtureRepo.root, 'init', '--bare', remote);
+    await git(fixtureRepo.repo, 'remote', 'add', 'origin', remote);
+    await git(fixtureRepo.repo, 'push', '-u', 'origin', 'main');
+    await writeFile(path.join(fixtureRepo.repo, '笔记 example.txt'), 'staged draft\n');
+    await git(fixtureRepo.repo, 'add', '--', '笔记 example.txt');
+    await writeFile(path.join(fixtureRepo.repo, '笔记 example.txt'), 'final tracked change\n');
+    await writeFile(path.join(fixtureRepo.repo, 'new.txt'), 'untracked addition\n');
+    const originalIndex = await git(fixtureRepo.repo, 'ls-files', '--stage');
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          text: 'Plan ready',
+          operations: [
+            { repositoryId: 'one', type: 'stageAll' },
+            { repositoryId: 'one', type: 'commit', generateMessage: true },
+            { repositoryId: 'one', type: 'push' },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce('feat: update notes and add a file');
+    const service = new AssistantService({
+      repository: async () => ({ id: 'one', name: 'One', path: fixtureRepo.repo }),
+      complete,
+    });
+    const reply = await service.chat({
+      repositoryIds: ['one'],
+      prompt: '暂存所有改动，生成提交说明，再提交并推送',
+      language: 'zh-CN',
+      history: [],
+      includeStagedDiff: false,
+      allowCommitDiff: true,
+    });
+    expect(JSON.stringify(complete.mock.calls[0])).not.toContain('untracked addition');
+    const summaryRequest = JSON.stringify(complete.mock.calls[1]);
+    expect(summaryRequest).toContain('final tracked change');
+    expect(summaryRequest).toContain('untracked addition');
+    expect(summaryRequest).not.toContain('staged draft');
+    expect(await git(fixtureRepo.repo, 'ls-files', '--stage')).toBe(originalIndex);
+    expect(await git(remote, 'rev-parse', 'refs/heads/main')).toBe(head);
+    const commit = reply.plan!.steps.find((step) => step.type === 'commit')!;
+    expect(commit.message).toBe('feat: update notes and add a file');
+    expect(reply.plan!.steps.map((step) => step.type)).toEqual(['stageAll', 'commit', 'push']);
+    expect(
+      (await service.execute(reply.plan!.id, { [commit.id]: 'feat: reviewed notes' })).status,
+    ).toBe('completed');
+    expect(await git(remote, 'log', '-1', '--format=%s', 'main')).toBe('feat: reviewed notes');
+  } finally {
+    await fixtureRepo.cleanup();
+  }
+});
+
+it('未允许发送拟提交差异时不读取或发送差异，也不生成可执行计划', async () => {
+  const fixtureRepo = await fixture();
+  try {
+    await writeFile(path.join(fixtureRepo.repo, 'new.txt'), 'private worktree text\n');
+    const complete = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        text: 'Plan',
+        operations: [
+          { repositoryId: 'one', type: 'stageAll' },
+          { repositoryId: 'one', type: 'commit', generateMessage: true },
+        ],
+      }),
+    );
+    const service = new AssistantService({
+      repository: async () => ({ id: 'one', name: 'One', path: fixtureRepo.repo }),
+      complete,
+    });
+    await expect(
+      service.chat({
+        repositoryIds: ['one'],
+        prompt: '暂存并自动写提交说明',
+        language: 'zh-CN',
+        history: [],
+        includeStagedDiff: false,
+      }),
+    ).rejects.toMatchObject({ code: 'assistantCommitConsent' });
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(complete.mock.calls)).not.toContain('private worktree text');
+    expect(await git(fixtureRepo.repo, 'ls-files')).toBe('');
+  } finally {
+    await fixtureRepo.cleanup();
+  }
+});
+
+it.each(['filter', 'changed'] as const)(
+  '拟提交内容遇到 %s 时不返回可执行计划',
+  async (scenario) => {
+    const fixtureRepo = await fixture();
+    try {
+      await commitFile(
+        fixtureRepo.repo,
+        '.gitattributes',
+        scenario === 'filter' ? '*.txt filter=demo\n' : '\n',
+      );
+      await writeFile(path.join(fixtureRepo.repo, 'new.txt'), 'original content\n');
+      const complete = vi
+        .fn()
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            text: 'Plan',
+            operations: [
+              { repositoryId: 'one', type: 'stageAll' },
+              { repositoryId: 'one', type: 'commit', generateMessage: true },
+            ],
+          }),
+        )
+        .mockImplementationOnce(async () => {
+          await writeFile(path.join(fixtureRepo.repo, 'new.txt'), 'changed during generation\n');
+          return 'feat: original content';
+        });
+      const service = new AssistantService({
+        repository: async () => ({ id: 'one', name: 'One', path: fixtureRepo.repo }),
+        complete,
+      });
+      await expect(
+        service.chat({
+          repositoryIds: ['one'],
+          prompt: '暂存并自动写提交说明',
+          language: 'zh-CN',
+          history: [],
+          includeStagedDiff: false,
+          allowCommitDiff: true,
+        }),
+      ).rejects.toMatchObject({
+        code: scenario === 'filter' ? 'assistantCommitFilter' : 'assistantStateChanged',
+      });
+      expect(complete).toHaveBeenCalledTimes(scenario === 'filter' ? 1 : 2);
+      expect(await git(fixtureRepo.repo, 'diff', '--cached')).toBe('');
+    } finally {
+      await fixtureRepo.cleanup();
+    }
+  },
+);
+
 it('先生成只读多仓库计划，确认后才提交及推送，计划只能执行一次', async () => {
   const f = await fixture();
   try {

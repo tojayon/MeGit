@@ -61,6 +61,8 @@ The active detail has a dark filled tab. When the detail columns do not fit, use
 
 ### AI assistant
 
+To stage, commit, and push from chat, reference the repositories and choose **Stage, commit and push**, or ask directly. Under **Data scope and capabilities**, allow the planned commit diff for the next message if you want AI-generated subjects. This may send unstaged changes and new files to the configured AI provider. Review or edit the commit messages and verify the upstream targets before confirming. Preparing the plan does not stage, commit, or push anything.
+
 ![Floating AI chat with UI Library and Web App selected as references](docs/screenshots/ai-assistant.png)
 
 *Demo conversation: two repository references, a release-readiness question, and a suggested next step.*

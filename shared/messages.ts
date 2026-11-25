@@ -4,6 +4,8 @@ export const errorMessages = {
   assistantBoardChanged: '流程图已变化或尚未保存，请检查当前工作流后重新生成计划。',
   assistantBoardLocked: '工作流布局已锁定，请先解锁再应用流程图修改。',
   assistantOutput: 'AI 返回了不受支持或超出所选仓库范围的操作，请调整要求后重试。',
+  assistantCommitConsent: '请在「发送范围与能力」允许发送拟提交差异，或直接提供提交说明，再重新发送。',
+  assistantCommitFilter: '拟暂存的文件使用了 Git 内容过滤器。请先手动审阅并暂存这些文件，再让 AI 生成提交说明。',
   assistantScope:
     '请选择当前流程图或 1–20 个仓库。每个仓库最多处理 2000 个改动文件、128 MiB 内容。',
   assistantBoardCapacity: '当前流程图内容超过 200,000 字符，请精简后重试或取消流程图引用。',

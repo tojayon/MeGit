@@ -253,6 +253,7 @@ const en = {
     quick: {
       inspect: 'Check repositories',
       commit: 'Prepare commits',
+      stageCommitPush: 'Stage, commit and push',
       push: 'Push to remotes',
       explainFlow: 'Explain this flow',
       createFlow: 'Add a testing flow',
@@ -268,6 +269,8 @@ const en = {
       inspect: 'Check branch and sync status of the selected repositories and suggest next steps.',
       commit:
         'Prepare a commit plan for the selected repositories. Check staged changes first and ask me for commit messages if needed.',
+      stageCommitPush:
+        'For the selected repositories, stage all changes, generate a commit message from the planned diff, commit, and push to the configured upstream. Show me the plan first.',
       push: 'Prepare a plan to push existing commits in the selected repositories to their configured upstream branches.',
     },
     loadingPlan: 'Checking the operation plan…',
@@ -276,8 +279,9 @@ const en = {
     scope: 'Select references',
     dataScope: 'Data scope and capabilities',
     includeDiff: 'Allow staged differences for this request',
+    allowCommitDiff: 'Allow sending the planned commit diff for the next message only',
     disclosure:
-      'Sends selected repository names, branches, status and recent conversation. Referencing the current flowchart also sends its name, description, full step text, positions, groups and connections, including content you entered. Registered repository paths are not automatically attached. Opting in sends up to 48,000 characters of staged differences in total, including filenames and code. Confirmed plans support fetch, stage, commit, push and flowchart changes. Flowchart changes use one undo step and never execute step commands. Git actions and flowchart edits are reviewed separately.',
+      'Sends selected repository names, branches, status and recent conversation. A flowchart reference also sends its contents and layout. Registered repository paths are not automatically attached. If allowed, diffs sent per message total up to 48,000 characters, including filenames and code. For a plan that stages all changes, the planned commit diff may include unstaged and new files. Only share changes that are safe to send. Git actions and flowchart edits require separate review and confirmation.',
     removeRepository: 'Remove {{name}} from references',
     missingRepository: 'Removed repository',
     noModel: 'No model configured',
@@ -1127,6 +1131,10 @@ const en = {
     assistantBoardLocked: 'The workflow layout is locked. Unlock it before applying flowchart edits.',
     assistantOutput:
       'The AI proposed unsupported operations or repositories outside the selected scope. Adjust your request and try again.',
+    assistantCommitConsent:
+      'Allow the planned commit diff under Data scope and capabilities, or provide a commit message, then resend.',
+    assistantCommitFilter:
+      'Some files use Git content filters. Review and stage those files manually before asking AI to generate the commit message.',
     assistantScope:
       'Select the current flowchart or 1–20 repositories. Each repository supports up to 2,000 changed files and 128 MiB of content.',
     assistantBoardCapacity:

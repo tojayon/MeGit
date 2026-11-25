@@ -44,6 +44,7 @@ async function run(
   proxy?: GitProxy,
   localOnly = false,
   alternateObjects?: string,
+  isolatedIndex?: { index: string; objects: string },
 ) {
   const proxyArgs = proxy
     ? [
@@ -76,6 +77,9 @@ async function run(
           ...(proxy || remoteProbe ? { GIT_ALLOW_PROTOCOL: 'file:git:http:https:ssh' } : {}),
           ...(localOnly ? { GIT_ALLOW_PROTOCOL: 'file', GIT_NO_LAZY_FETCH: '1' } : {}),
           ...(alternateObjects ? { GIT_ALTERNATE_OBJECT_DIRECTORIES: alternateObjects } : {}),
+          ...(isolatedIndex
+            ? { GIT_INDEX_FILE: isolatedIndex.index, GIT_OBJECT_DIRECTORY: isolatedIndex.objects }
+            : {}),
           ...(remoteProbe
             ? {
                 GIT_ASKPASS: '',
@@ -114,6 +118,27 @@ async function run(
 }
 
 export { run as runGit };
+
+export function runGitIndexPreview(
+  repo: string,
+  directory: string,
+  alternateObjects: string,
+  args: string[],
+  outputLimit?: number,
+) {
+  return run(
+    repo,
+    ['-c', `core.hooksPath=${directory}`, '-c', 'core.fsmonitor=false', '-c', 'core.splitIndex=false', ...args],
+    false,
+    false,
+    outputLimit,
+    false,
+    undefined,
+    true,
+    JSON.stringify(alternateObjects),
+    { index: path.join(directory, 'index'), objects: path.join(directory, 'objects') },
+  );
+}
 
 export function routeGitAddress(
   repo: string,

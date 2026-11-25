@@ -127,6 +127,90 @@ test('跨仓库聊天先审阅再提交推送，刷新保留会话且不重放�
   }
 });
 
+test('聊天为未暂存改动生成说明，单次授权后审阅并推送', async ({ page, request }) => {
+  const fixtureRepo = await fixture();
+  const received: string[] = [];
+  const upstream = createServer(async (req, res) => {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    received.push(body);
+    const content =
+      received.length === 1
+        ? JSON.stringify({
+            text: '请审阅提交和推送计划。',
+            operations: [
+              { repositoryId: 'assistant-repo', type: 'stageAll' },
+              { repositoryId: 'assistant-repo', type: 'commit', generateMessage: true },
+              { repositoryId: 'assistant-repo', type: 'push' },
+            ],
+          })
+        : 'feat: add draft feature';
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ choices: [{ message: { content } }] }));
+  });
+  upstream.listen(0, '127.0.0.1');
+  await once(upstream, 'listening');
+  try {
+    const address = upstream.address();
+    if (!address || typeof address === 'string') throw new Error('No port');
+    const head = await commitFile(fixtureRepo.repo);
+    const remote = path.join(fixtureRepo.root, 'remote.git');
+    await git(fixtureRepo.root, 'init', '--bare', remote);
+    await git(fixtureRepo.repo, 'remote', 'add', 'origin', remote);
+    await git(fixtureRepo.repo, 'push', '-u', 'origin', 'main');
+    await writeFile(path.join(fixtureRepo.repo, 'feature.txt'), 'new draft feature\n');
+    const { token } = await (await request.get('/api/session')).json();
+    const headers = { 'X-MeGit-Token': token };
+    expect(
+      (
+        await request.put('/api/ai/settings', {
+          headers,
+          data: { endpoint: `http://127.0.0.1:${address.port}/v1`, model: 'demo', apiKey: '' },
+        })
+      ).ok(),
+    ).toBe(true);
+    const workspace = await (await request.get('/api/workspace', { headers })).json();
+    workspace.repositories = [{ id: 'assistant-repo', name: '示例仓库', path: fixtureRepo.repo }];
+    workspace.boards[0].nodes = [
+      { id: 'node', repoId: 'assistant-repo', position: { x: 0, y: 0 } },
+    ];
+    expect((await request.put('/api/workspace', { headers, data: workspace })).ok()).toBe(true);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+    const panel = page.getByRole('complementary', { name: 'MeGit AI 助手' });
+    const scope = panel.getByRole('button', { name: '发送范围与能力', exact: true });
+    const consent = panel.getByRole('checkbox', { name: '仅允许下一条消息发送拟提交差异' });
+    await panel.getByRole('button', { name: '暂存、提交并推送', exact: true }).click();
+    await expect(panel.getByRole('textbox', { name: '给 AI 助手的消息' })).toHaveValue(/生成说明/);
+    await scope.click();
+    await expect(consent).not.toBeChecked();
+    await consent.check();
+    await page.keyboard.press('Escape');
+    await panel.getByRole('button', { name: '发送消息', exact: true }).click();
+    const message = panel.getByRole('textbox', { name: '提交说明', exact: true });
+    await expect(message).toHaveValue('feat: add draft feature');
+    expect(received).toHaveLength(2);
+    expect(received[0]).not.toContain('new draft feature');
+    expect(received[1]).toContain('new draft feature');
+    expect(received[1]).not.toContain(fixtureRepo.repo);
+    expect(await git(fixtureRepo.repo, 'diff', '--cached')).toBe('');
+    expect(await git(remote, 'rev-parse', 'refs/heads/main')).toBe(head);
+    await scope.click();
+    await expect(consent).not.toBeChecked();
+    await page.keyboard.press('Escape');
+    await message.fill('feat: reviewed draft feature');
+    await panel.getByRole('button', { name: '确认执行计划', exact: true }).click();
+    await expect(panel.getByText('执行完成', { exact: true })).toBeVisible();
+    expect(await git(remote, 'log', '-1', '--format=%s', 'main')).toBe(
+      'feat: reviewed draft feature',
+    );
+  } finally {
+    upstream.closeAllConnections();
+    await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    await fixtureRepo.cleanup();
+  }
+});
+
 test('助手配置保存后立即更新，停止生成保留草稿，范围帮助支持键盘', async ({ page, request }) => {
   const f = await fixture();
   try {

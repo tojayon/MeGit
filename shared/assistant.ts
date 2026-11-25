@@ -15,6 +15,7 @@ export const assistantInputSchema = z
     boardId: z.string().min(1).max(100).optional(),
     projectGrant: projectGrantSchema.optional(),
     includeStagedDiff: z.boolean().default(false),
+    allowCommitDiff: z.boolean().optional(),
     planIds: z.array(z.string().max(128)).max(16).optional(),
     history: z
       .array(
@@ -31,12 +32,17 @@ export const assistantOutputSchema = z.strictObject({
   boardOperations: z.array(boardOperationSchema).max(40).default([]),
   operations: z
     .array(
-      z.discriminatedUnion('type', [
+      z.union([
         z.strictObject({ repositoryId: z.string(), type: z.enum(['fetch', 'stageAll', 'push']) }),
         z.strictObject({
           repositoryId: z.string(),
           type: z.literal('commit'),
           message: z.string().trim().min(1).max(10000),
+        }),
+        z.strictObject({
+          repositoryId: z.string(),
+          type: z.literal('commit'),
+          generateMessage: z.literal(true),
         }),
       ]),
     )

@@ -135,6 +135,7 @@ export function AssistantPanel({
   const projectBusy = useRef(false);
   const focusReview = useRef<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [commitDiffConsent, setCommitDiffConsent] = useState<string | null>(null);
   const [executing, setExecuting] = useState<string | null>(null);
   const root = useRef<HTMLElement>(null);
   const history = useRef<HTMLDivElement>(null);
@@ -159,6 +160,8 @@ export function AssistantPanel({
   const currentIds = current.repositoryIds.filter((id) =>
     unarchived.some((repo) => repo.id === id),
   );
+  const commitScope = JSON.stringify([current.id, currentIds]);
+  const allowCommitDiff = currentIds.length > 0 && commitDiffConsent === commitScope;
   const destination =
     currentIds.length === 1 ? unarchived.find((repo) => repo.id === currentIds[0]) : undefined;
   const savedGrant = grants[current.id];
@@ -367,6 +370,7 @@ export function AssistantPanel({
     const controller = new AbortController();
     pending.current = controller;
     setGenerating(true);
+    setCommitDiffConsent(null);
     setError(undefined);
     const conversationId = current.id;
     const prompt = current.draft.trim();
@@ -412,6 +416,7 @@ export function AssistantPanel({
           ...(grant ? { projectGrant: grant } : {}),
           language: i18n.resolvedLanguage === 'en' ? 'en' : 'zh-CN',
           includeStagedDiff: current.includeStagedDiff,
+          allowCommitDiff,
           planIds: planIds.slice(-16),
           history: current.messages
             .slice(-16)
@@ -510,6 +515,7 @@ export function AssistantPanel({
   function selectConversation(id: string) {
     pending.current?.abort();
     setError(undefined);
+    setCommitDiffConsent(null);
     follow.current = false;
     setSession((saved) => ({ ...saved, activeId: id }));
   }
@@ -531,6 +537,7 @@ export function AssistantPanel({
   }
 
   function changeRepositoryReferences(ids: string[]) {
+    setCommitDiffConsent(null);
     if (savedGrant) {
       forgetGrant(current.id);
       void revokeGrant(savedGrant.permission).catch(setError);
@@ -751,9 +758,10 @@ export function AssistantPanel({
                       'arrangeFlow',
                       'inspect',
                       'commit',
+                      'stageCommitPush',
                       'push',
                     ] as const)
-                  : (['inspect', 'commit', 'push'] as const)
+                  : (['inspect', 'commit', 'stageCommitPush', 'push'] as const)
                 ).map((kind) => (
                   <button
                     type="button"
@@ -1088,6 +1096,17 @@ export function AssistantPanel({
                   />
                   {t('assistant.includeDiff')}
                 </label>
+                <label className="assistant-diff-option">
+                  <input
+                    type="checkbox"
+                    checked={allowCommitDiff}
+                    disabled={generating || activeRun || !currentIds.length}
+                    onChange={(event) =>
+                      setCommitDiffConsent(event.target.checked ? commitScope : null)
+                    }
+                  />
+                  {t('assistant.allowCommitDiff')}
+                </label>
               </InfoPopover>
               <AssistantCapability
                 key={current.id}
@@ -1108,9 +1127,7 @@ export function AssistantPanel({
                 onClick={showQuickSettings}
               >
                 <Settings2 size={15} aria-hidden="true" />
-                <span className="assistant-model">
-                  {settings?.model || t('assistant.noModel')}
-                </span>
+                <span className="assistant-model">{settings?.model || t('assistant.noModel')}</span>
               </IconButton>
               {generating ? (
                 <IconButton
