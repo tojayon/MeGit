@@ -1,5 +1,10 @@
 # MeGit 验收记录
 
+## 2026-11-25：双语 README 徽标
+
+- 中英文页首各 6 枚可点击徽标。Edge 实测浅色宽屏和深色窄屏均成功加载，核对 MIT 文件及 LinuxDo 友链地址。LinuxDo 首页对自动请求返回 403。
+- `npm run check` 通过（294 项测试），主题与语言切换的 Edge 场景通过。验证记录位于 `.megit/verification/readme-badges/`。
+
 ## 2026-11-25：仓库文件与工作区统一风格
 
 - `npm run check` 通过（294 项测试）。9 项 Edge 场景通过，覆盖两个面板的品牌色，文件面板的居中标题、等高全宽栏、按钮状态，以及英文窄屏布局和原有差异预览、保存流程。记录位于 `.megit/verification/repository-panel-unified/`。

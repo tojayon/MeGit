@@ -4,7 +4,16 @@
 
 <p align="center">把相关仓库放在同一张白板上，查清每条分支还缺哪些提交，并逐步审阅发布所需的 Git 改动。</p>
 
-<p align="center"><a href="#快速开始">快速开始</a> · <a href="#产品导览">产品导览</a> · <a href="#典型场景">典型场景</a> · <a href="https://github.com/tojayon/MeGit/releases">下载安装</a> · <a href="README.md">English</a></p>
+<p align="center">
+  <a href="https://github.com/tojayon/MeGit/stargazers"><img src="https://img.shields.io/github/stars/tojayon/MeGit?style=flat-square&amp;label=Star&amp;color=01357C&amp;logo=github&amp;logoColor=white" alt="GitHub 星标数"></a>
+  <a href="https://github.com/tojayon/MeGit/forks"><img src="https://img.shields.io/github/forks/tojayon/MeGit?style=flat-square&amp;label=Fork&amp;color=275390&amp;logo=github&amp;logoColor=white" alt="GitHub 派生数"></a>
+  <a href="https://github.com/tojayon/MeGit/commits/main/"><img src="https://img.shields.io/github/last-commit/tojayon/MeGit/main?style=flat-square&amp;label=%E6%9C%80%E8%BF%91%E6%8F%90%E4%BA%A4&amp;color=36540C" alt="main 最近一次提交"></a>
+  <a href="https://github.com/tojayon/MeGit/releases"><img src="https://img.shields.io/badge/Windows-x64-01357C?style=flat-square" alt="下载 Windows x64 版 MeGit"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-MIT-36540C?style=flat-square" alt="MIT 许可证"></a>
+  <a href="https://linux.do/"><img src="https://img.shields.io/badge/%E5%8F%8B%E9%93%BE-LinuxDo-01357C?style=flat-square&amp;logo=discourse&amp;logoColor=white" alt="LinuxDo 社区友链"></a>
+</p>
+
+<p align="center"><a href="#快速开始">快速开始</a> · <a href="#产品导览">产品导览</a> · <a href="#典型场景">典型场景</a> · <a href="README.md">English</a></p>
 
 ![MeGit 明亮主题。组件库向 Web 应用整合四个待合入提交，发布检查带有重试回路](docs/screenshots/workflow.zh-CN.png)
 

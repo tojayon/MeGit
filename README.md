@@ -4,7 +4,16 @@
 
 <p align="center">Put related repositories on one canvas, see what each branch is missing, and review the Git changes that move a release forward.</p>
 
-<p align="center"><a href="#quick-start">Quick start</a> · <a href="#product-tour">Product tour</a> · <a href="#common-workflows">Common workflows</a> · <a href="https://github.com/tojayon/MeGit/releases">Download</a> · <a href="README.zh-CN.md">简体中文</a></p>
+<p align="center">
+  <a href="https://github.com/tojayon/MeGit/stargazers"><img src="https://img.shields.io/github/stars/tojayon/MeGit?style=flat-square&amp;label=Stars&amp;color=01357C&amp;logo=github&amp;logoColor=white" alt="GitHub stars"></a>
+  <a href="https://github.com/tojayon/MeGit/forks"><img src="https://img.shields.io/github/forks/tojayon/MeGit?style=flat-square&amp;label=Forks&amp;color=275390&amp;logo=github&amp;logoColor=white" alt="GitHub forks"></a>
+  <a href="https://github.com/tojayon/MeGit/commits/main/"><img src="https://img.shields.io/github/last-commit/tojayon/MeGit/main?style=flat-square&amp;label=Last%20commit&amp;color=36540C" alt="Last commit on main"></a>
+  <a href="https://github.com/tojayon/MeGit/releases"><img src="https://img.shields.io/badge/Windows-x64-01357C?style=flat-square" alt="Download MeGit for Windows x64"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-36540C?style=flat-square" alt="MIT License"></a>
+  <a href="https://linux.do/"><img src="https://img.shields.io/badge/Community-LinuxDo-01357C?style=flat-square&amp;logo=discourse&amp;logoColor=white" alt="LinuxDo community"></a>
+</p>
+
+<p align="center"><a href="#quick-start">Quick start</a> · <a href="#product-tour">Product tour</a> · <a href="#common-workflows">Common workflows</a> · <a href="README.zh-CN.md">简体中文</a></p>
 
 ![A light-theme release workflow linking UI Library to Web App, with four commits pending integration and a release check with a retry path](docs/screenshots/workflow.png)
 
