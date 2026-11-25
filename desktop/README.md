@@ -36,11 +36,11 @@ Find the installer in `desktop/src-tauri/target/x86_64-pc-windows-msvc/release/b
 
 Add `-PrepareOnly` to stage the assets without generating an installer. Then use `node --test desktop/backend.test.mjs` to test the bundled backend and `cargo test --locked --release --target x86_64-pc-windows-msvc --manifest-path desktop/src-tauri/Cargo.toml` to test window navigation. Browser builds and tests remain independent.
 
-## Release manually on GitHub
+## Build and release on GitHub
 
-1. For a new version, run `npm version 0.1.1 --no-git-tag-version` at the repository root (replace the example with the intended version). Commit and push the version files and changes to `main`. For a first release, you can use the current version if it has not been released. No tag is required in advance.
-2. Once the workflow is on the GitHub default branch, open **Actions → Windows Release → Run workflow**. Select `main`, enter the matching `version` without a `v` prefix, and leave `prerelease` checked if this is a preview build.
-3. The workflow tests and builds the installer, saves it with `SHA256.txt`, points the `v<version>` tag at the dispatched commit, and creates a **Release draft**. Open the draft from the run summary or **Releases**, test the installer, review the notes, and click **Publish release** yourself. Normal pushes neither trigger the workflow nor publish releases. The automated build is unsigned.
+1. Run `npm version 0.1.3 --no-git-tag-version` at the repository root (replace the example with the intended version). Commit and push the version files and changes to `main`. The workflow compares the root `package.json` before and after the entire push and only tests and builds automatically if `version` changes. No tag is required in advance. Automatic builds mark the draft as a pre-release.
+2. To build without changing the version, open **Actions → Windows Release → Run workflow**, select `main`, enter the current `version` without the `v` prefix, and choose whether to mark it as a `prerelease`. Adding the workflow alone does not backfill existing versions.
+3. The workflow saves the installer with `SHA256.txt`, points the `v<version>` tag at the built commit, and creates a **Release draft**. Open the draft from the run summary or **Releases**, test the installer, review the notes, and click **Publish release** yourself. The automated build is unsigned and never publishes the draft.
 
 The workflow refuses version mismatches, existing releases (including drafts), and tags that point at a different commit. If an interrupted upload leaves an incomplete draft, recover the files from the run's **Artifacts**, or remove the incomplete draft before retrying. A tag already pointing to the same commit can be reused. If draft creation fails with a permissions error, check whether repository or organization policy allows Actions to create tags and releases.
 

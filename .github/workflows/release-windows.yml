@@ -1,8 +1,11 @@
 name: Windows Release
 
-run-name: Windows Release v${{ inputs.version }}
+run-name: Windows Release ${{ inputs.version && format('v{0}', inputs.version) || github.ref_name }}
 
 on:
+  push:
+    branches: [main]
+    paths: [package.json]
   workflow_dispatch:
     inputs:
       version:
@@ -17,18 +20,61 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: windows-release-${{ inputs.version }}
-  cancel-in-progress: false
-
 jobs:
+  resolve:
+    name: Resolve the release version
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Compare or validate package.json version
+        id: version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE_SHA: ${{ github.event.before }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          function Read-PackageVersion([string]$Commit) {
+            $manifest = gh api --method GET "repos/$env:GITHUB_REPOSITORY/contents/package.json" `
+              --header 'Accept: application/vnd.github.raw+json' -f "ref=$Commit"
+            if ($LASTEXITCODE -ne 0) { throw "Could not read package.json at $Commit." }
+            ($manifest | ConvertFrom-Json).version
+          }
+
+          if ($env:GITHUB_EVENT_NAME -eq 'push' -and $env:BEFORE_SHA -match '\A0{40}\z') {
+            Write-Output 'No previous main commit; use Run workflow to build the initial version.'
+            exit 0
+          }
+
+          $version = Read-PackageVersion $env:GITHUB_SHA
+          if ($version -isnot [string] -or $version -cnotmatch '\A(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\z') {
+            throw 'The version in package.json must use X.Y.Z format without a v prefix.'
+          }
+
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+            $previousVersion = Read-PackageVersion $env:BEFORE_SHA
+            if ($version -ceq $previousVersion) {
+              Write-Output "package.json version is unchanged ($version); skipping the installer build."
+              exit 0
+            }
+            Write-Output "package.json version changed from $previousVersion to $version."
+          } elseif ($env:REQUESTED_VERSION -cne $version) {
+            throw "Requested version does not match package.json ($version). Enter it without a v prefix."
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
   build:
     name: Build and test Windows x64
-    if: github.ref == 'refs/heads/main'
+    needs: resolve
+    if: needs.resolve.outputs.version != ''
     runs-on: windows-2025
     timeout-minutes: 45
     env:
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.resolve.outputs.version }}
       CARGO_TARGET_DIR: ${{ github.workspace }}/desktop/src-tauri/target
       VITEST_MAX_WORKERS: '4'
     steps:
@@ -42,15 +88,6 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Validate the release version
-        run: |
-          if ($env:VERSION -cnotmatch '\A(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\z') {
-            throw 'Enter a version in X.Y.Z format without a v prefix.'
-          }
-          $sourceVersion = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
-          if ($env:VERSION -cne $sourceVersion) {
-            throw "Requested version $env:VERSION does not match package.json ($sourceVersion)."
-          }
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
@@ -82,31 +119,34 @@ jobs:
       - name: Save the installer for review
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: windows-x64-v${{ inputs.version }}
+          name: windows-x64-v${{ needs.resolve.outputs.version }}
           path: release-assets/
           if-no-files-found: error
           overwrite: true
 
   draft:
     name: Create an unpublished Release draft
-    needs: build
+    needs: [resolve, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
+    concurrency:
+      group: windows-release-draft-${{ needs.resolve.outputs.version }}
+      cancel-in-progress: false
     steps:
       - name: Retrieve the verified build
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: windows-x64-v${{ inputs.version }}
+          name: windows-x64-v${{ needs.resolve.outputs.version }}
           path: release-assets/
       - name: Verify checksum and create draft
         shell: bash
         working-directory: release-assets
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
-          PRERELEASE: ${{ inputs.prerelease }}
+          VERSION: ${{ needs.resolve.outputs.version }}
+          PRERELEASE: ${{ github.event_name == 'push' || inputs.prerelease }}
         run: |
           tag="v${VERSION}"
           installer="MeGit_${VERSION}_x64-setup.exe"
