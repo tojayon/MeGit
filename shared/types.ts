@@ -1,4 +1,5 @@
 import type { ErrorInfo, IntegrationMessage } from './messages.js';
+import type { RepositoryShortcut } from './repository-files.js';
 export type RelationKind = 'integration' | 'dependency' | 'delivery';
 export type PortSide = 'top' | 'right' | 'bottom' | 'left';
 export type EdgeRouting = 'smoothstep' | 'step' | 'bezier' | 'straight';
@@ -7,6 +8,7 @@ export interface Repository {
   name: string;
   path: string;
   logoPath?: string;
+  shortcut?: RepositoryShortcut;
   archived?: boolean;
 }
 export interface RepositoryImage {
@@ -286,6 +288,7 @@ export interface IntegrationState {
 }
 export interface Snapshot {
   repositories: Record<string, RepoState>;
+  repositoryFields?: Record<string, { value: string } | { error: ErrorInfo }>;
   relations: Record<string, IntegrationState>;
   checkedAt: string;
 }

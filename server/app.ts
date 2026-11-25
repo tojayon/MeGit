@@ -26,6 +26,8 @@ import { readCommitContext } from './ai-commit.js';
 import { checkRemoteRead, githubLoginAvailable, loginRemoteGitHub } from './remote-access.js';
 import { NetworkSettings, testNetworkProxy, withProxyFetch } from './network-proxy.js';
 import { LocalServices } from './local-service.js';
+import { inspectRepositoryEdit, listRepositoryFiles, previewRepositoryEdit, saveRepositoryEdit } from './repository-files.js';
+import { repositoryEditRequestSchema, repositoryEditSaveSchema, repositoryEditTargetSchema } from '../shared/repository-files.js';
 import { commitHashSchema as hashSchema, localRelationMerge, relationSelectionSchema } from './relation-merge.js';
 
 const relationActionSchema = relationSelectionSchema.extend({ type: z.enum(['pull', 'push', 'integrate']) });
@@ -175,6 +177,39 @@ export function createApp(options: { dataDirectory: string }) {
     return repo;
   }
 
+  async function editableRepository(id: string) {
+    const repo = await repository(id);
+    if (repo.archived) throw new AppError('repositoryMissing', 404);
+    return repo;
+  }
+
+  app.get('/api/repositories/:id/files', async (req, res) => {
+    const repo = await editableRepository(req.params.id);
+    res.json(await listRepositoryFiles(repo.path));
+  });
+  app.post('/api/repositories/:id/files/read', async (req, res) => {
+    const target = repositoryEditTargetSchema.safeParse(req.body);
+    if (!target.success) throw new AppError('repositoryEditPath');
+    const repo = await editableRepository(req.params.id);
+    res.json(await inspectRepositoryEdit(repo.path, target.data));
+  });
+  app.post('/api/repositories/:id/files/preview', async (req, res) => {
+    const input = repositoryEditRequestSchema.safeParse(req.body);
+    if (!input.success) throw new AppError('repositoryEditPath');
+    const repo = await editableRepository(req.params.id);
+    const { files, approval } = await previewRepositoryEdit(repo.path, input.data);
+    res.json({ files, approval });
+  });
+  app.put('/api/repositories/:id/files', async (req, res) => {
+    const input = repositoryEditSaveSchema.safeParse(req.body);
+    if (!input.success) throw new AppError('repositoryEditPath');
+    const id = req.params.id;
+    const repo = await editableRepository(id);
+    res.json(await saveRepositoryEdit(repo.path, input.data, async () => {
+      if ((await editableRepository(id)).path !== repo.path) throw new AppError('repositoryEditChanged', 409);
+    }));
+  });
+
   app.use(
     '/api/ai',
     aiRouter(
@@ -265,8 +300,10 @@ export function createApp(options: { dataDirectory: string }) {
       (b) => b.id === (req.query.boardId || workspace.activeBoardId),
     );
     if (!board) throw new AppError('boardMissing', 404);
+    const repositoryFields: NonNullable<Snapshot['repositoryFields']> = {};
     const result: Snapshot = {
       repositories: {},
+      repositoryFields,
       relations: {},
       checkedAt: new Date().toISOString(),
     };
@@ -277,6 +314,14 @@ export function createApp(options: { dataDirectory: string }) {
           try {
             await repository(repo.id);
             result.repositories[repo.id] = await readRepository(repo.path);
+            if (repo.shortcut && !repo.archived) {
+              try {
+                const { value } = await inspectRepositoryEdit(repo.path, repo.shortcut.target);
+                repositoryFields[repo.id] = { value: value.length > 120 ? value.slice(0, 119) + '…' : value };
+              } catch (error) {
+                repositoryFields[repo.id] = { error: errorInfo(error) };
+              }
+            }
           } catch (error) {
             result.repositories[repo.id] = failedState(error);
           }

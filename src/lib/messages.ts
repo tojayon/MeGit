@@ -22,6 +22,7 @@ export function formatError(error: unknown): string {
 export type NoticeMessage =
   | { key: `actions.${GitAction['type']}`; values: { name: string; target: string } }
   | { key: 'board.duplicate' }
+  | { key: 'repositoryFiles.saved' }
   | { key: 'relation.sync.integrated'; values: { target: string } }
   | Error
   | ErrorInfo;

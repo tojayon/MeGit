@@ -6,6 +6,8 @@
 
 运行 Windows x64 安装包 `MeGit_<版本>_x64-setup.exe`，然后从开始菜单打开 **MeGit**。安装以当前用户为范围。需要 WebView2；如果未安装，安装程序会联网获取。重新打开 MeGit 会唤醒已有窗口。默认关闭窗口时退出，并停止 MeGit 后端和它管理的本地服务。
 
+请从同一个 [GitHub Release](https://github.com/tojayon/MeGit/releases) 下载安装包和 `SHA256.txt`。在 PowerShell 中运行 `Get-FileHash -Algorithm SHA256 -LiteralPath '.\MeGit_<版本>_x64-setup.exe'`，将示例替换成实际文件名，并在安装前比对 `SHA256.txt` 中的完整哈希。预发布安装包未签名，Windows 可能显示 SmartScreen 提示。
+
 - Git 功能使用系统安装的 **Git for Windows**；如果未找到 Git，请安装并加入 PATH 后重新打开 MeGit。GitHub 登录仍使用 Git Credential Manager 和默认浏览器。
 - MeGit 内置自己的 Node.js。要启动仓库的 npm 脚本，仍需在系统 PATH 中安装该仓库需要的 Node.js，且配有同一安装内的 npm。PowerShell 脚本沿用本机 Windows PowerShell 和执行策略。
 - 桌面版使用 `127.0.0.1:43217`。如果端口已经被占用，MeGit 提示后退出，不接管或停止其他程序。浏览器版默认仍使用 `4317`。

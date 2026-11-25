@@ -31,6 +31,7 @@ export function RepositoryCard({
   onAction,
   onGenerate,
   onOpen,
+  onWorktree,
   children,
   serviceControls,
   reference,
@@ -46,6 +47,7 @@ export function RepositoryCard({
   onAction: (action: GitAction) => Promise<boolean>;
   onGenerate: () => Promise<boolean>;
   onOpen: () => void;
+  onWorktree?: () => void;
   children?: ReactNode;
   serviceControls?: ReactNode;
   reference?: string;
@@ -68,6 +70,31 @@ export function RepositoryCard({
   const openLabel = t('repository.viewNamed', {
     name: reference ? `${repo.name} · ${reference}` : repo.name,
   });
+  function worktreeCount(kind: 'modified' | 'staged', count: number) {
+    const label = t(`repositoryCard.${kind}Count`, { count });
+    const className = `repository-card-count ${kind}`;
+    return (
+      <Tooltip content={t(`repositoryCard.${kind}Help`)}>
+        {onWorktree ? (
+          <button
+            type="button"
+            className={`${className} nodrag nopan`}
+            aria-haspopup="dialog"
+            onClick={(event) => {
+              event.stopPropagation();
+              onWorktree();
+            }}
+          >
+            {label}
+          </button>
+        ) : (
+          <span className={className} tabIndex={0}>
+            {label}
+          </span>
+        )}
+      </Tooltip>
+    );
+  }
   async function generate() {
     if (!canGenerate) return;
     setError(null);
@@ -143,19 +170,11 @@ export function RepositoryCard({
                   <span className="repository-card-divider" aria-hidden="true">
                     |
                   </span>
-                  <Tooltip content={t('repositoryCard.modifiedHelp')}>
-                    <span className="repository-card-count modified" tabIndex={0}>
-                      {t('repositoryCard.modifiedCount', { count: paths.length })}
-                    </span>
-                  </Tooltip>
+                  {worktreeCount('modified', paths.length)}
                   <span className="repository-card-divider" aria-hidden="true">
                     |
                   </span>
-                  <Tooltip content={t('repositoryCard.stagedHelp')}>
-                    <span className="repository-card-count staged" tabIndex={0}>
-                      {t('repositoryCard.stagedCount', { count: staged })}
-                    </span>
-                  </Tooltip>
+                  {worktreeCount('staged', staged)}
                 </>
               )}
             </div>

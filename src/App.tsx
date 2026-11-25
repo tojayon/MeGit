@@ -68,6 +68,7 @@ import { focusWithoutTooltip } from './lib/overlays';
 import { GitLearningDialog } from './components/GitLearningDialog';
 import { RepositoryIndex } from './components/RepositoryIndex';
 import { RepositoryAvatarDialog } from './components/RepositoryAvatarDialog';
+import { RepositoryFilesDialog } from './components/RepositoryFilesDialog';
 import { WorkflowHeader, workflowPanelId, workflowTabId } from './components/WorkflowHeader';
 import { WorkspaceStatusbar } from './components/WorkspaceStatusbar';
 import { useViewState, useViewIssue, viewStorage } from './lib/use-view-state';
@@ -148,6 +149,7 @@ export default function App() {
   const [assistantOpen, setAssistantOpen] = useViewState('app.assistant', false, isBoolean);
   const viewIssue = useViewIssue();
   const [avatarRepositoryId, setAvatarRepositoryId] = useState<string | null>(null);
+  const [repositoryFiles, setRepositoryFiles] = useState<string | null>(null);
   const [relationDraft, setRelationDraft] = useState<Partial<FlowEdge> | undefined>();
   const [connectionDraft, setConnectionDraft] = useState<Partial<FlowConnection> | undefined>();
   const [groupDraft, setGroupDraft] = useState<FlowGroup | undefined>();
@@ -290,7 +292,7 @@ export default function App() {
   }, [board?.id, workspace?.revision, saveStatus, refresh]);
 
   const openRepo = useCallback(
-    (id: string, targetBoardId?: string, byNode = false) => {
+    (id: string, targetBoardId?: string, byNode = false, worktree = false) => {
       const targetBoard = targetBoardId
         ? workspace?.boards.find((b) => b.id === targetBoardId)
         : board;
@@ -299,6 +301,11 @@ export default function App() {
         : (targetBoard?.nodes.find((n) => n.repoId === id && !n.ref) ??
           targetBoard?.nodes.find((n) => n.repoId === id));
       if (!targetBoard || !node) return;
+      if (worktree) {
+        const repo = workspace?.repositories.find((entry) => entry.id === node.repoId);
+        if (!repo) return;
+        viewStorage.write(`${viewKey(targetBoard.id, node.id, node.ref || 'HEAD', repo.path)}.tools`, 'worktree');
+      }
       reopenTab(targetBoard.id);
       setSelectedRepo(node.repoId);
       setSelectedEdge(null);
@@ -833,6 +840,7 @@ export default function App() {
                   );
                 }}
                 onSelectRepo={(id) => openRepo(id, undefined, true)}
+                onWorktree={(id) => openRepo(id, undefined, true, true)}
                 onSelectEdge={openEdge}
                 onSelectConnection={(id) => {
                   setSelectedIds([]);
@@ -1038,6 +1046,8 @@ export default function App() {
                         }}
                         onNotice={notify}
                         onAvatar={() => setAvatarRepositoryId(activeRepo.id)}
+                        onFiles={() => setRepositoryFiles(activeRepo.id)}
+                        shortcutField={snapshot?.repositoryFields?.[activeRepo.id]}
                         avatarDisabled={saveStatus === 'failed'}
                       />
                     )}
@@ -1395,6 +1405,24 @@ export default function App() {
             }
           />
         )}
+      {repositoryFiles && workspace.repositories.filter((repo) => repo.id === repositoryFiles && !repo.archived).map((repo) => (
+        <RepositoryFilesDialog
+          key={`${repo.id}:${repo.path}`}
+          repo={repo}
+          onClose={() => setRepositoryFiles(null)}
+          onSaved={() => {
+            void refresh();
+            notify({ key: 'repositoryFiles.saved' });
+          }}
+          onShortcut={saveStatus === 'failed' ? undefined : (shortcut) => update((draft) => {
+            const target = draft.repositories.find((item) => item.id === repo.id && item.path === repo.path);
+            if (target) {
+              if (shortcut) target.shortcut = shortcut;
+              else delete target.shortcut;
+            }
+          })}
+        />
+      ))}
       {notice && (
         <div
           className={`toast ${notice.error ? 'toast-error' : ''}`}

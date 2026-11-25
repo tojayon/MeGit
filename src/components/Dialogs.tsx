@@ -21,6 +21,7 @@ export function Dialog({
   title,
   titleIcon,
   titleDetail,
+  headerLeading,
   children,
   onClose,
   wide = false,
@@ -36,6 +37,7 @@ export function Dialog({
   title: string;
   titleIcon?: ReactNode;
   titleDetail?: ReactNode;
+  headerLeading?: ReactNode;
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
@@ -118,6 +120,7 @@ export function Dialog({
             <GripHorizontal size={18} />
           </IconButton>
         )}
+        {headerLeading}
         {titleIcon || titleDetail ? (
           <div className="dialog-title-context">
             <h2 id={titleId}>{title}</h2>

@@ -21,6 +21,9 @@ import type {
 import { i18n } from '../i18n';
 import { ApiError } from './messages';
 import { errorMessages, type ErrorInfo } from '../../shared/messages';
+import type {
+  RepositoryEditPreview, RepositoryEditRequest, RepositoryEditSnapshot, RepositoryEditTarget,
+} from '../../shared/repository-files';
 
 let session: Promise<string> | undefined;
 async function token() {
@@ -60,6 +63,20 @@ export async function request<T>(url: string, options: RequestInit = {}): Promis
   return data as T;
 }
 export const api = {
+  repositoryFiles: (id: string, signal?: AbortSignal) =>
+    request<string[]>(`/repositories/${encodeURIComponent(id)}/files`, { signal }),
+  readRepositoryEdit: (id: string, target: RepositoryEditTarget, signal?: AbortSignal) =>
+    request<RepositoryEditSnapshot>(`/repositories/${encodeURIComponent(id)}/files/read`, {
+      method: 'POST', body: JSON.stringify(target), signal,
+    }),
+  previewRepositoryEdit: (id: string, edit: RepositoryEditRequest, signal?: AbortSignal) =>
+    request<RepositoryEditPreview>(`/repositories/${encodeURIComponent(id)}/files/preview`, {
+      method: 'POST', body: JSON.stringify(edit), signal,
+    }),
+  saveRepositoryEdit: (id: string, edit: RepositoryEditRequest & { approval: string }) =>
+    request<{ written: string[] }>(`/repositories/${encodeURIComponent(id)}/files`, {
+      method: 'PUT', body: JSON.stringify(edit),
+    }),
   remoteAccessOptions: (repoId: string, name: string, signal: AbortSignal) =>
     request<{ githubLogin: boolean }>(
       `/repositories/${encodeURIComponent(repoId)}/remote-access?${new URLSearchParams({ name })}`,

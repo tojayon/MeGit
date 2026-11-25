@@ -22,6 +22,7 @@ import type {
   GitAction,
   RepoState,
   Repository,
+  Snapshot,
 } from '../../shared/types';
 import { api, timeAgo } from '../lib/api';
 import { Dialog } from './Dialogs';
@@ -49,6 +50,8 @@ import { useViewState, useScrollMemory, viewStorage } from '../lib/use-view-stat
 import { isText, isFiniteNumber } from '../lib/view-storage';
 import { useRepositoryActions } from '../lib/use-repository-actions';
 import { LocalServiceDialog } from './LocalServiceDialog';
+import { RepositoryFilesDialog } from './RepositoryFilesDialog';
+import { RepositoryShortcutControl } from './RepositoryShortcutControl';
 
 type DiffSelection = { title: string; query: DiffQuery };
 const isDiffSelection = (value: unknown): value is DiffSelection | null => {
@@ -680,6 +683,18 @@ export function RepositoryToolsPanel({
   );
 }
 
+export function WorktreeIdentity({ repo, state }: { repo: Repository; state?: RepoState }) {
+  return (
+    <div className="worktree-dialog-context repository-panel-identity" title={repo.name}>
+      <RepositoryAvatar repo={repo} size="small" />
+      <span className="repository-panel-name">{repo.name}</span>
+      {state?.branch && !state.detached && (
+        <span className="worktree-dialog-branch" title={state.branch}>{state.branch}</span>
+      )}
+    </div>
+  );
+}
+
 export function RepositoryPanel({
   repo,
   cardRef,
@@ -692,6 +707,8 @@ export function RepositoryPanel({
   onState,
   onNotice,
   onAvatar,
+  onFiles,
+  shortcutField,
   avatarDisabled,
 }: {
   repo: Repository;
@@ -705,11 +722,14 @@ export function RepositoryPanel({
   onState: (state: RepoState) => void;
   onNotice: (text: NoticeMessage, error?: boolean) => void;
   onAvatar?: () => void;
+  onFiles?: () => void;
+  shortcutField?: NonNullable<Snapshot['repositoryFields']>[string];
   avatarDisabled?: boolean;
 }) {
   const { t } = useTranslation();
   const showWorktree = cardUsesWorktree(cardRef, state);
   const [showLocalService, setShowLocalService] = useState(false);
+  const [showShortcut, setShowShortcut] = useState(false);
   const { message, setMessage, busy, executeAction, generateCommit } = useRepositoryActions({
     repo,
     worktreeRef: cardRef,
@@ -765,6 +785,15 @@ export function RepositoryPanel({
       onClose={onClose}
       actions={
         <>
+          {onFiles && showWorktree && (
+            <IconButton
+              label={t('repositoryFiles.title')}
+              onClick={onFiles}
+              placement={bottomNavigation ? 'top' : 'bottom'}
+            >
+              <FileCode2 size={16} />
+            </IconButton>
+          )}
           <IconButton
             label={t('localService.title')}
             onClick={() => setShowLocalService(true)}
@@ -821,26 +850,26 @@ export function RepositoryPanel({
           viewKey={viewKey && `${viewKey}.${view}`}
           restoreReady={readyView?.tab === view && readyView.ready}
           title={t(view === 'worktree' ? 'repository.worktree' : 'repository.history')}
-          titleIcon={
-            view === 'worktree' ? <RepositoryAvatar repo={repo} size="small" /> : undefined
-          }
-          titleDetail={
-            view === 'worktree' ? (
-              <div className="worktree-dialog-context">
-                <span>{repo.name}</span>
-                {state?.branch && !state.detached && (
-                  <span className="worktree-dialog-branch">{state.branch}</span>
-                )}
-              </div>
-            ) : undefined
-          }
+          headerLeading={view === 'worktree' && <WorktreeIdentity repo={repo} state={state} />}
           wide
           busy={!!busy}
           onClose={() => setView(null)}
           className={`repository-tools-dialog${view === 'worktree' ? ' worktree-detail-dialog' : ''}`}
-          headerActions={<HelpTip topic={view === 'worktree' ? 'worktree' : 'history'} />}
+          headerActions={
+            <>
+              {view === 'worktree' && onFiles && (
+                <IconButton label={t('repositoryFiles.title')} onClick={onFiles}>
+                  <FileCode2 size={16} />
+                </IconButton>
+              )}
+              <HelpTip topic={view === 'worktree' ? 'worktree' : 'history'} />
+            </>
+          }
         >
           <div className="dialog-body">
+            {view === 'worktree' && repo.shortcut && (
+              <RepositoryShortcutControl shortcut={repo.shortcut} field={shortcutField} onOpen={() => setShowShortcut(true)} />
+            )}
             <RepositoryToolsPanel
               cardRef={cardRef}
               viewKey={viewKey && `${viewKey}.${view}`}
@@ -856,6 +885,17 @@ export function RepositoryPanel({
               onGenerateCommit={generateCommit}
             />
           </div>
+          {view === 'worktree' && showShortcut && repo.shortcut && (
+            <RepositoryFilesDialog
+              repo={repo}
+              startShortcut={repo.shortcut}
+              onClose={() => setShowShortcut(false)}
+              onSaved={() => {
+                void onRefresh();
+                onNotice({ key: 'repositoryFiles.saved' });
+              }}
+            />
+          )}
         </Dialog>
       )}
       {diff && (

@@ -122,6 +122,7 @@ type RepoNode = Node<
     serviceProblem?: unknown;
     onServiceAction: ReturnType<typeof useLocalServiceCards>['execute'];
     onOpen: (id: string) => void;
+    onWorktree: (id: string) => void;
     boardId: string;
     onState: (id: string, state: RepoState) => void;
     onRefresh: () => Promise<void>;
@@ -180,6 +181,7 @@ const RepositoryNode = memo(function RepositoryNode({ id, data, selected }: Node
         !!data.ref && !!state && !state.branches.some((branch) => branchRef(branch) === data.ref)
       }
       showWorktree={cardUsesWorktree(data.ref, state)}
+      onWorktree={() => data.onWorktree(id)}
       serviceControls={data.service && !data.ref && state && !state.error && (
         <LocalServiceCardControls
           key={`${repo.id}:${repo.path}`}
@@ -337,6 +339,7 @@ function CanvasContents({
   selectedGroup,
   selectedIds,
   onSelectRepo,
+  onWorktree,
   onRepositoryState,
   onRefresh,
   onNotice,
@@ -373,6 +376,7 @@ function CanvasContents({
   selectedGroup: string | null;
   selectedIds: string[];
   onSelectRepo: (id: string) => void;
+  onWorktree: (id: string) => void;
   onRepositoryState: (id: string, state: RepoState) => void;
   onRefresh: () => Promise<void>;
   onNotice: (notice: NoticeMessage, error?: boolean) => void;
@@ -647,6 +651,7 @@ function CanvasContents({
           data: {
             repo,
             state: snapshot?.repositories[node.repoId],
+            onWorktree,
             ref: node.ref,
             service: node.ref ? undefined : serviceByRepo.get(node.repoId),
             servicePending: localServices.pending.get(node.repoId),

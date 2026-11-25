@@ -123,15 +123,52 @@ describe('MeGit 品牌色规范', () => {
         expect(contrast(tokens['sync-pull-text'], tokens[background])).toBeGreaterThanOrEqual(4.5);
       }
       expect(contrast(tokens.canvas, tokens.danger)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(tokens['card-toolbar-bg'], tokens['card-commit-hover'])).toBeGreaterThanOrEqual(
-        4.5,
-      );
-      expect(contrast(tokens['card-input-accent'], tokens['card-input-hover'])).toBeGreaterThanOrEqual(
-        4.5,
-      );
+      expect(
+        contrast(tokens['card-toolbar-bg'], tokens['card-commit-hover']),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrast(tokens['card-input-accent'], tokens['card-input-hover']),
+      ).toBeGreaterThanOrEqual(4.5);
       for (const foreground of ['card-input-text', 'card-input-muted', 'card-input-accent']) {
         expect(contrast(tokens[foreground], tokens['card-input-bg'])).toBeGreaterThanOrEqual(4.5);
       }
     }
+  });
+
+  it('代码高亮在正文、当前行和搜索底色上保持可读', async () => {
+    const { themes } = await loadPalette();
+    for (const [theme, tokens] of Object.entries(themes)) {
+      const foregrounds = ['text', 'text-secondary', 'accent', 'green', 'diff-hunk-text'];
+      for (const foreground of foregrounds) {
+        for (const background of ['diff-bg', 'hover', 'diff-hunk-bg']) {
+          expect(
+            contrast(tokens[foreground], tokens[background]),
+            `${theme}: ${foreground} on ${background}`,
+          ).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      expect(contrast(tokens.muted, tokens['surface-raised'])).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(tokens.focus, tokens['diff-hunk-bg'])).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('深蓝工作区栏的文字、提交状态与输入控件使用高对比色', async () => {
+    const { themes } = await loadPalette();
+    const dark = themes.dark;
+    const blue = dark['card-input-accent'];
+    for (const foreground of ['brand-icon-surface', 'diff-hunk-text']) {
+      expect(contrast(dark[foreground], blue)).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const background of ['card-input-bg', 'brand-icon-surface']) {
+      for (const foreground of ['card-input-text', 'card-input-muted', 'card-input-accent']) {
+        expect(contrast(dark[foreground], dark[background])).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(dark[background], blue)).toBeGreaterThanOrEqual(3);
+    }
+    expect(contrast(dark['accent-solid'], blue)).toBeGreaterThanOrEqual(3);
+    expect(
+      contrast(dark['canvas-mode-text'], dark['card-toolbar-disabled']),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(dark.focus, blue)).toBeGreaterThanOrEqual(3);
   });
 });

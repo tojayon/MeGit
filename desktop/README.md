@@ -6,6 +6,8 @@
 
 Run the Windows x64 installer, `MeGit_<version>_x64-setup.exe`, then open **MeGit** from the Start menu. Installation is per user. If WebView2 is missing, the installer downloads it. Starting MeGit again opens the existing window. By default, closing the window quits MeGit and stops its backend and managed local services.
 
+Download the installer and `SHA256.txt` from the same [GitHub Release](https://github.com/tojayon/MeGit/releases). Run `Get-FileHash -Algorithm SHA256 -LiteralPath '.\MeGit_<version>_x64-setup.exe'` in PowerShell with the actual filename and compare the full hash with `SHA256.txt` before running the installer. Current preview builds are unsigned, so Windows may show a SmartScreen warning.
+
 - Install **Git for Windows** and put it on your PATH for Git features. GitHub sign-in continues to use Git Credential Manager and your default browser.
 - MeGit bundles its own Node.js. Running a repository npm script still requires the project's Node.js installation and its matching npm on your PATH. PowerShell scripts use Windows PowerShell and respect its execution policy.
 - Desktop uses `127.0.0.1:43217`; it fails on a conflict without stopping or attaching to the other process. Browser mode still defaults to `4317`.

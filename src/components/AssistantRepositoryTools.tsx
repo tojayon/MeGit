@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { RepoState, Repository, GitAction } from '../../shared/types';
 import { useRepositoryActions } from '../lib/use-repository-actions';
 import { formatError } from '../lib/messages';
-import { RepositoryToolsPanel, RepositoryPanel } from './RepositoryPanel';
+import { RepositoryToolsPanel, RepositoryPanel, WorktreeIdentity } from './RepositoryPanel';
 import { RepositoryAvatar } from './RepositoryAvatar';
 import { Dialog } from './Dialogs';
 
@@ -46,11 +46,14 @@ export function AssistantRepositoryTools({
   return (
     <Dialog
       title={t(view === 'worktree' ? 'repository.worktree' : 'assistantGuidance.branches')}
-      titleIcon={<RepositoryAvatar repo={repo} size="small" />}
+      headerLeading={view === 'worktree' && <WorktreeIdentity repo={repo} state={state} />}
+      titleIcon={view === 'branches' && <RepositoryAvatar repo={repo} size="small" />}
       titleDetail={
-        <span>
-          {repo.name} · {state.branch}
-        </span>
+        view === 'branches' && (
+          <span>
+            {repo.name} · {state.branch}
+          </span>
+        )
       }
       className={
         view === 'worktree'

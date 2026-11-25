@@ -60,6 +60,7 @@ try {
 
     Copy-Item -LiteralPath 'dist', 'dist-server' -Destination $backend -Recurse
     Copy-Item -LiteralPath 'package.json', 'package-lock.json' -Destination $backend
+    Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $backend 'MeGit-LICENSE.txt')
     Invoke-Step 'npm.cmd' @('--prefix', $backend, 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund')
 
     if (!$PrepareOnly) {

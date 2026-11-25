@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const directory = path.join(root, 'public/brand');
 const palette = JSON.parse(await fs.readFile(path.join(directory, 'palette.json'), 'utf8'));
-const logo = await fs.readFile(path.join(directory, 'megit-logo.svg'), 'utf8');
+const normalizeLineEndings = (value) => value.replaceAll('\r\n', '\n');
+const logo = normalizeLineEndings(await fs.readFile(path.join(directory, 'megit-logo.svg'), 'utf8'));
 const xml = (value) =>
   String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
 
@@ -200,7 +201,7 @@ for (const [name, output] of [
   const target = path.join(directory, name);
   if (process.argv.includes('--check')) {
     const current = await fs.readFile(target, 'utf8').catch(() => '');
-    if (current !== output) {
+    if (normalizeLineEndings(current) !== output) {
       console.error(`${name} is out of date; run npm run brand:palette.`);
       process.exitCode = 1;
     }

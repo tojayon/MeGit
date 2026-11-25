@@ -1,41 +1,30 @@
-<p align="center">
-  <img src="public/brand/megit-logo.svg" width="250" alt="MeGit">
-</p>
+<p align="center"><img src="public/brand/megit-logo.svg" width="250" alt="MeGit"></p>
 
-<p align="center"><strong>A visual Git workbench for multi-repository workflows</strong></p>
-<p align="center">Map dependencies, verify what has landed, and inspect local Git history from one workflow.</p>
+<h1 align="center">A visual Git workbench for multi-repository workflows</h1>
 
-<p align="center">
-  <a href="#quick-start"><img src="https://img.shields.io/badge/Node.js-22.12%2B-43853d" alt="Node.js 22.12+"></a>
-  <a href="#local-by-default"><img src="https://img.shields.io/badge/Local-127.0.0.1-1769aa" alt="Runs locally"></a>
-  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Languages-EN%20%2F%20ZH-1769aa" alt="English and Simplified Chinese"></a>
-</p>
+<p align="center">Put related repositories on one canvas, see what each branch is missing, and review the Git changes that move a release forward.</p>
 
-<p align="center">
-  <a href="#quick-start">Quick start</a> · <a href="#features">Features</a> · <a href="#product-gallery">Screenshots</a> · <a href="README.zh-CN.md">简体中文</a>
-</p>
+<p align="center"><a href="#quick-start">Quick start</a> · <a href="#product-tour">Product tour</a> · <a href="#common-workflows">Common workflows</a> · <a href="https://github.com/tojayon/MeGit/releases">Download</a> · <a href="README.zh-CN.md">简体中文</a></p>
 
-![MeGit light theme: a shared library, a web app, and their release workflow](docs/screenshots/workflow.png)
+![A light-theme release workflow linking UI Library to Web App, with four commits pending integration and a release check with a retry path](docs/screenshots/workflow.png)
 
-## Features
+## What you can do with MeGit
 
-- **Workflow canvas** — Each workflow has one canvas. Keep multiple workflows open in tabs, group repositories, map dependencies and release steps, and export as SVG or PNG. Each tab has workflow information on the left and a close button on the right. Closing the tab does not remove the workflow.
-- **Integration checks** — See which source commits are missing from a target. Open the connection to inspect the comparison.
-- **Connection shortcuts** — Pending push (blue, right) and pull (green, left) are visible without hovering when they can run. If a direction has no pending commits, its shortcut appears in gray on hover or keyboard focus and cannot be activated. Pull status reflects the last fetch. For two local repositories, edit the connection and enable fast-forward integration to move source commits into the checked-out target. Every action shows its direction and requires confirmation; the connection remains a comparison entry point.
-- **Review and merge locally** — Enable *Review and merge* on a connection between two local repositories to compare their unique commits before changing anything. Prepare the merge in the checked-out target, review the staged result, and explicitly commit or abort. If files conflict, resolve and stage them in the target, then reopen the connection to continue. No remote or push is needed.
-- **Git workbench** — Compare with the trunk or view the latest commit’s diff using the buttons beside each branch label. Stage changes, commit, and manage branches and remotes in the same workbench. Pull highlights in green when there are incoming commits, and Push highlights in blue when there are outgoing commits. Both show the sync direction and require confirmation. Fetch runs directly.
-- **Optional AI assistant** — Ask about selected repositories, draft commit messages, and review proposed actions before applying them.
-- **AI merge review** — Request a summary, possible risks, suggested checks, and a draft merge commit message in one request. Sending review content requires confirmation. Once the merge is ready, you can use or edit the draft without submitting the merge.
+MeGit is a local workbench for projects whose code and release steps span several Git repositories. Repository cards show branch and working tree state. Directed links show where changes need to go. Open a card to inspect Git history or open a code integration link to see which commits are missing.
+
+- **See the whole project.** Group repositories, show several refs from the same repository side by side, and map build, test, and release decisions on the canvas. Open several workflows in tabs and export the visible canvas as SVG or PNG.
+- **Follow changes down to the file.** Explore branch history, compare refs, inspect commit diffs, and move changes from the working tree to the staging area and into a commit.
+- **Review before applying changes.** Check sync direction, inspect a local merge, preview an npm version bump, or review a proposed AI plan.
 
 ## Quick start
 
 ### Windows desktop
 
-Run the Windows x64 installer, then open **MeGit** from the Start menu. The desktop app bundles its Node.js runtime and uses your existing Git for Windows installation. See the [desktop installation and build guide](desktop/README.md).
+Download the Windows x64 installer and its matching `SHA256.txt` from [GitHub Releases](https://github.com/tojayon/MeGit/releases). Preview installers are unsigned. MeGit bundles Node.js and uses your installed Git for Windows. [Installation and checksum verification](desktop/README.md).
 
 ### Browser
 
-Requires **Node.js 22.12+** and **Git** on your `PATH`.
+You need Node.js **22.12+** and Git on your `PATH`.
 
 ```sh
 git clone https://github.com/tojayon/MeGit.git
@@ -45,67 +34,140 @@ npm run build
 npm start
 ```
 
-Open **[127.0.0.1:4317](http://127.0.0.1:4317)**. On Windows, you can also double-click [`Start-MeGit.cmd`](Start-MeGit.cmd) in the checkout.
+Open [http://127.0.0.1:4317](http://127.0.0.1:4317). On Windows, [`Start-MeGit.cmd`](Start-MeGit.cmd) can install dependencies and build on first launch.
 
-Add two local repositories and connect them with a **Code integration** edge to compare their Git refs by commit ancestry.
+### Try your first workflow
 
-Hold **Shift** while dragging cards, groups, or a selection to move only horizontally or vertically. The main drag direction sets the axis until you release Shift. Auto snap only adjusts positions along that axis; hold **Alt** to bypass snapping without unlocking it.
+1. Select **Add repository** and register two existing local Git repositories. To compare two refs in one repository, add a second card for the same repository and bind it to another branch.
+2. Draw a **Code integration** link from the source card to the target card. The two refs need shared commit history for the comparison.
+3. Select the link to inspect the result. If the target lacks an object needed for the comparison, fetch the source remote from the target repository and check again.
 
-Open a workflow under **My workflows**. Use **Workflow settings** in the upper-right canvas toolbar to edit its name and description or to remove it after confirmation. Local repositories are kept, and the last workflow cannot be removed. Global settings remain in the sidebar. To register or manage local repositories, open **Repository management** just above **Preferences**.
+## Product tour
 
-Workflow tabs span the canvas and the right-hand details. Repository and relationship controls are at the bottom of their respective panels. Each workflow remembers which details were open, the active detail, and the panel width when you switch workflows or reload the browser tab. Select **Hide workflow panel** just to the left of **+** under **My workflows** to give the details the full workspace width without closing any tabs. Use the same button to show the canvas again.
+### 1. Map the route from code to release
 
-The active detail has a dark filled tab. When the detail columns do not fit, use the dark arrow buttons at either end of the bottom row to browse them. Long titles stay on one line; hover or focus a title to see its full name. The details browser and branch map hide their scrollbars without disabling scrolling or panning.
-
-## Product gallery
-
-### AI assistant
-
-To stage, commit, and push from chat, reference the repositories and choose **Stage, commit and push**, or ask directly. Under **Data scope and capabilities**, allow the planned commit diff for the next message if you want AI-generated subjects. This may send unstaged changes and new files to the configured AI provider. Review or edit the commit messages and verify the upstream targets before confirming. Preparing the plan does not stage, commit, or push anything.
-
-![Floating AI chat with UI Library and Web App selected as references](docs/screenshots/ai-assistant.png)
-
-*Demo conversation: two repository references, a release-readiness question, and a suggested next step.*
-
-The reference picker is the first control in the reference row. The lower-left controls show what is sent and which capabilities are active. The model button opens Quick AI settings for the endpoint, model, and API key, next to the Send or Stop button in the message box’s lower-right cutout. Project delivery permissions remain in Software settings.
-
-| Branch map | Integration comparison |
-| :---: | :---: |
-| [![Branch map showing forks, a merge, and HEAD](docs/screenshots/branch-map.png)](docs/screenshots/branch-map.png) | [![Comparison showing four missing commits and their ancestry](docs/screenshots/integration.png)](docs/screenshots/integration.png) |
+Repository cards belong on the same canvas as notes, decision nodes, and retry paths. **Code integration** follows Git history. **Development dependency** and **Delivery** record how you organize the work. Groups keep related repositories together, while workflow tabs preserve a different view for each project or release.
 
 <details>
-<summary>Git visual classroom and dark mode</summary>
+<summary>See the release canvas in dark mode</summary>
 
-**Git visual classroom** — Step through a merge without touching a repository.
-
-![Interactive Git lesson showing two branch histories joining](docs/screenshots/git-classroom.png)
-
-**Dark mode** — The same release workflow in the dark theme.
-
-![MeGit release workflow in dark mode](docs/screenshots/workflow-dark.png)
+![The same release workflow in the dark theme](docs/screenshots/workflow-dark.png)
 
 </details>
 
-## Local by default
+### 2. Check what has landed and what is still missing
 
-Open **Settings** from the sidebar to configure the AI service and network proxy. AI connection details and project permissions appear in separate groups. Test and save actions stay visible while you scroll; the desktop app’s **Interface** switches apply immediately.
+The integration panel compares the selected source and target refs by commit ancestry. Inspect their common history and the commits the target still needs. For two local repositories, you can enable fast-forward integration or prepare a merge, inspect its staged result, and choose whether to commit or abort. Delivery links document intended handoffs. Build and deployment status belongs to your release process.
 
-The bottom-left control in the AI composer shows the current conversation’s capabilities. **Default scope** reads referenced repository context and reads and edits the referenced workflow. For file changes, enable **AI project delivery** in **Settings → AI service**, reference exactly one repository in the chat, then choose **Default scope → Repository read/write**. There’s no second repository picker. **Learn more** shows the local path, AI provider, and file access rules. Send requests in the same chat and review proposals before saving. Ordinary questions and workflow edits still work. Changing repository references restores the default scope; new chats and page reloads do not inherit the authorization. A generated PowerShell entry can also be saved to local startup settings after explicit trust. Saving does not run the script, stage changes, commit, or push.
+![Integration comparison with source and target lanes and four missing commits](docs/screenshots/integration.png)
 
-MeGit binds to `127.0.0.1` and saves workflows locally. Git uses your existing configuration and credentials. An AI provider receives task context only when you use a configured AI feature.
+### 3. Explore branches, merges, and individual changes
 
-In the branch map, open **Manage remotes** to fetch one remote from its card or fetch all remotes from the footer. Each card’s settings button contains **Check read access** and **Sign in to GitHub**, where available. If an integration connection says the target has not fetched the source commit, fetch the source remote from the target repository. For two local repositories, you can add the source repository’s local path as a remote. Fetch does not merge changes.
+The branch map shows the actual forks and merges in Git history. Choose a comparison trunk without switching the checked-out branch. Select a branch to see its status, compare it with the trunk, or open the latest commit's diff. Expand a collapsed segment to inspect its commits in place.
 
-On Windows, open **Local service** in a repository's details to approve an existing npm script or a repository PowerShell script. Start, stop, or restart the managed foreground service and read its output directly in the terminal panel. An optional TCP port enables readiness and conflict checks. When a service with a configured port is running, **Open service** on the left of the footer opens `http://127.0.0.1:<port>` in a new tab. MeGit does not stop unrelated listeners or launch services automatically.
+<p align="center">
+  <a href="docs/screenshots/branch-map.png"><img src="docs/screenshots/branch-map.png" width="46%" alt="Branch map with feature branches, a merge, and HEAD"></a>
+  <a href="docs/screenshots/branch-comparison.png"><img src="docs/screenshots/branch-comparison.png" width="46%" alt="In-map branch comparison with commits unique to feature/export"></a>
+</p>
 
-Click the repository name on a canvas card to open its details. Once a local service is configured, a circular button sits halfway in a semicircular notch near the upper-right side of the current HEAD card. The button is green for Start and red for Stop, and shares the card's blue outline when selected. Hovering shows a tooltip without changing the button's appearance or size. While the service runs, elapsed time appears above the card, to the left of the Stop button, without resizing the card. It shows `02:03:04` until one full day has elapsed, then includes days (for example, `01d 02:03:04`). The timer updates every second, continues across page refreshes, and resets when the service restarts. Errors appear on the card; Restart, configuration, and full output stay in the Local service panel.
+<details>
+<summary>See the commit diff and the dark branch map</summary>
 
-See the [local service script specification](docs/LOCAL_SERVICE_SCRIPTS.md) for entry rules and working npm and PowerShell examples.
+![Commit diff with changed files and the added export function](docs/screenshots/commit-diff.png)
 
-Each active service has its own terminal tab on the left side of the workflow footer. Select a tab to open that repository's terminal directly. Save and check details are under **Status information** on the right.
+![Branch map in the dark theme](docs/screenshots/branch-map-dark.png)
 
-## Development
+</details>
 
-`npm run dev` starts the app. `npm run check` runs the project checks; `npm run test:e2e` runs the Edge scenarios.
+### 4. Review the working tree before committing
 
-[User guide (简体中文)](README.zh-CN.md) · [Architecture](docs/ARCHITECTURE.md) · [Design system](docs/DESIGN_SYSTEM.md)
+The working tree shows unstaged and staged files side by side. Read file diffs, stage or unstage changes individually or in bulk, and write a commit message. The repository card shares the same draft and provides a compact staging and commit entry point. Fetch updates local remote refs. Pull and push show the direction and ask for confirmation.
+
+![Working tree with separate file lists, sync controls, and a commit message](docs/screenshots/working-tree.png)
+
+<details>
+<summary>See the commit message editor and the dark working tree</summary>
+
+![Expanded commit message editor with a subject and release checklist](docs/screenshots/commit-message.png)
+
+![Working tree in the dark theme](docs/screenshots/working-tree-dark.png)
+
+</details>
+
+### 5. Edit small project files and preview version bumps
+
+Open **Repository files** from the repository toolbar, select a file in the tree, and edit it in the adjacent pane. Existing, non-ignored UTF-8 text files up to 96 KiB are supported. Review the diff before saving. Click **Modified** or **Staged** on the repository card to open the working tree panel, where configured shortcuts appear. The npm shortcut updates `package.json` and any existing npm lockfiles together. A JSON shortcut edits a scalar such as `/release/channel` while preserving the surrounding formatting.
+
+![Version shortcut preview showing updates to package.json and package-lock.json](docs/screenshots/version-preview.png)
+
+<details>
+<summary>See the repository file tree and review a text edit before saving</summary>
+
+![Repository file tree beside the editor for a release checklist](docs/screenshots/repository-file-tree.png)
+
+![Repository file preview showing edits to a release checklist in README.md](docs/screenshots/repository-files.png)
+
+</details>
+
+### 6. Ask the AI assistant with repository context
+
+Reference the repositories you want to discuss. The assistant can summarize their state, draft a commit message, propose a workflow edit, or prepare a Git plan for actions such as staging, committing, and pushing to a configured upstream. Review the proposed changes and confirm them in MeGit. Project file editing is an optional capability for a single explicitly authorized repository.
+
+![AI assistant answering a release-readiness question about two referenced repositories](docs/screenshots/ai-assistant.png)
+
+<details>
+<summary>See the AI assistant in dark mode</summary>
+
+![The same assistant conversation in the dark theme](docs/screenshots/ai-assistant-dark.png)
+
+</details>
+
+### 7. Run a local preview on Windows
+
+Approve a repository's existing npm script or PowerShell launch entry. Start, restart, or stop it through MeGit, inspect its terminal output, and open the configured loopback address when the service is running. Active services are accessible from the workflow footer. [Local service scripts and examples](docs/LOCAL_SERVICE_SCRIPTS.md).
+
+![Local service console showing npm output, the preview port, and start or stop controls](docs/screenshots/local-service.png)
+
+<details>
+<summary>See the local service console in dark mode</summary>
+
+![Local service console in the dark theme](docs/screenshots/local-service-dark.png)
+
+</details>
+
+### 8. Learn Git visually and make the interface your own
+
+The **Git visual classroom** lets you step through staging, snapshots, branch switches, merging, remote sync, undo, and conflict resolution with animated examples. Open **Preferences** to switch independently between English and Simplified Chinese, and between light and dark themes.
+
+![Git visual classroom showing two branches joining in a simulated merge](docs/screenshots/git-classroom.png)
+
+<details>
+<summary>See language and theme preferences</summary>
+
+![Preferences dialog with light and dark themes and an interface language selector](docs/screenshots/preferences.png)
+
+</details>
+
+## Common workflows
+
+- **Roll out a shared library update.** Link the library to each downstream app. Use the integration panels to see which apps still lack the relevant commits.
+- **Maintain public and internal variants.** Map both repositories in one workflow and compare the refs that represent your shared baseline and the internal version.
+- **Prepare a release.** Review the working tree, preview the package version change, start a local preview on Windows, and track checks with decision nodes.
+- **Get comfortable with Git.** Practice a merge in the classroom, then use the branch map and command previews to inspect a real repository.
+
+## Local data and AI
+
+MeGit listens on `127.0.0.1` and stores workflows locally. A source checkout uses `.megit/` by default. Git uses your existing configuration and credentials. Fetch, pull, and push contact the remotes involved in those operations.
+
+AI is optional. An AI request sends the context selected for that feature to the configured provider. This can include repository metadata, workflow text, file contents, or diffs. One-message permission to send a proposed commit diff can include unstaged and new files. Check the scope before sharing private code. Windows protects saved API keys with the current user's system credentials.
+
+## Documentation and development
+
+- [User guide (简体中文)](docs/USER_GUIDE.zh-CN.md) · [Windows desktop guide](desktop/README.md) · [Local service scripts](docs/LOCAL_SERVICE_SCRIPTS.md)
+- [Architecture](docs/ARCHITECTURE.md) · [Design system](docs/DESIGN_SYSTEM.md) · [Screenshot gallery and capture instructions](docs/screenshots/README.md)
+
+Run `npm run dev` to start the development server, `npm run check` for project checks, and `npm run test:e2e` for the Edge scenarios. Use isolated data and temporary repositories when testing.
+
+## License
+
+MeGit is distributed under the [MIT License](LICENSE). Bundled third-party components retain their own licenses.

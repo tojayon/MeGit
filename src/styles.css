@@ -1181,6 +1181,17 @@ code {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+button.repository-card-count {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+button.repository-card-count:is(:hover, :focus-visible) {
+  text-decoration: underline;
+}
 .repository-card-count.modified {
   color: var(--orange);
 }
@@ -3771,7 +3782,7 @@ code {
   font-weight: var(--weight-strong);
 }
 .dialog-title-context,
-.worktree-dialog-context {
+.repository-panel-identity {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -3781,28 +3792,65 @@ code {
 .dialog-title-context + .dialog-header-actions {
   flex: none;
 }
-.worktree-dialog-context {
-  flex-wrap: wrap;
-  color: var(--muted);
+.repository-panel-identity {
+  color: var(--repository-panel-bar-text);
   font-size: var(--text-caption);
-  overflow-wrap: anywhere;
+}
+.repository-panel-identity .repository-avatar {
+  color: inherit;
 }
 .worktree-dialog-branch {
-  color: var(--accent);
+  color: var(--diff-hunk-text);
+}
+:is(.repository-panel-name, .worktree-dialog-branch) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .worktree-detail-dialog[open] {
   display: flex;
   flex-direction: column;
   height: var(--worktree-dialog-height);
 }
-.worktree-detail-dialog > .dialog-header {
+:is(.worktree-detail-dialog, .repository-files-dialog) > .dialog-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-2);
   flex: none;
+}
+:is(.worktree-detail-dialog, .repository-files-dialog) > .dialog-header > h2 {
+  text-align: center;
+  margin: 0;
+}
+:is(.worktree-detail-dialog, .repository-files-dialog) > .dialog-header > .dialog-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  min-width: 0;
+}
+:is(.worktree-detail-dialog, .repository-files-dialog) > .dialog-header .icon-button {
+  color: var(--repository-panel-bar-text);
+}
+:is(.worktree-detail-dialog, .repository-files-dialog) > .dialog-header .icon-button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+.worktree-detail-dialog > .dialog-header,
+.repository-files-dialog > :is(.dialog-header, .dialog-footer),
+.worktree-detail-dialog .commit-compact-row {
+  min-height: var(--repository-panel-bar-height);
+  box-sizing: border-box;
+  padding: 0 var(--repository-panel-bar-gutter);
+  border: 0;
+  background: var(--repository-panel-bar-bg);
+  color: var(--repository-panel-bar-text);
 }
 .repository-tools-dialog.worktree-detail-dialog > .dialog-body {
   flex: 1;
   min-height: 0;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-6);
+  padding: 0;
   container: worktree-dialog / inline-size;
 }
 .worktree-detail-dialog .commit-composer {
@@ -3813,8 +3861,61 @@ code {
 .worktree-detail-dialog .commit-compact-row {
   flex: none;
   order: 1;
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-3);
+  flex-wrap: nowrap;
+}
+.worktree-detail-dialog .commit-compact-field {
+  flex: 1 1 auto;
+  border-color: var(--worktree-input-bg);
+  background: var(--worktree-input-bg);
+  color: var(--card-input-text);
+  color-scheme: light;
+}
+.worktree-detail-dialog .commit-compact-field:focus-within {
+  background: var(--worktree-input-focus-bg);
+}
+.worktree-detail-dialog .commit-compact-field textarea {
+  color: var(--card-input-text);
+}
+.worktree-detail-dialog .commit-compact-field textarea::placeholder {
+  color: var(--card-input-muted);
+}
+.worktree-detail-dialog .commit-compact-field .icon-button {
+  color: var(--card-input-accent);
+}
+.worktree-detail-dialog .commit-compact-field .icon-button[aria-disabled='true'] {
+  color: var(--card-input-muted);
+}
+.worktree-detail-dialog .commit-compact-field .icon-button:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--card-input-hover);
+}
+.worktree-detail-dialog .commit-compact-row .button {
+  min-height: var(--control-compact);
+}
+.worktree-detail-dialog .commit-compact-row .button[data-action='commit']:disabled,
+.repository-files-dialog > .dialog-footer .button:disabled {
+  opacity: 1;
+  background: var(--repository-panel-disabled-bg);
+  border-color: var(--repository-panel-disabled-bg);
+  color: var(--repository-panel-disabled-text);
+}
+.worktree-detail-dialog :is(.worktree-file-panes, .worktree-dialog-sync) {
+  margin-inline: var(--space-6);
+}
+.worktree-detail-dialog .repository-shortcut {
+  display: flex;
+  padding: var(--space-1) var(--repository-panel-bar-gutter);
+  background: var(--diff-hunk-bg);
+}
+.worktree-detail-dialog .repository-shortcut-button {
+  min-height: var(--control-small);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface);
+  color: var(--accent);
+}
+@media (pointer: coarse) {
+  .worktree-detail-dialog .repository-shortcut-button {
+    min-height: var(--control-touch);
+  }
 }
 .worktree-file-panes {
   flex: 1;
@@ -3822,7 +3923,6 @@ code {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
-  border-block: 1px solid var(--border);
 }
 .worktree-file-panes > .repo-sync-note {
   grid-column: 1 / -1;
@@ -4332,6 +4432,322 @@ code {
   max-height: 65dvh;
   background: var(--diff-bg);
   padding: 9px 0;
+}
+.repository-shortcut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: none;
+}
+.repository-shortcut-button {
+  max-width: 100%;
+  min-width: 0;
+  background: var(--surface-raised);
+}
+.repository-shortcut-button .button-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repository-files-body {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+.repository-files-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  height: var(--repository-file-dialog-height);
+}
+.repository-file-layout {
+  display: grid;
+  grid-template-columns: minmax(0, var(--repository-file-tree-width)) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.repository-file-tree {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-inline-end: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+.repository-file-tree h3,
+.repository-file-tree-scroll > p {
+  margin: var(--space-3);
+}
+.repository-file-tree h3 {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+.repository-file-tree-scroll {
+  flex: 1;
+  overflow: auto;
+  padding-inline: var(--space-2);
+}
+.repository-file-entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.repository-file-entries .repository-file-entries {
+  padding-inline-start: var(--space-3);
+}
+.repository-file-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-compact);
+  box-sizing: border-box;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.repository-file-row::-webkit-details-marker {
+  display: none;
+}
+.repository-file-row > svg {
+  flex: none;
+  color: var(--muted);
+}
+.repository-file-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.repository-file-item {
+  padding-inline-start: calc(var(--space-2) * 3 + var(--space-1));
+}
+.repository-file-row:hover {
+  background: var(--hover);
+}
+.repository-file-row[aria-current='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: inset 2px 0 var(--accent);
+}
+details[open] > .repository-file-row > .repository-file-chevron {
+  transform: rotate(90deg);
+}
+.repository-file-manual {
+  border-top: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+}
+.repository-file-manual summary {
+  cursor: pointer;
+}
+.repository-file-manual form {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+.repository-file-manual input {
+  width: 100%;
+}
+.repository-file-layout > .repository-file-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.repository-file-layout .repository-files-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.repository-file-layout .repository-files-body:has(> .repository-code-area:not([hidden])) {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+.repository-file-layout .repository-files-body:has(> .repository-code-area:not([hidden])) > .error-message {
+  margin: var(--space-2) var(--space-3);
+}
+.repository-files-dialog > .dialog-footer {
+  flex: none;
+  align-items: center;
+  padding-block: var(--space-1);
+}
+.repository-files-dialog > .dialog-footer .button {
+  min-height: var(--control-compact);
+  padding-block: var(--space-1);
+}
+.repository-file-empty {
+  text-align: center;
+}
+.repository-files-body:has(> .repository-file-empty:only-child) {
+  align-content: center;
+}
+@media (max-width: 620px) {
+  .repository-file-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .repository-file-tree {
+    max-height: 28dvh;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .repository-file-manual {
+    overflow: auto;
+  }
+}
+@media (pointer: coarse) {
+  .repository-file-row {
+    min-height: var(--control-touch);
+  }
+}
+.repository-file-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}
+.repository-file-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--muted);
+}
+.repository-file-branch svg {
+  flex: none;
+}
+.repository-file-layout .repository-files-body:has(> .repository-code-area:not([hidden])) > .repository-file-context {
+  padding: var(--space-2) var(--repository-panel-bar-gutter);
+  background: var(--diff-hunk-bg);
+}
+.repository-file-layout .repository-file-branch {
+  color: var(--diff-hunk-text);
+}
+.repository-code-area {
+  min-height: 0;
+}
+.repository-code-area[hidden] {
+  display: none;
+}
+.repository-code-editor {
+  height: 100%;
+}
+.repository-code-editor .cm-editor {
+  height: 100%;
+  color: var(--text);
+  background: var(--diff-bg);
+  font-size: var(--text-body);
+}
+.repository-code-editor .cm-editor.cm-focused {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--focus);
+}
+.repository-code-editor .cm-scroller {
+  line-height: 1.7;
+}
+.repository-code-editor .cm-content {
+  caret-color: var(--text);
+  padding-block: var(--space-3);
+}
+.repository-code-editor .cm-line {
+  padding-inline: var(--space-3);
+}
+.repository-code-editor .cm-gutters,
+.repository-code-editor .cm-panels {
+  color: var(--muted);
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+.repository-code-editor .cm-lineNumbers .cm-gutterElement {
+  padding-inline: var(--space-2);
+}
+.repository-code-editor :is(.cm-activeLine, .cm-activeLineGutter) {
+  background: var(--hover);
+}
+.repository-code-editor .cm-activeLineGutter {
+  color: var(--text-secondary);
+}
+.repository-code-editor .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
+.repository-code-editor .cm-content ::selection {
+  background: var(--selection-bg);
+}
+.repository-code-editor .cm-editor :is(.cm-searchMatch, .cm-selectionMatch, .cm-matchingBracket) {
+  background: var(--diff-hunk-bg);
+}
+.repository-code-editor .cm-editor :is(.cm-searchMatch-selected, .cm-matchingBracket) {
+  outline: 1px solid var(--focus);
+  outline-offset: -1px;
+}
+.repository-code-editor .cm-editor .cm-nonmatchingBracket {
+  background: var(--danger-soft);
+  text-decoration: underline wavy var(--danger);
+}
+.repository-code-editor .cm-editor .cm-specialChar {
+  color: var(--danger);
+}
+.repository-code-editor .cm-editor :is(.cm-tooltip, .cm-foldPlaceholder) {
+  color: var(--text-secondary);
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+}
+.repository-code-editor .cm-tooltip-autocomplete ul li[aria-selected] {
+  color: var(--on-accent);
+  background: var(--accent-solid);
+}
+.repository-code-editor :is(.cm-cursor, .cm-dropCursor) {
+  border-color: var(--text);
+}
+.repository-code-editor .cm-panel :is(.cm-textfield, .cm-button) {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+}
+.repository-code-editor .cm-panel input.cm-textfield {
+  width: min(16ch, 60%);
+  min-height: var(--control-small);
+  padding: var(--space-1) var(--space-2);
+}
+.repository-code-editor .cm-panel label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-1);
+}
+.repository-code-editor .cm-panel button[name='close'] {
+  color: var(--text);
+}
+.repository-field-dialog .repository-files-body {
+  padding: var(--space-4) var(--space-6) var(--space-5);
+}
+.repository-field-dialog .repository-file-context {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+  font-size: var(--text-caption);
+  align-items: center;
+}
+.repository-field-dialog .repository-field-value {
+  font-family: monospace;
+  background: var(--surface);
+  font-weight: var(--weight-strong);
+}
+.repository-field-dialog .dialog-footer {
+  padding-block: var(--space-2);
+}
+.repository-file-preview h3 {
+  margin: 0 0 var(--space-1);
+  overflow-wrap: anywhere;
+}
+.repository-file-preview .diff-view pre > span {
+  display: block;
+  min-width: max-content;
+  padding-inline: var(--space-2);
 }
 .diff-view pre {
   margin: 0;

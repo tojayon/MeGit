@@ -2,6 +2,9 @@
 :root,
 .local-service-console,
 .local-service-preview,
+.worktree-detail-dialog > .dialog-header,
+.repository-files-dialog > :is(.dialog-header, .dialog-footer),
+.worktree-detail-dialog .commit-compact-row,
 :root[data-theme='dark'] {
   color-scheme: dark;
   --surface: #1d2024;
@@ -82,6 +85,7 @@
   --minimap-node: #4d72a3;
   --minimap-mask: #16181bb8;
   --diff-bg: #1b1d21;
+  --code-identifier: var(--diff-hunk-text);
   --diff-add-bg: #223408;
   --diff-add-text: #c2e88f;
   --diff-remove-bg: #3b222a;
@@ -97,6 +101,18 @@
   --preview-light-bg: #f5f6f8;
   --preview-light-panel: #d9e1eb;
   --preview-light-node: #01357c;
+}
+.worktree-detail-dialog > .dialog-header,
+.repository-files-dialog > :is(.dialog-header, .dialog-footer),
+.worktree-detail-dialog .commit-compact-row {
+  --repository-panel-bar-bg: var(--card-input-accent);
+  --repository-panel-bar-text: var(--brand-icon-surface);
+  --repository-panel-disabled-bg: var(--card-toolbar-disabled);
+  --repository-panel-disabled-text: var(--canvas-mode-text);
+}
+.worktree-detail-dialog .commit-compact-row {
+  --worktree-input-bg: var(--card-input-bg);
+  --worktree-input-focus-bg: var(--brand-icon-surface);
 }
 :root[data-theme='light'] {
   color-scheme: light;
@@ -178,6 +194,7 @@
   --minimap-node: #4d72a3;
   --minimap-mask: #f5f6f8bb;
   --diff-bg: #fbfcfe;
+  --code-identifier: var(--diff-hunk-text);
   --diff-add-bg: #edf8dd;
   --diff-add-text: #36540c;
   --diff-remove-bg: #fdecf0;

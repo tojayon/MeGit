@@ -31,7 +31,9 @@ test('分支详情和工作区只高亮待同步方向，推送先确认', async
       if (outgoing.method() === 'POST' && outgoing.url().includes('/commit-repo/actions')) calls++;
     });
     const confirm = page.getByRole('dialog', { name: '推送', exact: true });
-    const push = page.locator('.branch-tree-selection').getByRole('button', { name: '推送', exact: true });
+    const push = page
+      .locator('.branch-tree-selection')
+      .getByRole('button', { name: '推送', exact: true });
     await expect(push).toHaveCSS('background-color', 'rgb(0, 169, 243)');
     await push.press('Enter');
     await expect(confirm).toContainText('提交中心 · main → 提交中心 · origin/main');
@@ -98,9 +100,10 @@ test('HEAD 卡片直接暂存、取消暂存和提交；草稿与工作区共用
     await expect.poll(async () => git(f.repo, 'diff', '--cached', '--name-only')).toBe('');
     await page.getByRole('button', { name: '查看工作区改动', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '工作区', exact: true });
-    const titleContext = dialog.locator('.dialog-title-context');
-    await expect(titleContext.locator(':scope > *')).toHaveText(['工作区', '', /提交中心\s*main/]);
-    await expect(titleContext.locator(':scope > :nth-child(2)')).toHaveAttribute(
+    await expect(dialog.getByRole('heading', { name: '工作区', exact: true })).toBeVisible();
+    const titleContext = dialog.locator('.worktree-dialog-context');
+    await expect(titleContext).toHaveText(/提交中心\s*main/);
+    await expect(titleContext.locator('.repository-avatar')).toHaveAttribute(
       'data-repository-id',
       'commit-repo',
     );
@@ -115,7 +118,7 @@ test('HEAD 卡片直接暂存、取消暂存和提交；草稿与工作区共用
     await expect(card.getByRole('alert')).toBeVisible();
     await expect(card.getByLabel('提交说明', { exact: true })).toHaveValue('从 HEAD 直接提交');
     await page.unroute('**/api/repositories/commit-repo/actions');
-    await commit.click();
+    await commit.press('Enter');
     await expect.poll(async () => git(f.repo, 'log', '-1', '--format=%s')).toBe('从 HEAD 直接提交');
     await expect(card.getByLabel('提交说明', { exact: true })).toHaveValue('');
     await expect(page.getByRole('dialog', { name: '工作区', exact: true })).toHaveCount(0);
@@ -194,7 +197,7 @@ test('明亮英文窄屏可在 HEAD 提交，命令提示跟随说明，工作�
     await page.screenshot({ path: '.megit/verification/commit-composer/head-light-en-mobile.png' });
     await page.getByRole('button', { name: 'View working changes', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Working tree', exact: true });
-    await expect(dialog.locator('.dialog-title-context > h2')).toHaveText('Working tree');
+    await expect(dialog.locator('.dialog-header').getByRole('heading')).toHaveText('Working tree');
     await expect(dialog.locator('.worktree-dialog-branch')).toBeInViewport();
     await expect(
       dialog.getByRole('button', { name: 'Close Working tree', exact: true }),
@@ -227,7 +230,7 @@ test('明亮英文窄屏可在 HEAD 提交，命令提示跟随说明，工作�
       path: '.megit/verification/commit-composer/worktree-light-en-mobile.png',
     });
     const worktreeCommit = dialog.getByRole('button', { name: 'Commit 1 file', exact: true });
-    await expect(worktreeCommit).toHaveCSS('background-color', 'rgb(1, 53, 124)');
+    await expect(worktreeCommit).toHaveCSS('background-color', 'rgb(0, 169, 243)');
     await worktreeCommit.click();
     await expect
       .poll(async () => git(f.repo, 'log', '-1', '--format=%s'))
@@ -302,8 +305,11 @@ test('工作区双栏独立滚动并恢复，提交栏固定在底部', async ({
     await expect(unstageAll).toHaveCSS('background-color', 'rgb(255, 155, 167)');
     const commit = dialog.getByRole('button', { name: '提交 40 个文件', exact: true });
     await expect(commit).toBeDisabled();
-    await expect(commit).toHaveCSS('background-color', 'rgb(36, 40, 46)');
-    for (const [header, button] of [[modifiedHeader, stageAll], [stagedHeader, unstageAll]]) {
+    await expect(commit).toHaveCSS('background-color', 'rgb(217, 225, 235)');
+    for (const [header, button] of [
+      [modifiedHeader, stageAll],
+      [stagedHeader, unstageAll],
+    ]) {
       await expect(button).toBeEnabled();
       const headerBox = (await header.boundingBox())!;
       const buttonBox = (await button.boundingBox())!;

@@ -9,6 +9,7 @@ import { isSafeRef } from '../shared/refs.js';
 import { isCardRef } from '../shared/card-refs.js';
 import { isRepositoryImagePath } from '../shared/repository-images.js';
 import { readRepositoryImage } from './repository-images.js';
+import { repositoryShortcutSchema } from '../shared/repository-files.js';
 
 const id = z.string().min(1).max(100);
 const ref = z.string().refine(isSafeRef);
@@ -28,6 +29,7 @@ export const workspaceSchema = z.object({
         name: z.string().trim().min(1).max(120),
         path: z.string().min(1).max(4000),
         logoPath: z.string().refine(isRepositoryImagePath).optional(),
+        shortcut: repositoryShortcutSchema.optional(),
         archived: z.boolean().optional(),
       }),
     )
